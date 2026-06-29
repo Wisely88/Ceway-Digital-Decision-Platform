@@ -1,0 +1,74 @@
+{
+  "dlt": {
+    "name": "大乐透",
+    "code": "DLT",
+    "module": "DLT Module",
+    "status": "已上线",
+    "description": "前区 35 选 5，后区 12 选 2",
+    "front": {
+      "min": 1,
+      "max": 35,
+      "pick": 5
+    },
+    "back": {
+      "min": 1,
+      "max": 12,
+      "pick": 2
+    },
+    "enabled": true
+  },
+  "ssq": {
+    "name": "双色球",
+    "code": "SSQ",
+    "module": "SSQ Module",
+    "status": "开发中",
+    "description": "红球 33 选 6，蓝球 16 选 1",
+    "front": {
+      "min": 1,
+      "max": 33,
+      "pick": 6
+    },
+    "back": {
+      "min": 1,
+      "max": 16,
+      "pick": 1
+    },
+    "enabled": false
+  },
+  "k8": {
+    "name": "快乐8",
+    "code": "K8",
+    "module": "K8 Module",
+    "status": "规划中",
+    "description": "快乐8 场景规划中",
+    "front": {
+      "min": 1,
+      "max": 80,
+      "pick": 20
+    },
+    "back": {
+      "min": 0,
+      "max": 0,
+      "pick": 0
+    },
+    "enabled": false
+  },
+  "custom": {
+    "name": "自定义分析",
+    "code": "CUSTOM",
+    "module": "Custom Analysis",
+    "status": "规划中",
+    "description": "自定义号码规则与历史数据",
+    "front": {
+      "min": 1,
+      "max": 35,
+      "pick": 5
+    },
+    "back": {
+      "min": 1,
+      "max": 12,
+      "pick": 2
+    },
+    "enabled": false
+  }
+}
