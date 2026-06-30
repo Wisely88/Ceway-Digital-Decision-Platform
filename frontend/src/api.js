@@ -1,4 +1,14 @@
+import {
+  getDemoDashboard,
+  getDemoPlan,
+  getDemoRecords,
+  getDemoScenes,
+  saveDemoRecord,
+} from "./demoData";
+
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === "true"
+  || window.location.hostname.endsWith("github.io");
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -17,6 +27,7 @@ async function request(path, options = {}) {
 }
 
 export function getScenes() {
+  if (STATIC_DEMO) return getDemoScenes();
   return request("/scenes");
 }
 
@@ -29,6 +40,9 @@ export function getDltDashboard({
   balance,
   levelUnits,
 }) {
+  if (STATIC_DEMO) {
+    return getDemoDashboard({ budget, lastPrize, strategy, window, principal, balance, levelUnits });
+  }
   const params = new URLSearchParams({
     budget,
     last_prize: lastPrize,
@@ -44,6 +58,9 @@ export function getDltDashboard({
 }
 
 export function generateDltPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits }) {
+  if (STATIC_DEMO) {
+    return getDemoPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits });
+  }
   return request("/plan/dlt", {
     method: "POST",
     body: JSON.stringify({
@@ -59,10 +76,12 @@ export function generateDltPlan({ budget, strategy, lastPrize, window, principal
 }
 
 export function getDltRecords() {
+  if (STATIC_DEMO) return getDemoRecords();
   return request("/records/dlt");
 }
 
 export function saveDltRecord({ budget, strategy, latestIssue, plan }) {
+  if (STATIC_DEMO) return saveDemoRecord({ budget, strategy, latestIssue, plan });
   return request("/records/dlt", {
     method: "POST",
     body: JSON.stringify({
@@ -75,6 +94,9 @@ export function saveDltRecord({ budget, strategy, latestIssue, plan }) {
 }
 
 export async function importDltHistory(file) {
+  if (STATIC_DEMO) {
+    throw new Error("GitHub Pages 演示模式不支持导入 CSV，请在本地后端环境使用该功能。");
+  }
   const formData = new FormData();
   formData.append("file", file);
 
