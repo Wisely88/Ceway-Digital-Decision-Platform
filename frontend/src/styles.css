@@ -1265,6 +1265,77 @@ td {
   align-self: start;
 }
 
+.backtest-panel {
+  align-self: start;
+}
+
+.backtest-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin-bottom: 14px;
+}
+
+.backtest-summary div,
+.backtest-grid div,
+.backtest-item {
+  background: rgba(7, 18, 32, 0.66);
+  border: 1px solid rgba(83, 129, 179, 0.22);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.backtest-summary span,
+.backtest-grid p,
+.backtest-item span {
+  color: #a9bdd2;
+  font-size: 13px;
+}
+
+.backtest-summary span {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.backtest-summary strong,
+.backtest-grid h3,
+.backtest-item strong,
+.backtest-item b {
+  color: #ffffff;
+}
+
+.backtest-summary strong {
+  font-size: 20px;
+}
+
+.backtest-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+.backtest-grid h3,
+.backtest-grid p {
+  margin: 0;
+}
+
+.backtest-list {
+  display: grid;
+  gap: 10px;
+}
+
+.backtest-item {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.backtest-item div {
+  display: grid;
+  gap: 4px;
+}
+
 .review-summary {
   display: grid;
   gap: 10px;
@@ -1875,7 +1946,7 @@ td {
     gap: 8px;
   }
 
-  .review-summary {
+.review-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1885,6 +1956,11 @@ td {
   }
 
   .review-compare {
+    grid-template-columns: 1fr;
+  }
+
+  .backtest-grid,
+  .backtest-item {
     grid-template-columns: 1fr;
   }
 

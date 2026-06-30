@@ -3,6 +3,7 @@ import {
   getDemoPlan,
   getDemoRecords,
   getDemoReview,
+  getDemoBacktest,
   getDemoScenes,
   getDemoDraws,
   saveDemoRecord,
@@ -108,6 +109,12 @@ export function saveDltRecord({ budget, strategy, latestIssue, plan }) {
 export function getDltReview() {
   if (STATIC_DEMO) return getDemoReview();
   return request("/review/dlt");
+}
+
+export function getDltBacktest({ budget = 20, strategy = "balanced", periods = 100, window = 100 } = {}) {
+  if (STATIC_DEMO) return getDemoBacktest({ budget, strategy, periods, window });
+  const params = new URLSearchParams({ budget, strategy, periods, window });
+  return request(`/backtest/dlt?${params.toString()}`);
 }
 
 export function getDltDataStatus() {

@@ -404,6 +404,89 @@ export function getDemoReview() {
   });
 }
 
+export function getDemoBacktest({ budget = 20, strategy = "balanced", periods = 12, window = 30 } = {}) {
+  const count = Math.min(periods, HISTORY.length - 2);
+  const start = Math.max(1, HISTORY.length - count - 1);
+  const items = [];
+  const baselineItems = [];
+
+  for (let index = start; index < HISTORY.length - 1; index += 1) {
+    const trends = buildTrends(Math.min(window, index + 1));
+    const scores = scoreFront(trends);
+    const backs = scoreBack(trends);
+    const plan = strategy === "conservative"
+      ? buildSinglePlan(budget, strategy, scores, backs)
+      : buildDantuoPlan(budget, strategy, scores, backs);
+    const actual = HISTORY[index + 1];
+    items.push({
+      source_issue: HISTORY[index].issue,
+      actual_issue: actual.issue,
+      actual_date: actual.date,
+      strategy,
+      budget,
+      ...reviewDemoPlan(plan, actual),
+    });
+
+    const randomFront = [1 + (index % 31), 3 + (index % 28), 7 + (index % 24), 12 + (index % 20), 18 + (index % 16)]
+      .map((number) => ((number - 1) % 35) + 1);
+    const randomBack = [((index + 2) % 12) + 1, ((index + 8) % 12) + 1];
+    const randomPlan = {
+      mode: "single",
+      cost: budget,
+      tickets: Math.max(1, Math.floor(budget / 2)),
+      items: [{ front: [...new Set(randomFront)].slice(0, 5).sort((a, b) => a - b), back: [...new Set(randomBack)].slice(0, 2).sort((a, b) => a - b) }],
+    };
+    baselineItems.push({
+      source_issue: HISTORY[index].issue,
+      actual_issue: actual.issue,
+      actual_date: actual.date,
+      strategy: "random",
+      budget,
+      ...reviewDemoPlan(randomPlan, actual),
+    });
+  }
+
+  const summarize = (rows) => {
+    const hitRows = rows.filter((item) => item.hit_tickets > 0);
+    const best = rows.reduce((current, item) => {
+      if (!current) return item;
+      const currentScore = (current.best?.front_hits || 0) + (current.best?.back_hits || 0);
+      const itemScore = (item.best?.front_hits || 0) + (item.best?.back_hits || 0);
+      return itemScore > currentScore ? item : current;
+    }, null);
+    return {
+      periods: rows.length,
+      total_cost: rows.reduce((sum, item) => sum + item.cost, 0),
+      hit_records: hitRows.length,
+      record_hit_rate: Math.round((hitRows.length / Math.max(1, rows.length)) * 10000) / 100,
+      best_hit: best?.best?.hit_label || "-",
+      best_prize_label: best?.best?.prize_label || "-",
+      avg_front_hits: Math.round((rows.reduce((sum, item) => sum + (item.best?.front_hits || 0), 0) / Math.max(1, rows.length)) * 100) / 100,
+      avg_back_hits: Math.round((rows.reduce((sum, item) => sum + (item.best?.back_hits || 0), 0) / Math.max(1, rows.length)) * 100) / 100,
+    };
+  };
+
+  const summary = summarize(items);
+  const baseline = summarize(baselineItems);
+  summary.edge_vs_random = Math.round((summary.record_hit_rate - baseline.record_hit_rate) * 100) / 100;
+
+  return Promise.resolve({
+    config: {
+      budget,
+      strategy,
+      periods: items.length,
+      window,
+      start_issue: items[0]?.source_issue || "-",
+      end_issue: items.at(-1)?.actual_issue || "-",
+    },
+    summary,
+    baseline,
+    items: items.slice(-10).reverse(),
+    baseline_items: baselineItems.slice(-10).reverse(),
+    disclaimer: "演示环境使用样例数据回测，仅展示模块形态；本地环境使用 SQLite 全量数据。",
+  });
+}
+
 export function getDemoDraws(limit = 10) {
   return Promise.resolve(
     HISTORY.slice(-limit).reverse().map((row) => ({

@@ -7,6 +7,7 @@ import {
   Coins,
   Database,
   ArrowLeft,
+  GitCompare,
   FileStack,
   FileUp,
   Gauge,
@@ -42,6 +43,7 @@ import {
   getDltDraws,
   getDltRecords,
   getDltReview,
+  getDltBacktest,
   getScenes,
   importDltHistory,
   saveDltRecord,
@@ -135,14 +137,14 @@ const PRODUCT_STATUS = [
   },
   {
     label: "当前版本",
-    value: "V1.3 Decision Pipeline",
-    detail: "评分链路与推荐复盘已完成",
+    value: "V1.5 回测验证版",
+    detail: "历史回测与随机对照已接入",
     tone: "green",
   },
   {
     label: "下一阶段",
-    value: "V1.4 Data Management",
-    detail: "SQLite · 开奖管理 · 持久化",
+    value: "V2.0 行为分析版",
+    detail: "外部数据 · Attention · 行为模型",
     tone: "purple",
   },
   {
@@ -885,6 +887,62 @@ function ReviewPanel({ review, onRefresh }) {
   );
 }
 
+function BacktestPanel({ backtest, onRefresh }) {
+  if (!backtest) return null;
+  const summary = backtest.summary || {};
+  const baseline = backtest.baseline || {};
+  const config = backtest.config || {};
+  return (
+    <section className="panel wide backtest-panel">
+      <div className="panel-title">
+        <div>
+          <h2>历史回测</h2>
+          <p>滚动使用历史数据生成方案，并与下一期开奖和随机选号对照</p>
+        </div>
+        <button className="ghost-button compact" onClick={onRefresh} type="button">
+          <GitCompare size={14} />
+          运行回测
+        </button>
+      </div>
+      <div className="backtest-summary">
+        <div><span>回测期数</span><strong>{summary.periods || 0}</strong></div>
+        <div><span>CBGO 命中记录率</span><strong>{summary.record_hit_rate || 0}%</strong></div>
+        <div><span>随机对照</span><strong>{baseline.record_hit_rate || 0}%</strong></div>
+        <div><span>相对差值</span><strong>{summary.edge_vs_random || 0}%</strong></div>
+        <div><span>最佳命中</span><strong>{summary.best_hit || "-"}</strong></div>
+        <div><span>最佳奖级</span><strong>{summary.best_prize_label || "-"}</strong></div>
+      </div>
+      <div className="backtest-grid">
+        <div>
+          <h3>CBGO 策略</h3>
+          <p>平均前区命中 {summary.avg_front_hits || 0}，平均后区命中 {summary.avg_back_hits || 0}，投入 {summary.total_cost || 0} 元。</p>
+        </div>
+        <div>
+          <h3>随机基线</h3>
+          <p>平均前区命中 {baseline.avg_front_hits || 0}，平均后区命中 {baseline.avg_back_hits || 0}，投入 {baseline.total_cost || 0} 元。</p>
+        </div>
+      </div>
+      <div className="backtest-list">
+        {(backtest.items || []).slice(0, 8).map((item) => (
+          <article className="backtest-item" key={`${item.source_issue}-${item.actual_issue}`}>
+            <div>
+              <strong>{item.source_issue} → {item.actual_issue}</strong>
+              <span>{item.actual_date} · {planModeLabel(item.mode)} · {item.cost} 元</span>
+            </div>
+            <div>
+              <b>{item.best?.hit_label || "-"}</b>
+              <span>{item.best?.prize_label || "-"}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+      <p className="review-disclaimer">
+        区间 {config.start_issue || "-"} 至 {config.end_issue || "-"} · 窗口 {config.window || "-"} 期。{backtest.disclaimer}
+      </p>
+    </section>
+  );
+}
+
 function DataManagementPanel({ status, draws, onSearchDraws, onPageDraws, onSync }) {
   if (!status) return null;
   const quality = status.quality;
@@ -899,7 +957,7 @@ function DataManagementPanel({ status, draws, onSearchDraws, onPageDraws, onSync
       <div className="panel-title">
         <div>
           <h2>数据管理</h2>
-          <p>v1.4 数据底座：SQLite 开奖数据、推荐记录、复盘结果与完整性检查</p>
+          <p>SQLite 开奖数据、推荐记录、复盘结果与完整性检查</p>
         </div>
         <div className="panel-actions">
           <button className="ghost-button compact" onClick={() => onSync(false)} type="button">更新最新开奖</button>
@@ -981,6 +1039,7 @@ function Dashboard({ scenes, onBack }) {
   const [generated, setGenerated] = useState(null);
   const [savedPlans, setSavedPlans] = useState([]);
   const [review, setReview] = useState(null);
+  const [backtest, setBacktest] = useState(null);
   const [dataStorage, setDataStorage] = useState(null);
   const [draws, setDraws] = useState([]);
   const [drawIssue, setDrawIssue] = useState("");
@@ -1026,6 +1085,9 @@ function Dashboard({ scenes, onBack }) {
         items: [],
         disclaimer: "复盘数据暂不可用，已跳过异常记录。",
       }));
+    getDltBacktest({ budget, strategy, periods: 100, window: windowSize })
+      .then(setBacktest)
+      .catch(() => setBacktest(null));
     getDltDataStatus().then(setDataStorage).catch(() => setDataStorage(null));
     getDltDraws({ limit: 12 }).then(setDraws).catch(() => setDraws({ items: [], total: 0, limit: 12, offset: 0, issue: "" }));
   }, []);
@@ -1050,6 +1112,19 @@ function Dashboard({ scenes, onBack }) {
         items: [],
         disclaimer: `复盘数据暂不可用：${err.message}`,
       });
+    }
+  };
+
+  const refreshBacktest = async () => {
+    setError("");
+    setNotice("正在运行历史回测...");
+    try {
+      const data = await getDltBacktest({ budget, strategy, periods: 100, window: windowSize });
+      setBacktest(data);
+      setNotice(`历史回测完成：${data.summary?.periods || 0} 期，命中记录率 ${data.summary?.record_hit_rate || 0}%。`);
+    } catch (err) {
+      setError(err.message);
+      setNotice("");
     }
   };
 
@@ -1250,6 +1325,7 @@ function Dashboard({ scenes, onBack }) {
           onSync={syncHistory}
         />
         <ReviewPanel review={review} onRefresh={refreshReview} />
+        <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} />
 
         <div className="module-grid">
           <TrendPanel

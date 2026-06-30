@@ -10,6 +10,7 @@ from fastapi import FastAPI, File, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from backtest import build_dlt_backtest
 from capital import capital_state
 from db import data_status, delete_dlt_record_db, save_review_results, search_dlt_draws
 from engine import (
@@ -26,7 +27,7 @@ from review import build_review
 from scorer import score_back_numbers, score_front_numbers
 
 
-app = FastAPI(title="Ceway v1.4 Data Management API")
+app = FastAPI(title="Ceway v1.5 Backtest API")
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 app.add_middleware(
@@ -119,7 +120,7 @@ def build_dlt_payload(
             "subtitle": "Digital Decision Platform",
             "framework": "Powered by CBGO Framework",
             "baseline": "v1.2 MVP",
-            "version": "v1.4 Data Management",
+            "version": "v1.5 Backtest Validation",
         },
         "disclaimer": "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
         "history_count": len(history),
@@ -241,6 +242,22 @@ def review_dlt(limit: int = Query(default=20, ge=1, le=100)) -> dict:
             "items": [],
             "disclaimer": f"复盘数据暂不可用，已跳过异常记录。原因：{exc}",
         }
+
+
+@app.get("/backtest/dlt")
+def backtest_dlt(
+    budget: int = Query(default=20, ge=2),
+    strategy: str = Query(default="balanced", pattern="^(conservative|balanced|aggressive)$"),
+    periods: int = Query(default=100, ge=5, le=500),
+    window: int = Query(default=100, ge=30, le=200),
+) -> dict:
+    return build_dlt_backtest(
+        load_dlt_history(),
+        budget=budget,
+        strategy=strategy,
+        periods=periods,
+        window=window,
+    )
 
 
 @app.get("/data/dlt/status")
