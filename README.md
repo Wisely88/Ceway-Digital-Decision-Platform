@@ -60,3 +60,38 @@ npm run dev
 ```
 
 前端默认读取 `http://localhost:8000`。
+
+## 同时公网展示 ClawScore 与策维
+
+最优方案是只开一个本地统一入口，再用一个 ngrok 地址暴露：
+
+```text
+/clawscore  -> ClawScore
+/ceway/     -> 策维
+/api        -> ClawScore API
+/ceway-api  -> 策维 API
+```
+
+前置条件：
+
+- ClawScore 已在 `127.0.0.1:4321` 运行。
+- 策维后端已在 `127.0.0.1:8000` 运行。
+
+启动统一入口：
+
+```bash
+./scripts/start-public-gateway.sh
+```
+
+本地验证：
+
+```text
+http://127.0.0.1:8788/clawscore
+http://127.0.0.1:8788/ceway/
+```
+
+启动公网地址：
+
+```bash
+ngrok http 8788
+```
