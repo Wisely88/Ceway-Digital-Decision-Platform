@@ -1383,16 +1383,67 @@ td {
 
 .data-management-summary span,
 .draw-item span,
-.data-management-note {
+.data-management-note,
+.sync-card span {
   color: #a9bdd2;
   font-size: 13px;
 }
 
 .data-management-summary strong,
-.draw-item strong {
+.draw-item strong,
+.quality-card strong,
+.sync-card strong {
   color: #ffffff;
   display: block;
   font-size: 20px;
+}
+
+.data-quality-message {
+  color: #c7d8ea;
+  font-weight: 700;
+  margin: 8px 0 0;
+}
+
+.quality-card,
+.sync-card {
+  background: rgba(7, 18, 32, 0.66);
+  border: 1px solid rgba(83, 129, 179, 0.22);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 12px;
+}
+
+.quality-card.ok {
+  border-color: rgba(49, 216, 107, 0.38);
+}
+
+.quality-card.gap {
+  border-color: rgba(255, 176, 65, 0.48);
+}
+
+.quality-card.sample {
+  border-color: rgba(255, 176, 65, 0.48);
+}
+
+.quality-card p,
+.sync-card p,
+.missing-issues {
+  color: #a9bdd2;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.quality-card > span {
+  color: #7cc2ff;
+  font-weight: 900;
+}
+
+.missing-issues {
+  border-top: 1px solid rgba(83, 129, 179, 0.18);
+  overflow-wrap: anywhere;
+  padding-top: 8px;
 }
 
 .draw-list {

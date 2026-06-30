@@ -667,6 +667,7 @@ function CapitalPanel({ capital }) {
 
 function DataStatusPanel({ dataStatus, onImport }) {
   if (!dataStatus) return null;
+  const quality = dataStatus.quality;
 
   return (
     <section className={`data-status-panel ${dataStatus.is_sample ? "sample" : ""}`}>
@@ -674,10 +675,12 @@ function DataStatusPanel({ dataStatus, onImport }) {
         <Badge>{dataStatus.source_label}</Badge>
         <h2>数据状态</h2>
         <p>{dataStatus.message}</p>
+        {quality && <p className="data-quality-message">{quality.message}</p>}
       </div>
       <dl>
         <div><dt>最新期号</dt><dd>{dataStatus.latest_issue || "-"}</dd></div>
         <div><dt>开奖日期</dt><dd>{dataStatus.latest_date || "-"}</dd></div>
+        {quality && <div><dt>完整性</dt><dd>{quality.label}</dd></div>}
         <div><dt>数据文件</dt><dd>{dataStatus.path}</dd></div>
       </dl>
       <label className="upload-button data-upload">
@@ -872,12 +875,14 @@ function ReviewPanel({ review, onRefresh }) {
 
 function DataManagementPanel({ status, draws }) {
   if (!status) return null;
+  const quality = status.quality;
+  const lastSync = status.last_sync;
   return (
     <section className="panel wide data-management-panel">
       <div className="panel-title">
         <div>
           <h2>数据管理</h2>
-          <p>v1.4 数据底座：SQLite 开奖数据、推荐记录与复盘结果</p>
+          <p>v1.4 数据底座：SQLite 开奖数据、推荐记录、复盘结果与完整性检查</p>
         </div>
         <Badge>{status.storage === "sqlite" ? "SQLite" : "演示数据"}</Badge>
       </div>
@@ -886,7 +891,28 @@ function DataManagementPanel({ status, draws }) {
         <div><span>推荐记录</span><strong>{status.record_count || 0} 条</strong></div>
         <div><span>复盘结果</span><strong>{status.review_count || 0} 条</strong></div>
         <div><span>最新期号</span><strong>{status.latest_issue || "-"}</strong></div>
+        <div><span>首期数据</span><strong>{status.first_issue || "-"}</strong></div>
+        <div><span>完整性</span><strong>{quality?.label || "-"}</strong></div>
       </div>
+      {quality && (
+        <div className={`quality-card ${quality.level || "unknown"}`}>
+          <div>
+            <strong>{quality.label}</strong>
+            <p>{quality.message}</p>
+          </div>
+          <span>{quality.missing_count || 0} 个缺口</span>
+          {quality.missing_issues?.length > 0 && (
+            <p className="missing-issues">缺失期号：{quality.missing_issues.join("、")}</p>
+          )}
+        </div>
+      )}
+      {lastSync && (
+        <div className="sync-card">
+          <span>最近同步</span>
+          <strong>{lastSync.source} · {lastSync.status === "ok" ? "成功" : "失败"}</strong>
+          <p>{lastSync.synced_at} · {lastSync.message || "-"}</p>
+        </div>
+      )}
       <div className="draw-list">
         {draws.slice(0, 8).map((draw) => (
           <article className="draw-item" key={draw.issue}>

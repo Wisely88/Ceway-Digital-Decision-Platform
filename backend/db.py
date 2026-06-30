@@ -49,6 +49,16 @@ def init_db() -> None:
               actual_issue text,
               result_json text not null
             );
+
+            create table if not exists dlt_sync_runs (
+              id integer primary key autoincrement,
+              source text not null,
+              status text not null,
+              fetched_rows integer not null default 0,
+              imported_rows integer not null default 0,
+              message text,
+              synced_at text not null default current_timestamp
+            );
             """
         )
 
@@ -217,12 +227,102 @@ def data_status() -> dict:
         record_count = connection.execute("select count(*) from dlt_recommendation_records").fetchone()[0]
         review_count = connection.execute("select count(*) from dlt_review_results").fetchone()[0]
         latest = connection.execute("select * from dlt_draws order by issue desc limit 1").fetchone()
+        first = connection.execute("select * from dlt_draws order by issue asc limit 1").fetchone()
+        rows = connection.execute("select issue from dlt_draws order by issue").fetchall()
+        sync = connection.execute("select * from dlt_sync_runs order by synced_at desc, id desc limit 1").fetchone()
+    quality = dlt_quality_from_issues([row["issue"] for row in rows])
     return {
         "storage": "sqlite",
         "path": str(DB_PATH),
         "draw_count": draw_count,
         "record_count": record_count,
         "review_count": review_count,
+        "first_issue": first["issue"] if first else None,
+        "first_date": first["draw_date"] if first else None,
         "latest_issue": latest["issue"] if latest else None,
         "latest_date": latest["draw_date"] if latest else None,
+        "quality": quality,
+        "last_sync": dict(sync) if sync else None,
     }
+
+
+def dlt_quality_from_issues(issues: list[str]) -> dict:
+    year_groups: dict[str, set[int]] = {}
+    skipped = []
+    for issue in issues:
+        issue_text = str(issue).strip()
+        if len(issue_text) == 5:
+            year = issue_text[:2]
+            sequence = issue_text[2:]
+        elif len(issue_text) == 7:
+            year = issue_text[:4]
+            sequence = issue_text[4:]
+        else:
+            skipped.append(issue_text)
+            continue
+        if not sequence.isdigit():
+            skipped.append(issue_text)
+            continue
+        year_groups.setdefault(year, set()).add(int(sequence))
+
+    missing = []
+    year_ranges = []
+    for year, numbers in sorted(year_groups.items()):
+        if not numbers:
+            continue
+        start = min(numbers)
+        end = max(numbers)
+        year_missing = [
+            format_dlt_issue(year, number)
+            for number in range(start, end + 1)
+            if number not in numbers
+        ]
+        missing.extend(year_missing)
+        year_ranges.append(
+            {
+                "year": year,
+                "first": format_dlt_issue(year, start),
+                "last": format_dlt_issue(year, end),
+                "count": len(numbers),
+                "missing_count": len(year_missing),
+            }
+        )
+
+    if len(issues) <= 30:
+        level = "sample"
+        label = "样例数据"
+        message = "当前开奖数据量较少，仅适合界面验证和流程测试。"
+    elif missing:
+        level = "gap"
+        label = "存在缺口"
+        message = f"检测到 {len(missing)} 个期号缺口，请补充历史开奖 CSV 后再做正式分析。"
+    else:
+        level = "ok"
+        label = "连续完整"
+        message = "已导入期号范围内未发现连续性缺口。"
+
+    return {
+        "level": level,
+        "label": label,
+        "message": message,
+        "missing_count": len(missing),
+        "missing_issues": missing[:30],
+        "skipped_issues": skipped[:10],
+        "year_ranges": year_ranges,
+    }
+
+
+def format_dlt_issue(year: str, number: int) -> str:
+    return f"{year}{number:03d}"
+
+
+def save_sync_run(source: str, status: str, fetched_rows: int, imported_rows: int, message: str = "") -> None:
+    init_db()
+    with connect() as connection:
+        connection.execute(
+            """
+            insert into dlt_sync_runs (source, status, fetched_rows, imported_rows, message)
+            values (?, ?, ?, ?, ?)
+            """,
+            [source, status, fetched_rows, imported_rows, message],
+        )

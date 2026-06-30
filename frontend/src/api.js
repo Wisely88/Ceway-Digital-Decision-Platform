@@ -108,8 +108,19 @@ export function getDltDataStatus() {
       draw_count: 30,
       record_count: JSON.parse(localStorage.getItem("ceway_demo_records") || "[]").length,
       review_count: 1,
+      first_issue: "2025001",
+      first_date: "2025-01-01",
       latest_issue: "2025030",
       latest_date: "2025-03-10",
+      quality: {
+        level: "sample",
+        label: "样例数据",
+        message: "GitHub Pages 演示环境使用内置样例数据，本地环境可通过 CSV 或脚本更新 SQLite。",
+        missing_count: 0,
+        missing_issues: [],
+        year_ranges: [{ year: "2025", first: "2025001", last: "2025030", count: 30, missing_count: 0 }],
+      },
+      last_sync: null,
     });
   }
   return request("/data/dlt/status");

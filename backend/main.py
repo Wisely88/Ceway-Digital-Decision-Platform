@@ -104,6 +104,7 @@ def build_dlt_payload(
     )
     top_numbers = [item["number"] for item in score_table[:5]]
     latest_row = history[-1] if history else None
+    storage_status = data_status()
 
     return {
         "scene": "DLT",
@@ -126,6 +127,8 @@ def build_dlt_payload(
             "latest_date": latest_row["date"] if latest_row else None,
             "is_sample": len(history) <= 30,
             "message": "当前走势分析基于本地 SQLite 数据库。可通过 CSV 导入更新开奖数据。",
+            "quality": storage_status.get("quality"),
+            "last_sync": storage_status.get("last_sync"),
         },
         "top_numbers": top_numbers,
         "budget": budget,
