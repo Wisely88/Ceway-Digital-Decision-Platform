@@ -836,6 +836,24 @@ function ReviewPanel({ review, onRefresh }) {
                   <b>{item.best?.hit_label || "-"}</b>
                   <span>{item.best?.prize_label || "-"}</span>
                 </div>
+                <div className="review-compare">
+                  <div>
+                    <span>推荐号码</span>
+                    <p>
+                      前区 {(item.best?.front || []).map((number) => String(number).padStart(2, "0")).join(" ")}
+                      <br />
+                      后区 {(item.best?.back || []).map((number) => String(number).padStart(2, "0")).join(" ")}
+                    </p>
+                  </div>
+                  <div>
+                    <span>开奖号码</span>
+                    <p>
+                      前区 {item.actual.front.map((number) => String(number).padStart(2, "0")).join(" ")}
+                      <br />
+                      后区 {item.actual.back.map((number) => String(number).padStart(2, "0")).join(" ")}
+                    </p>
+                  </div>
+                </div>
                 <p>
                   推荐期号 {item.latest_issue || "-"} · {planModeLabel(item.mode)} · {item.cost} 元 ·
                   命中票数 {item.hit_tickets}/{item.tickets} · 命中率 {item.hit_rate}%
@@ -1072,6 +1090,7 @@ function Dashboard({ scenes, onBack }) {
         {error && <p className="error">{error}</p>}
         {notice && <p className="notice">{notice}</p>}
         <DataStatusPanel dataStatus={dashboard.data_status} onImport={importHistory} />
+        <ReviewPanel review={review} onRefresh={refreshReview} />
 
         <div className="module-grid">
           <TrendPanel
@@ -1104,7 +1123,6 @@ function Dashboard({ scenes, onBack }) {
             </div>
           </section>
           <CapitalPanel capital={dashboard.capital_state} />
-          <ReviewPanel review={review} onRefresh={refreshReview} />
           <HistoryRecords records={savedPlans} />
         </div>
 

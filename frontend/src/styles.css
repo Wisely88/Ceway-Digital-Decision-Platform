@@ -1328,6 +1328,33 @@ td {
   margin: 0;
 }
 
+.review-compare {
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.review-compare div {
+  background: rgba(8, 23, 40, 0.64);
+  border: 1px solid rgba(83, 129, 179, 0.18);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.review-compare span {
+  color: #7cc2ff;
+  font-weight: 800;
+}
+
+.review-compare p {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.8;
+  margin: 4px 0 0;
+}
+
 .review-disclaimer {
   border-top: 1px solid rgba(83, 129, 179, 0.18);
   margin-top: 12px;
