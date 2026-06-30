@@ -82,6 +82,16 @@ export function getDltRecords() {
   return request("/records/dlt");
 }
 
+export function deleteDltRecord(id) {
+  if (STATIC_DEMO) {
+    const records = JSON.parse(localStorage.getItem("ceway_demo_records") || "[]")
+      .filter((record) => record.id !== id);
+    localStorage.setItem("ceway_demo_records", JSON.stringify(records));
+    return Promise.resolve({ status: "ok", deleted: true, id });
+  }
+  return request(`/records/dlt/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
 export function saveDltRecord({ budget, strategy, latestIssue, plan }) {
   if (STATIC_DEMO) return saveDemoRecord({ budget, strategy, latestIssue, plan });
   return request("/records/dlt", {
@@ -128,9 +138,29 @@ export function getDltDataStatus() {
 
 export function getDltDraws({ limit = 10 } = {}) {
   if (STATIC_DEMO) {
-    return getDemoDraws(limit);
+    return getDemoDraws(limit).then((items) => ({ items, total: items.length, limit, offset: 0, issue: "" }));
   }
   return request(`/data/dlt/draws?limit=${limit}`);
+}
+
+export function searchDltDraws({ limit = 12, offset = 0, issue = "" } = {}) {
+  if (STATIC_DEMO) {
+    return getDemoDraws(30).then((items) => {
+      const filtered = issue ? items.filter((item) => item.issue.includes(issue)) : items;
+      return { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset, issue };
+    });
+  }
+  const params = new URLSearchParams({ limit, offset });
+  if (issue) params.set("issue", issue);
+  return request(`/data/dlt/draws?${params.toString()}`);
+}
+
+export function syncDltHistory({ source = "sporttery", full = false } = {}) {
+  if (STATIC_DEMO) {
+    throw new Error("GitHub Pages 演示模式不支持联网更新，请在本地后端环境使用。");
+  }
+  const params = new URLSearchParams({ source, full });
+  return request(`/data/dlt/sync?${params.toString()}`, { method: "POST" });
 }
 
 export async function importDltHistory(file) {

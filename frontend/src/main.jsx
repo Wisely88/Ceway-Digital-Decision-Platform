@@ -35,6 +35,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  deleteDltRecord,
   generateDltPlan,
   getDltDataStatus,
   getDltDashboard,
@@ -44,6 +45,8 @@ import {
   getScenes,
   importDltHistory,
   saveDltRecord,
+  searchDltDraws,
+  syncDltHistory,
 } from "./api";
 import "./styles.css";
 
@@ -762,16 +765,22 @@ function normalizeRecordPlan(record) {
   return record?.plan || record;
 }
 
-function HistoryRecords({ records }) {
-  const visibleRecords = records.slice(0, 6);
+function HistoryRecords({ records, onDelete }) {
+  const [filter, setFilter] = useState("");
+  const visibleRecords = records
+    .filter((record) => !filter || `${record.latest_issue || ""}${record.strategy || ""}`.includes(filter))
+    .slice(0, 8);
   return (
     <section className="panel wide history-panel">
       <div className="panel-title">
         <div>
           <h2>历史推荐记录</h2>
-          <p>保存推荐时间、预算、模式、方案、费用和解释</p>
+          <p>保存推荐时间、预算、模式、方案、费用和解释，支持期号/策略筛选</p>
         </div>
         <Badge>{records.length} 条</Badge>
+      </div>
+      <div className="inline-tools">
+        <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="搜索期号或策略" />
       </div>
       {visibleRecords.length === 0 ? (
         <p className="empty-text">暂无保存记录。生成方案后点击“保存方案”。</p>
@@ -791,6 +800,9 @@ function HistoryRecords({ records }) {
                   <span>{plan.tickets} 注</span>
                 </div>
                 <p>{plan.reason || plan.explanation?.[0] || "该记录保留推荐方案和评分解释。"}</p>
+                {record.id && (
+                  <button className="ghost-button compact danger" onClick={() => onDelete(record.id)} type="button">删除记录</button>
+                )}
               </article>
             );
           })}
@@ -873,10 +885,15 @@ function ReviewPanel({ review, onRefresh }) {
   );
 }
 
-function DataManagementPanel({ status, draws }) {
+function DataManagementPanel({ status, draws, onSearchDraws, onPageDraws, onSync }) {
   if (!status) return null;
   const quality = status.quality;
   const lastSync = status.last_sync;
+  const drawItems = Array.isArray(draws) ? draws : draws.items || [];
+  const total = Array.isArray(draws) ? draws.length : draws.total || 0;
+  const offset = Array.isArray(draws) ? 0 : draws.offset || 0;
+  const limit = Array.isArray(draws) ? drawItems.length || 8 : draws.limit || 8;
+  const currentIssue = Array.isArray(draws) ? "" : draws.issue || "";
   return (
     <section className="panel wide data-management-panel">
       <div className="panel-title">
@@ -884,7 +901,11 @@ function DataManagementPanel({ status, draws }) {
           <h2>数据管理</h2>
           <p>v1.4 数据底座：SQLite 开奖数据、推荐记录、复盘结果与完整性检查</p>
         </div>
-        <Badge>{status.storage === "sqlite" ? "SQLite" : "演示数据"}</Badge>
+        <div className="panel-actions">
+          <button className="ghost-button compact" onClick={() => onSync(false)} type="button">更新最新开奖</button>
+          <button className="ghost-button compact" onClick={() => onSync(true)} type="button">全量校准</button>
+          <Badge>{status.storage === "sqlite" ? "SQLite" : "演示数据"}</Badge>
+        </div>
       </div>
       <div className="data-management-summary">
         <div><span>开奖数据</span><strong>{status.draw_count || 0} 期</strong></div>
@@ -913,8 +934,18 @@ function DataManagementPanel({ status, draws }) {
           <p>{lastSync.synced_at} · {lastSync.message || "-"}</p>
         </div>
       )}
+      <div className="inline-tools">
+        <input
+          defaultValue={currentIssue}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") onSearchDraws(event.currentTarget.value.trim());
+          }}
+          placeholder="输入期号后回车搜索"
+        />
+        <span>共 {total} 期</span>
+      </div>
       <div className="draw-list">
-        {draws.slice(0, 8).map((draw) => (
+        {drawItems.map((draw) => (
           <article className="draw-item" key={draw.issue}>
             <div>
               <strong>{draw.issue}</strong>
@@ -927,6 +958,11 @@ function DataManagementPanel({ status, draws }) {
             </p>
           </article>
         ))}
+      </div>
+      <div className="pager-row">
+        <button className="ghost-button compact" disabled={offset <= 0} onClick={() => onPageDraws(Math.max(0, offset - limit), currentIssue)} type="button">上一页</button>
+        <span>{offset + 1} - {Math.min(offset + limit, total)} / {total}</span>
+        <button className="ghost-button compact" disabled={offset + limit >= total} onClick={() => onPageDraws(offset + limit, currentIssue)} type="button">下一页</button>
       </div>
       <p className="data-management-note">当前数据库路径：{status.path}</p>
     </section>
@@ -947,6 +983,7 @@ function Dashboard({ scenes, onBack }) {
   const [review, setReview] = useState(null);
   const [dataStorage, setDataStorage] = useState(null);
   const [draws, setDraws] = useState([]);
+  const [drawIssue, setDrawIssue] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -982,15 +1019,60 @@ function Dashboard({ scenes, onBack }) {
         const stored = JSON.parse(localStorage.getItem("cbgo_saved_plans") || "[]");
         setSavedPlans(stored);
       });
-    getDltReview().then(setReview).catch(() => setReview(null));
+    getDltReview()
+      .then(setReview)
+      .catch(() => setReview({
+        summary: { reviewed: 0, pending: 0, total_cost: 0, record_hit_rate: 0, best_hit: "-", best_prize_label: "-" },
+        items: [],
+        disclaimer: "复盘数据暂不可用，已跳过异常记录。",
+      }));
     getDltDataStatus().then(setDataStorage).catch(() => setDataStorage(null));
-    getDltDraws({ limit: 8 }).then(setDraws).catch(() => setDraws([]));
+    getDltDraws({ limit: 12 }).then(setDraws).catch(() => setDraws({ items: [], total: 0, limit: 12, offset: 0, issue: "" }));
   }, []);
+
+  const refreshDataStorage = async ({ offset = 0, issue = drawIssue } = {}) => {
+    const [status, drawPayload] = await Promise.all([
+      getDltDataStatus(),
+      searchDltDraws({ limit: 12, offset, issue }),
+    ]);
+    setDataStorage(status);
+    setDraws(drawPayload);
+    setDrawIssue(issue);
+  };
 
   const refreshReview = async () => {
     try {
       const data = await getDltReview();
       setReview(data);
+    } catch (err) {
+      setReview({
+        summary: { reviewed: 0, pending: 0, total_cost: 0, record_hit_rate: 0, best_hit: "-", best_prize_label: "-" },
+        items: [],
+        disclaimer: `复盘数据暂不可用：${err.message}`,
+      });
+    }
+  };
+
+  const syncHistory = async (full = false) => {
+    setError("");
+    setNotice(full ? "正在全量校准开奖数据..." : "正在更新最新开奖数据...");
+    try {
+      const result = await syncDltHistory({ source: "sporttery", full });
+      await loadDashboard();
+      await refreshDataStorage({ offset: 0, issue: "" });
+      setNotice(`开奖数据更新完成：最新期号 ${result.data_status?.latest_issue || "-"}`);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const deleteRecord = async (id) => {
+    setError("");
+    try {
+      await deleteDltRecord(id);
+      setSavedPlans((items) => items.filter((record) => record.id !== id));
+      await refreshReview();
+      setNotice("历史推荐记录已删除。");
     } catch (err) {
       setError(err.message);
     }
@@ -1056,8 +1138,7 @@ function Dashboard({ scenes, onBack }) {
     try {
       const result = await importDltHistory(file);
       await loadDashboard();
-      getDltDataStatus().then(setDataStorage).catch(() => setDataStorage(null));
-      getDltDraws({ limit: 8 }).then(setDraws).catch(() => setDraws([]));
+      await refreshDataStorage({ offset: 0, issue: "" });
       setNotice(`已导入 ${result.rows} 期历史开奖数据。`);
     } catch (err) {
       setError(err.message);
@@ -1161,7 +1242,13 @@ function Dashboard({ scenes, onBack }) {
         {error && <p className="error">{error}</p>}
         {notice && <p className="notice">{notice}</p>}
         <DataStatusPanel dataStatus={dashboard.data_status} onImport={importHistory} />
-        <DataManagementPanel status={dataStorage} draws={draws} />
+        <DataManagementPanel
+          status={dataStorage}
+          draws={draws}
+          onSearchDraws={(issue) => refreshDataStorage({ offset: 0, issue })}
+          onPageDraws={(offset, issue) => refreshDataStorage({ offset, issue })}
+          onSync={syncHistory}
+        />
         <ReviewPanel review={review} onRefresh={refreshReview} />
 
         <div className="module-grid">
@@ -1195,7 +1282,7 @@ function Dashboard({ scenes, onBack }) {
             </div>
           </section>
           <CapitalPanel capital={dashboard.capital_state} />
-          <HistoryRecords records={savedPlans} />
+          <HistoryRecords records={savedPlans} onDelete={deleteRecord} />
         </div>
 
         <footer className="disclaimer footer-note">

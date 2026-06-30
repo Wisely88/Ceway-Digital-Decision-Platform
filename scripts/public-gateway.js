@@ -8,6 +8,7 @@ const { URL } = require("url");
 const ROOT_DIR = path.resolve(__dirname, "..");
 const CEWAY_DIST = path.join(ROOT_DIR, "frontend", "dist");
 const PORT = Number(process.env.PUBLIC_GATEWAY_PORT || 8788);
+const HOST = process.env.PUBLIC_GATEWAY_HOST || "0.0.0.0";
 const CLAWSCORE_TARGET = process.env.CLAWSCORE_TARGET || "http://127.0.0.1:4321";
 const CEWAY_API_TARGET = process.env.CEWAY_API_TARGET || "http://127.0.0.1:8000";
 
@@ -165,8 +166,9 @@ server.on("upgrade", (req, socket, head) => {
   socket.destroy();
 });
 
-server.listen(PORT, "127.0.0.1", () => {
+server.listen(PORT, HOST, () => {
   console.log(`统一入口：http://127.0.0.1:${PORT}`);
+  console.log(`监听地址：${HOST}:${PORT}`);
   console.log(`ClawScore：http://127.0.0.1:${PORT}/clawscore`);
   console.log(`策维：http://127.0.0.1:${PORT}/ceway/`);
 });

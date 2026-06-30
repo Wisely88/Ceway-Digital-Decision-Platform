@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from capital import capital_state
-from db import data_status, save_review_results
+from db import data_status, delete_dlt_record_db, save_review_results, search_dlt_draws
 from engine import (
     calculate_trends,
     load_dlt_history,
@@ -23,6 +27,7 @@ from scorer import score_back_numbers, score_front_numbers
 
 
 app = FastAPI(title="Ceway v1.4 Data Management API")
+ROOT_DIR = Path(__file__).resolve().parents[1]
 
 app.add_middleware(
     CORSMiddleware,
@@ -189,7 +194,16 @@ def plan_dlt(request: GenerateRequest) -> dict:
 
 @app.get("/records/dlt")
 def records_dlt() -> list[dict]:
-    return load_dlt_records()
+    try:
+        return load_dlt_records()
+    except Exception:
+        return []
+
+
+@app.delete("/records/dlt/{record_id}")
+def delete_record_dlt(record_id: str) -> dict:
+    deleted = delete_dlt_record_db(record_id)
+    return {"status": "ok", "deleted": deleted, "id": record_id}
 
 
 @app.post("/records/dlt")
@@ -208,9 +222,25 @@ def create_record_dlt(request: RecordRequest) -> dict:
 
 @app.get("/review/dlt")
 def review_dlt(limit: int = Query(default=20, ge=1, le=100)) -> dict:
-    payload = build_review(load_dlt_records(), load_dlt_history(), limit=limit)
-    save_review_results(payload["items"])
-    return payload
+    try:
+        payload = build_review(load_dlt_records(), load_dlt_history(), limit=limit)
+        save_review_results(payload.get("items", []))
+        return payload
+    except Exception as exc:
+        return {
+            "summary": {
+                "records": 0,
+                "reviewed": 0,
+                "pending": 0,
+                "total_cost": 0,
+                "hit_records": 0,
+                "record_hit_rate": 0.0,
+                "best_hit": "-",
+                "best_prize_label": "-",
+            },
+            "items": [],
+            "disclaimer": f"复盘数据暂不可用，已跳过异常记录。原因：{exc}",
+        }
 
 
 @app.get("/data/dlt/status")
@@ -220,8 +250,52 @@ def dlt_data_status() -> dict:
 
 
 @app.get("/data/dlt/draws")
-def dlt_draws(limit: int = Query(default=20, ge=1, le=200)) -> list[dict]:
-    return load_latest_dlt_draws(limit=limit)
+def dlt_draws(
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    issue: str | None = Query(default=None),
+) -> dict:
+    return search_dlt_draws(limit=limit, offset=offset, issue=issue)
+
+
+@app.post("/data/dlt/sync")
+def sync_dlt_history(
+    source: str = Query(default="sporttery", pattern="^(sporttery|78500)$"),
+    full: bool = Query(default=False),
+) -> dict:
+    command = [
+        sys.executable,
+        str(ROOT_DIR / "scripts" / "update_dlt_history.py"),
+        "--source",
+        source,
+        "--mode",
+        "replace" if full else "append",
+        "--limit",
+        "100",
+    ]
+    if full:
+        command.append("--all")
+    try:
+        result = subprocess.run(
+            command,
+            cwd=ROOT_DIR,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=45,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(status_code=504, detail="开奖数据同步超时，请稍后重试。") from exc
+
+    output = (result.stdout or result.stderr).strip()
+    try:
+        payload = json.loads(output)
+    except json.JSONDecodeError:
+        payload = {"status": "failed", "message": output or "同步脚本没有返回有效结果"}
+
+    if result.returncode != 0:
+        raise HTTPException(status_code=502, detail=payload.get("message", "开奖数据同步失败"))
+    return {"status": "ok", "sync": payload, "data_status": data_status()}
 
 
 @app.get("/data/dlt/template")

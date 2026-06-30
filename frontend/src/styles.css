@@ -1373,6 +1373,49 @@ td {
   margin-bottom: 14px;
 }
 
+.panel-actions,
+.inline-tools,
+.pager-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.inline-tools {
+  margin: 0 0 14px;
+}
+
+.inline-tools input {
+  background: rgba(7, 18, 32, 0.9);
+  border: 1px solid rgba(83, 129, 179, 0.28);
+  border-radius: 8px;
+  color: #ffffff;
+  min-height: 38px;
+  min-width: min(260px, 100%);
+  padding: 0 12px;
+}
+
+.inline-tools span,
+.pager-row span {
+  color: #a9bdd2;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pager-row {
+  border-top: 1px solid rgba(83, 129, 179, 0.18);
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.ghost-button.danger {
+  border-color: rgba(255, 93, 93, 0.36);
+  color: #ffb1b1;
+  justify-self: start;
+}
+
 .data-management-summary div,
 .draw-item {
   background: rgba(7, 18, 32, 0.66);

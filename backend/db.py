@@ -141,6 +141,28 @@ def latest_dlt_draws(limit: int = 20) -> list[dict]:
     return [draw_from_row(row) for row in rows]
 
 
+def search_dlt_draws(limit: int = 20, offset: int = 0, issue: str | None = None) -> dict:
+    init_db()
+    where = ""
+    params: list[str | int] = []
+    if issue:
+        where = " where issue like ?"
+        params.append(f"%{issue}%")
+    with connect() as connection:
+        total = connection.execute(f"select count(*) from dlt_draws{where}", params).fetchone()[0]
+        rows = connection.execute(
+            f"select * from dlt_draws{where} order by issue desc limit ? offset ?",
+            [*params, limit, offset],
+        ).fetchall()
+    return {
+        "items": [draw_from_row(row) for row in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "issue": issue or "",
+    }
+
+
 def draw_from_row(row: sqlite3.Row) -> dict:
     return {
         "issue": row["issue"],
@@ -194,6 +216,14 @@ def load_dlt_records_db(limit: int = 100) -> list[dict]:
         }
         for row in rows
     ]
+
+
+def delete_dlt_record_db(record_id: str) -> bool:
+    init_db()
+    with connect() as connection:
+        cursor = connection.execute("delete from dlt_recommendation_records where id = ?", [record_id])
+        connection.execute("delete from dlt_review_results where record_id = ?", [record_id])
+        return cursor.rowcount > 0
 
 
 def save_review_results(items: list[dict]) -> None:

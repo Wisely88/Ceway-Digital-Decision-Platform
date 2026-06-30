@@ -90,13 +90,19 @@ def save_dlt_history(csv_text: str, mode: str = "replace") -> int:
 
 
 def load_dlt_records() -> list[dict]:
-    records = load_dlt_records_db()
-    if records:
-        return records
+    try:
+        records = load_dlt_records_db()
+        if records:
+            return records
+    except Exception:
+        return []
     if not RECORDS_PATH.exists():
         return []
-    with RECORDS_PATH.open("r", encoding="utf-8") as file:
-        payload = json.load(file)
+    try:
+        with RECORDS_PATH.open("r", encoding="utf-8") as file:
+            payload = json.load(file)
+    except (OSError, json.JSONDecodeError):
+        return []
     if not isinstance(payload, list):
         return []
     return payload
