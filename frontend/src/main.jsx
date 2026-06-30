@@ -130,14 +130,14 @@ const PRODUCT_STATUS = [
   },
   {
     label: "当前版本",
-    value: "V1.2 Baseline",
-    detail: "MVP 第一阶段完成",
+    value: "V1.3 Decision Pipeline",
+    detail: "评分链路与推荐复盘已完成",
     tone: "green",
   },
   {
     label: "下一阶段",
-    value: "V1.3 Decision Pipeline",
-    detail: "评分链路 · 预算生成 · 决策解释",
+    value: "V1.4 Data Management",
+    detail: "SQLite · 开奖管理 · 持久化",
     tone: "purple",
   },
   {
@@ -295,7 +295,7 @@ function SceneSelect({ scenes, onEnter }) {
           <div>
             <Badge tone="live">场景选择页（所有版本通用）</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
-            <p>Digital Decision Platform · Powered by CBGO Framework。当前以 v1.2 MVP 作为 Baseline，所有新想法统一进入 Backlog。</p>
+            <p>Digital Decision Platform · Powered by CBGO Framework。当前版本为 v1.3 Decision Pipeline，v1.2 Baseline 已完成冻结。</p>
           </div>
         </div>
 
@@ -329,9 +329,9 @@ function SceneSelect({ scenes, onEnter }) {
 
       <section className="baseline-panel">
         <div>
-          <Badge tone="live">v1.2 Baseline</Badge>
-          <h2>冻结开发范围</h2>
-          <p>当前版本只交付 DLT Module 的本地历史数据分析、预算控制和方案输出；新想法统一进入 Backlog。</p>
+          <Badge tone="live">v1.3 Decision Pipeline</Badge>
+          <h2>当前交付范围</h2>
+          <p>当前版本完成 DLT Module 的历史分析、评分链路、预算组合、资金状态机、历史记录与推荐复盘。</p>
         </div>
         <div className="baseline-grid">
           <article>
