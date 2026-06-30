@@ -403,3 +403,14 @@ export function getDemoReview() {
     disclaimer: "复盘只统计历史推荐与实际开奖号码的匹配结果，不代表未来命中概率或收益能力。",
   });
 }
+
+export function getDemoDraws(limit = 10) {
+  return Promise.resolve(
+    HISTORY.slice(-limit).reverse().map((row) => ({
+      issue: row.issue,
+      date: row.date,
+      front: row.front,
+      back: row.back,
+    })),
+  );
+}

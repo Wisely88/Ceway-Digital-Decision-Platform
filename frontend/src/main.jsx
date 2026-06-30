@@ -36,7 +36,9 @@ import {
 } from "recharts";
 import {
   generateDltPlan,
+  getDltDataStatus,
   getDltDashboard,
+  getDltDraws,
   getDltRecords,
   getDltReview,
   getScenes,
@@ -868,6 +870,43 @@ function ReviewPanel({ review, onRefresh }) {
   );
 }
 
+function DataManagementPanel({ status, draws }) {
+  if (!status) return null;
+  return (
+    <section className="panel wide data-management-panel">
+      <div className="panel-title">
+        <div>
+          <h2>数据管理</h2>
+          <p>v1.4 数据底座：SQLite 开奖数据、推荐记录与复盘结果</p>
+        </div>
+        <Badge>{status.storage === "sqlite" ? "SQLite" : "演示数据"}</Badge>
+      </div>
+      <div className="data-management-summary">
+        <div><span>开奖数据</span><strong>{status.draw_count || 0} 期</strong></div>
+        <div><span>推荐记录</span><strong>{status.record_count || 0} 条</strong></div>
+        <div><span>复盘结果</span><strong>{status.review_count || 0} 条</strong></div>
+        <div><span>最新期号</span><strong>{status.latest_issue || "-"}</strong></div>
+      </div>
+      <div className="draw-list">
+        {draws.slice(0, 8).map((draw) => (
+          <article className="draw-item" key={draw.issue}>
+            <div>
+              <strong>{draw.issue}</strong>
+              <span>{draw.date}</span>
+            </div>
+            <p>
+              前区 {draw.front.map((number) => String(number).padStart(2, "0")).join(" ")}
+              <br />
+              后区 {draw.back.map((number) => String(number).padStart(2, "0")).join(" ")}
+            </p>
+          </article>
+        ))}
+      </div>
+      <p className="data-management-note">当前数据库路径：{status.path}</p>
+    </section>
+  );
+}
+
 function Dashboard({ scenes, onBack }) {
   const [budget, setBudget] = useState(20);
   const [lastPrize, setLastPrize] = useState(0);
@@ -880,6 +919,8 @@ function Dashboard({ scenes, onBack }) {
   const [generated, setGenerated] = useState(null);
   const [savedPlans, setSavedPlans] = useState([]);
   const [review, setReview] = useState(null);
+  const [dataStorage, setDataStorage] = useState(null);
+  const [draws, setDraws] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -916,6 +957,8 @@ function Dashboard({ scenes, onBack }) {
         setSavedPlans(stored);
       });
     getDltReview().then(setReview).catch(() => setReview(null));
+    getDltDataStatus().then(setDataStorage).catch(() => setDataStorage(null));
+    getDltDraws({ limit: 8 }).then(setDraws).catch(() => setDraws([]));
   }, []);
 
   const refreshReview = async () => {
@@ -987,6 +1030,8 @@ function Dashboard({ scenes, onBack }) {
     try {
       const result = await importDltHistory(file);
       await loadDashboard();
+      getDltDataStatus().then(setDataStorage).catch(() => setDataStorage(null));
+      getDltDraws({ limit: 8 }).then(setDraws).catch(() => setDraws([]));
       setNotice(`已导入 ${result.rows} 期历史开奖数据。`);
     } catch (err) {
       setError(err.message);
@@ -1090,6 +1135,7 @@ function Dashboard({ scenes, onBack }) {
         {error && <p className="error">{error}</p>}
         {notice && <p className="notice">{notice}</p>}
         <DataStatusPanel dataStatus={dashboard.data_status} onImport={importHistory} />
+        <DataManagementPanel status={dataStorage} draws={draws} />
         <ReviewPanel review={review} onRefresh={refreshReview} />
 
         <div className="module-grid">

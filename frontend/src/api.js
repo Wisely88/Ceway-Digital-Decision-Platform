@@ -4,6 +4,7 @@ import {
   getDemoRecords,
   getDemoReview,
   getDemoScenes,
+  getDemoDraws,
   saveDemoRecord,
 } from "./demoData";
 
@@ -97,6 +98,28 @@ export function saveDltRecord({ budget, strategy, latestIssue, plan }) {
 export function getDltReview() {
   if (STATIC_DEMO) return getDemoReview();
   return request("/review/dlt");
+}
+
+export function getDltDataStatus() {
+  if (STATIC_DEMO) {
+    return Promise.resolve({
+      storage: "static_demo",
+      path: "GitHub Pages demo",
+      draw_count: 30,
+      record_count: JSON.parse(localStorage.getItem("ceway_demo_records") || "[]").length,
+      review_count: 1,
+      latest_issue: "2025030",
+      latest_date: "2025-03-10",
+    });
+  }
+  return request("/data/dlt/status");
+}
+
+export function getDltDraws({ limit = 10 } = {}) {
+  if (STATIC_DEMO) {
+    return getDemoDraws(limit);
+  }
+  return request(`/data/dlt/draws?limit=${limit}`);
 }
 
 export async function importDltHistory(file) {

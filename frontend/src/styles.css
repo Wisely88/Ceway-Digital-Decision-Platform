@@ -1362,6 +1362,64 @@ td {
   padding-top: 10px;
 }
 
+.data-management-panel {
+  align-self: start;
+}
+
+.data-management-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin-bottom: 14px;
+}
+
+.data-management-summary div,
+.draw-item {
+  background: rgba(7, 18, 32, 0.66);
+  border: 1px solid rgba(83, 129, 179, 0.22);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.data-management-summary span,
+.draw-item span,
+.data-management-note {
+  color: #a9bdd2;
+  font-size: 13px;
+}
+
+.data-management-summary strong,
+.draw-item strong {
+  color: #ffffff;
+  display: block;
+  font-size: 20px;
+}
+
+.draw-list {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.draw-item {
+  display: grid;
+  gap: 8px;
+}
+
+.draw-item p {
+  color: #ffffff;
+  font-weight: 800;
+  line-height: 1.8;
+  margin: 0;
+}
+
+.data-management-note {
+  border-top: 1px solid rgba(83, 129, 179, 0.18);
+  margin: 12px 0 0;
+  overflow-wrap: anywhere;
+  padding-top: 10px;
+}
+
 .capital-panel {
   align-self: start;
 }
@@ -1725,6 +1783,11 @@ td {
 
   .review-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .data-management-summary,
+  .draw-list {
+    grid-template-columns: 1fr;
   }
 
   .review-compare {

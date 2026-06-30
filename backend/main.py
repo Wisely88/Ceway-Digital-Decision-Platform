@@ -2,18 +2,27 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from capital import capital_state
-from engine import calculate_trends, load_dlt_history, load_dlt_records, load_scenes, save_dlt_history, save_dlt_record
+from db import data_status, save_review_results
+from engine import (
+    calculate_trends,
+    load_dlt_history,
+    load_dlt_records,
+    load_latest_dlt_draws,
+    load_scenes,
+    save_dlt_history,
+    save_dlt_record,
+)
 from generator import generate_plans, normalize_strategy
 from review import build_review
 from scorer import score_back_numbers, score_front_numbers
 
 
-app = FastAPI(title="Ceway v1.3 Decision Pipeline API")
+app = FastAPI(title="Ceway v1.4 Data Management API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -104,19 +113,19 @@ def build_dlt_payload(
             "subtitle": "Digital Decision Platform",
             "framework": "Powered by CBGO Framework",
             "baseline": "v1.2 MVP",
-            "version": "v1.3 Decision Pipeline",
+            "version": "v1.4 Data Management",
         },
         "disclaimer": "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
         "history_count": len(history),
         "latest_issue": latest_row["issue"] if latest_row else None,
         "data_status": {
-            "source": "local_csv",
-            "source_label": "本地 CSV",
-            "path": "backend/data/dlt_history.csv",
+            "source": "sqlite",
+            "source_label": "SQLite 数据库",
+            "path": "backend/data/ceway.sqlite3",
             "latest_issue": latest_row["issue"] if latest_row else None,
             "latest_date": latest_row["date"] if latest_row else None,
             "is_sample": len(history) <= 30,
-            "message": "当前走势分析基于本地 CSV 数据。请导入最新开奖 CSV 后再用于正式分析。",
+            "message": "当前走势分析基于本地 SQLite 数据库。可通过 CSV 导入更新开奖数据。",
         },
         "top_numbers": top_numbers,
         "budget": budget,
@@ -196,18 +205,44 @@ def create_record_dlt(request: RecordRequest) -> dict:
 
 @app.get("/review/dlt")
 def review_dlt(limit: int = Query(default=20, ge=1, le=100)) -> dict:
-    return build_review(load_dlt_records(), load_dlt_history(), limit=limit)
+    payload = build_review(load_dlt_records(), load_dlt_history(), limit=limit)
+    save_review_results(payload["items"])
+    return payload
+
+
+@app.get("/data/dlt/status")
+def dlt_data_status() -> dict:
+    load_dlt_history()
+    return data_status()
+
+
+@app.get("/data/dlt/draws")
+def dlt_draws(limit: int = Query(default=20, ge=1, le=200)) -> list[dict]:
+    return load_latest_dlt_draws(limit=limit)
+
+
+@app.get("/data/dlt/template")
+def dlt_template() -> Response:
+    csv_text = "issue,date,f1,f2,f3,f4,f5,b1,b2\n2025001,2025-01-01,3,7,18,22,31,4,11\n"
+    return Response(
+        content=csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=dlt_history_template.csv"},
+    )
 
 
 @app.post("/data/dlt/import")
-async def import_dlt_history(file: UploadFile = File(...)) -> dict:
+async def import_dlt_history(
+    file: UploadFile = File(...),
+    mode: str = Query(default="replace", pattern="^(replace|append)$"),
+) -> dict:
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are supported")
 
     content = await file.read()
     try:
         csv_text = content.decode("utf-8-sig")
-        count = save_dlt_history(csv_text)
+        count = save_dlt_history(csv_text, mode=mode)
     except UnicodeDecodeError as exc:
         raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded") from exc
     except ValueError as exc:
@@ -216,5 +251,6 @@ async def import_dlt_history(file: UploadFile = File(...)) -> dict:
     return {
         "status": "ok",
         "filename": file.filename,
+        "mode": mode,
         "rows": count,
     }

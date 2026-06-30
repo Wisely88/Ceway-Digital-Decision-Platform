@@ -6,6 +6,16 @@ from io import StringIO
 from collections import Counter
 from pathlib import Path
 
+from db import (
+    dlt_draw_count,
+    latest_dlt_draws,
+    load_dlt_draws,
+    load_dlt_records_db,
+    replace_dlt_draws,
+    save_dlt_record_db,
+    upsert_dlt_draws,
+)
+
 
 BASE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BASE_DIR.parent
@@ -21,8 +31,12 @@ def load_scenes() -> dict:
 
 
 def load_dlt_history() -> list[dict]:
+    if dlt_draw_count() > 0:
+        return load_dlt_draws()
     with DATA_PATH.open("r", encoding="utf-8") as file:
-        return parse_dlt_csv(file.read())
+        rows = parse_dlt_csv(file.read())
+    upsert_dlt_draws(rows)
+    return rows
 
 
 def parse_dlt_csv(csv_text: str) -> list[dict]:
@@ -65,13 +79,20 @@ def parse_dlt_csv(csv_text: str) -> list[dict]:
     return rows
 
 
-def save_dlt_history(csv_text: str) -> int:
+def save_dlt_history(csv_text: str, mode: str = "replace") -> int:
     rows = parse_dlt_csv(csv_text)
-    DATA_PATH.write_text(csv_text.strip() + "\n", encoding="utf-8")
+    if mode == "append":
+        upsert_dlt_draws(rows)
+    else:
+        replace_dlt_draws(rows)
+        DATA_PATH.write_text(csv_text.strip() + "\n", encoding="utf-8")
     return len(rows)
 
 
 def load_dlt_records() -> list[dict]:
+    records = load_dlt_records_db()
+    if records:
+        return records
     if not RECORDS_PATH.exists():
         return []
     with RECORDS_PATH.open("r", encoding="utf-8") as file:
@@ -82,11 +103,12 @@ def load_dlt_records() -> list[dict]:
 
 
 def save_dlt_record(record: dict) -> list[dict]:
-    records = load_dlt_records()
-    records.insert(0, record)
-    records = records[:100]
-    RECORDS_PATH.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
-    return records
+    return save_dlt_record_db(record)
+
+
+def load_latest_dlt_draws(limit: int = 20) -> list[dict]:
+    load_dlt_history()
+    return latest_dlt_draws(limit=limit)
 
 
 def ratio_label(left: int, total: int) -> str:
