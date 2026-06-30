@@ -12,6 +12,7 @@
 body {
   margin: 0;
   min-width: 320px;
+  overflow-x: hidden;
 }
 
 button,
@@ -1498,12 +1499,53 @@ td {
   }
 
   .app-sidebar {
+    border-bottom: 1px solid rgba(83, 129, 179, 0.22);
+    border-right: 0;
     min-height: auto;
     position: static;
   }
 
+  .brand-block {
+    justify-content: center;
+  }
+
   .side-nav {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scene-mini,
+  .side-footer {
+    display: none;
+  }
+
+  .workspace-topbar {
+    margin: -24px -26px 18px;
+  }
+
+  .topbar-actions {
+    align-items: stretch;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .topbar-actions > * {
+    flex: 1 1 150px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat-card-button.expanded {
+    grid-column: 1 / -1;
+  }
+
+  .trend-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .primary-chart {
+    grid-row: auto;
   }
 
   .scene-header {
@@ -1518,9 +1560,196 @@ td {
     padding: 16px;
   }
 
+  .scene-shell,
+  .baseline-panel,
+  .roadmap-panel {
+    padding: 16px;
+  }
+
+  .scene-shell-title {
+    display: grid;
+    gap: 12px;
+  }
+
+  .scene-grid {
+    gap: 12px;
+  }
+
+  .scene-tile {
+    min-height: 220px;
+    padding: 16px;
+  }
+
+  .app-sidebar {
+    padding: 14px;
+  }
+
+  .brand-block {
+    justify-content: flex-start;
+  }
+
+  .brand-block strong {
+    font-size: 24px;
+  }
+
+  .brand-mark {
+    height: 36px;
+    width: 36px;
+  }
+
   .workspace-topbar {
     align-items: flex-start;
     flex-direction: column;
+    margin: -16px -16px 14px;
+    padding: 16px;
+  }
+
+  .workspace-topbar h1 {
+    font-size: 22px;
+  }
+
+  .workspace-topbar p {
+    font-size: 13px;
+  }
+
+  .topbar-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .topbar-actions .ghost-button {
+    grid-column: 1 / -1;
+  }
+
+  .control-panel {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .stats {
+    gap: 10px;
+    grid-template-columns: 1fr;
+  }
+
+  .stat-card {
+    min-height: auto;
+  }
+
+  .stat-card-button.expanded {
+    grid-column: auto;
+  }
+
+  .stat-card strong {
+    font-size: 19px;
+  }
+
+  .data-status-panel {
+    padding: 12px;
+  }
+
+  .data-status-panel dl div {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+
+  .panel-title {
+    display: grid;
+  }
+
+  .panel-actions {
+    justify-content: stretch;
+  }
+
+  .panel-actions > * {
+    width: 100%;
+  }
+
+  .trend-tabs {
+    overflow-x: auto;
+  }
+
+  .trend-tabs button {
+    min-width: 88px;
+  }
+
+  .chart-box {
+    padding: 10px;
+  }
+
+  .primary-chart .recharts-responsive-container,
+  .sum-chart .recharts-responsive-container {
+    min-width: 520px;
+  }
+
+  .primary-chart,
+  .sum-chart {
+    overflow-x: auto;
+  }
+
+  .trend-stats div {
+    gap: 8px;
+  }
+
+  .ratio-row {
+    gap: 12px;
+  }
+
+  .table-wrap {
+    max-height: 420px;
+  }
+
+  th,
+  td {
+    padding: 9px 10px;
+  }
+
+  .score-explanation {
+    min-width: 260px;
+  }
+
+  .plan-head,
+  .review-item,
+  .history-item {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-head {
+    align-items: flex-start;
+    display: grid;
+    gap: 8px;
+  }
+
+  .review-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .review-compare {
+    grid-template-columns: 1fr;
+  }
+
+  .review-compare p {
+    font-size: 13px;
+  }
+
+  .history-item,
+  .review-item {
+    grid-template-columns: 1fr;
+  }
+
+  .capital-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .capital-chart {
+    overflow-x: auto;
+  }
+
+  .capital-chart .recharts-responsive-container {
+    min-width: 520px;
   }
 
   .side-nav {
@@ -1529,7 +1758,6 @@ td {
 
   .trend-tabs,
   .number-groups,
-  .capital-grid,
   .version-strip {
     grid-template-columns: 1fr;
   }
@@ -1555,5 +1783,26 @@ td {
 
   .stat-card strong {
     font-size: 20px;
+  }
+}
+
+@media (max-width: 420px) {
+  .topbar-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .review-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .scene-logo {
+    transform: scale(0.9);
+  }
+
+  .ghost-button,
+  .icon-button,
+  .primary-button,
+  .upload-button {
+    min-height: 42px;
   }
 }
