@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from capital import capital_state
 from engine import calculate_trends, load_dlt_history, load_dlt_records, load_scenes, save_dlt_history, save_dlt_record
 from generator import generate_plans, normalize_strategy
+from review import build_review
 from scorer import score_back_numbers, score_front_numbers
 
 
@@ -191,6 +192,11 @@ def create_record_dlt(request: RecordRequest) -> dict:
     }
     records = save_dlt_record(record)
     return {"status": "ok", "record": record, "count": len(records)}
+
+
+@app.get("/review/dlt")
+def review_dlt(limit: int = Query(default=20, ge=1, le=100)) -> dict:
+    return build_review(load_dlt_records(), load_dlt_history(), limit=limit)
 
 
 @app.post("/data/dlt/import")

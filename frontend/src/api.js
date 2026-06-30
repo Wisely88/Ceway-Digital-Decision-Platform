@@ -2,6 +2,7 @@ import {
   getDemoDashboard,
   getDemoPlan,
   getDemoRecords,
+  getDemoReview,
   getDemoScenes,
   saveDemoRecord,
 } from "./demoData";
@@ -91,6 +92,11 @@ export function saveDltRecord({ budget, strategy, latestIssue, plan }) {
       plan,
     }),
   });
+}
+
+export function getDltReview() {
+  if (STATIC_DEMO) return getDemoReview();
+  return request("/review/dlt");
 }
 
 export async function importDltHistory(file) {

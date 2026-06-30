@@ -292,3 +292,114 @@ export function saveDemoRecord({ budget, strategy, latestIssue, plan }) {
   localStorage.setItem("ceway_demo_records", JSON.stringify(next));
   return Promise.resolve({ status: "ok", record, count: next.length });
 }
+
+function prizeLabel(frontHits, backHits) {
+  if (frontHits === 5 && backHits === 2) return "一等奖";
+  if (frontHits === 5 && backHits === 1) return "二等奖";
+  if (frontHits === 5) return "三等奖";
+  if (frontHits === 4 && backHits === 2) return "四等奖";
+  if (frontHits === 4 && backHits === 1) return "五等奖";
+  if (frontHits === 3 && backHits === 2) return "六等奖";
+  if (frontHits === 4) return "七等奖";
+  if ((frontHits === 3 && backHits === 1) || (frontHits === 2 && backHits === 2)) return "八等奖";
+  if ((frontHits === 3 && backHits === 0) || (frontHits === 2 && backHits === 1) || (frontHits <= 1 && backHits === 2)) return "九等奖";
+  return "未命中固定奖级";
+}
+
+function compareTicket(front, back, draw) {
+  const frontHits = front.filter((number) => draw.front.includes(number)).length;
+  const backHits = back.filter((number) => draw.back.includes(number)).length;
+  return {
+    front,
+    back,
+    front_hits: frontHits,
+    back_hits: backHits,
+    hit_label: `${frontHits}+${backHits}`,
+    prize_label: prizeLabel(frontHits, backHits),
+  };
+}
+
+function nextDemoDraw(issue) {
+  if (!issue) return HISTORY[HISTORY.length - 1];
+  const index = HISTORY.findIndex((row) => row.issue === issue);
+  return index >= 0 && index + 1 < HISTORY.length ? HISTORY[index + 1] : null;
+}
+
+function reviewDemoPlan(plan, draw) {
+  const details = plan.mode === "dantuo"
+    ? [compareTicket(
+      [...(plan.front_dan || []), ...(plan.front_tuo || [])].slice(0, 5),
+      (plan.back || []).slice(0, 2),
+      draw,
+    )]
+    : (plan.items || []).map((item, index) => ({ ticket: index + 1, ...compareTicket(item.front || [], item.back || [], draw) }));
+  const best = details.reduce((current, item) => {
+    if (!current) return item;
+    const currentScore = current.front_hits + current.back_hits;
+    const itemScore = item.front_hits + item.back_hits;
+    return itemScore > currentScore ? item : current;
+  }, null);
+  const hitTickets = details.filter((item) => item.prize_label !== "未命中固定奖级").length;
+  return {
+    actual: { issue: draw.issue, date: draw.date, front: draw.front, back: draw.back },
+    mode: plan.mode,
+    cost: plan.cost || 0,
+    tickets: plan.tickets || details.length,
+    best,
+    details: details.slice(0, 20),
+    hit_tickets: hitTickets,
+    hit_rate: Math.round((hitTickets / Math.max(1, plan.tickets || details.length)) * 10000) / 100,
+  };
+}
+
+export function getDemoReview() {
+  const records = JSON.parse(localStorage.getItem("ceway_demo_records") || "[]");
+  const fallback = records.length > 0 ? records : [
+    {
+      id: "demo-review-sample",
+      saved_at: new Date().toISOString(),
+      budget: 20,
+      strategy: "balanced",
+      latest_issue: "2025029",
+      plan: buildDantuoPlan(20, "balanced", scoreFront(buildTrends(30)), scoreBack(buildTrends(30))),
+    },
+  ];
+  const items = fallback.map((record) => {
+    const draw = nextDemoDraw(record.latest_issue);
+    if (!draw) {
+      return {
+        record_id: record.id,
+        saved_at: record.saved_at,
+        latest_issue: record.latest_issue,
+        status: "pending",
+        message: "推荐期之后暂无下一期开奖数据，暂不能复盘。",
+      };
+    }
+    return {
+      record_id: record.id,
+      saved_at: record.saved_at,
+      latest_issue: record.latest_issue,
+      strategy: record.strategy,
+      budget: record.budget,
+      status: "reviewed",
+      ...reviewDemoPlan(record.plan, draw),
+    };
+  });
+  const reviewed = items.filter((item) => item.status === "reviewed");
+  const hitRecords = reviewed.filter((item) => item.hit_tickets > 0);
+  const bestItem = reviewed[0];
+  return Promise.resolve({
+    summary: {
+      records: items.length,
+      reviewed: reviewed.length,
+      pending: items.length - reviewed.length,
+      total_cost: reviewed.reduce((sum, item) => sum + item.cost, 0),
+      hit_records: hitRecords.length,
+      record_hit_rate: Math.round((hitRecords.length / Math.max(1, reviewed.length)) * 10000) / 100,
+      best_hit: bestItem?.best?.hit_label || "-",
+      best_prize_label: bestItem?.best?.prize_label || "-",
+    },
+    items,
+    disclaimer: "复盘只统计历史推荐与实际开奖号码的匹配结果，不代表未来命中概率或收益能力。",
+  });
+}

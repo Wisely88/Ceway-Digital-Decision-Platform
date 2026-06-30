@@ -38,6 +38,7 @@ import {
   generateDltPlan,
   getDltDashboard,
   getDltRecords,
+  getDltReview,
   getScenes,
   importDltHistory,
   saveDltRecord,
@@ -794,6 +795,61 @@ function HistoryRecords({ records }) {
   );
 }
 
+function ReviewPanel({ review, onRefresh }) {
+  if (!review) return null;
+  const summary = review.summary || {};
+  return (
+    <section className="panel wide review-panel">
+      <div className="panel-title">
+        <div>
+          <h2>推荐复盘</h2>
+          <p>对比已保存推荐方案与下一期开奖，统计历史命中表现</p>
+        </div>
+        <button className="ghost-button compact" onClick={onRefresh} type="button">刷新复盘</button>
+      </div>
+      <div className="review-summary">
+        <div><span>已复盘</span><strong>{summary.reviewed || 0}</strong></div>
+        <div><span>待开奖</span><strong>{summary.pending || 0}</strong></div>
+        <div><span>投入金额</span><strong>{summary.total_cost || 0} 元</strong></div>
+        <div><span>命中记录率</span><strong>{summary.record_hit_rate || 0}%</strong></div>
+        <div><span>最佳命中</span><strong>{summary.best_hit || "-"}</strong></div>
+        <div><span>最佳奖级</span><strong>{summary.best_prize_label || "-"}</strong></div>
+      </div>
+      <div className="review-list">
+        {(review.items || []).slice(0, 6).map((item) => (
+          <article className="review-item" key={item.record_id || item.saved_at}>
+            {item.status === "pending" ? (
+              <>
+                <div>
+                  <strong>期号 {item.latest_issue || "-"}</strong>
+                  <span>{item.message}</span>
+                </div>
+                <Badge>待复盘</Badge>
+              </>
+            ) : (
+              <>
+                <div>
+                  <strong>实际开奖 {item.actual.issue}</strong>
+                  <span>前区 {item.actual.front.map((number) => String(number).padStart(2, "0")).join(" ")} · 后区 {item.actual.back.map((number) => String(number).padStart(2, "0")).join(" ")}</span>
+                </div>
+                <div>
+                  <b>{item.best?.hit_label || "-"}</b>
+                  <span>{item.best?.prize_label || "-"}</span>
+                </div>
+                <p>
+                  推荐期号 {item.latest_issue || "-"} · {planModeLabel(item.mode)} · {item.cost} 元 ·
+                  命中票数 {item.hit_tickets}/{item.tickets} · 命中率 {item.hit_rate}%
+                </p>
+              </>
+            )}
+          </article>
+        ))}
+      </div>
+      <p className="review-disclaimer">{review.disclaimer}</p>
+    </section>
+  );
+}
+
 function Dashboard({ scenes, onBack }) {
   const [budget, setBudget] = useState(20);
   const [lastPrize, setLastPrize] = useState(0);
@@ -805,6 +861,7 @@ function Dashboard({ scenes, onBack }) {
   const [dashboard, setDashboard] = useState(null);
   const [generated, setGenerated] = useState(null);
   const [savedPlans, setSavedPlans] = useState([]);
+  const [review, setReview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -840,7 +897,17 @@ function Dashboard({ scenes, onBack }) {
         const stored = JSON.parse(localStorage.getItem("cbgo_saved_plans") || "[]");
         setSavedPlans(stored);
       });
+    getDltReview().then(setReview).catch(() => setReview(null));
   }, []);
+
+  const refreshReview = async () => {
+    try {
+      const data = await getDltReview();
+      setReview(data);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   const topNumbers = useMemo(() => {
     if (!dashboard) return "-";
@@ -883,11 +950,13 @@ function Dashboard({ scenes, onBack }) {
         plan,
       });
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
+      await refreshReview();
       setNotice("方案已保存到后端历史记录。");
     } catch {
       const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
       localStorage.setItem("cbgo_saved_plans", JSON.stringify(nextPlans));
       setSavedPlans(nextPlans);
+      await refreshReview();
       setNotice("后端保存失败，方案已保存到本地浏览器。");
     }
   };
@@ -1035,6 +1104,7 @@ function Dashboard({ scenes, onBack }) {
             </div>
           </section>
           <CapitalPanel capital={dashboard.capital_state} />
+          <ReviewPanel review={review} onRefresh={refreshReview} />
           <HistoryRecords records={savedPlans} />
         </div>
 
