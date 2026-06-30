@@ -21,6 +21,19 @@ ceway/
 
 ## 本地启动
 
+推荐一键启动：
+
+```bash
+./scripts/start-local.sh
+```
+
+启动后打开：
+
+- 前端页面：`http://localhost:5173`
+- 后端接口文档：`http://127.0.0.1:8000/docs`
+
+如果页面打不开，通常是前端服务没有运行；重新执行上面的脚本即可。
+
 开发依据：
 
 - [v1.2 Baseline 开发方案](docs/ceway_v1_2_baseline.md)
@@ -28,7 +41,7 @@ ceway/
 - [Backlog](docs/backlog.md)
 - [数据导入说明](docs/data_import.md)
 
-后端：
+手动启动后端：
 
 ```bash
 cd backend
@@ -38,7 +51,7 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-前端：
+手动启动前端：
 
 ```bash
 cd frontend

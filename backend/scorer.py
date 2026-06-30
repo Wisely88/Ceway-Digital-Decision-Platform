@@ -26,13 +26,20 @@ def score_front_numbers(trends: dict) -> list[dict]:
         missing = normalize(missing_by_number.get(number, 0), max_missing)
         balanced = balance_score(number)
         total = round(heat * 0.4 + missing * 0.3 + balanced * 0.3, 2)
+        explanation = (
+            f"热度{heat}分、遗漏{missing}分、均衡{balanced}分；"
+            f"综合评分按 0.4/0.3/0.3 加权得到 {total}。"
+        )
         rows.append(
             {
                 "number": number,
+                "heat_count": heat_by_number.get(number, 0),
+                "missing_periods": missing_by_number.get(number, 0),
                 "heat_score": heat,
                 "missing_score": missing,
                 "balance_score": balanced,
                 "total_score": total,
+                "explanation": explanation,
             }
         )
 
@@ -50,4 +57,3 @@ def score_back_numbers(trends: dict) -> list[dict]:
         heat = normalize(heat_by_number.get(number, 0), max_heat)
         rows.append({"number": number, "score": heat})
     return sorted(rows, key=lambda item: (-item["score"], item["number"]))
-

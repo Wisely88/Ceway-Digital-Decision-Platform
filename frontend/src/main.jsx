@@ -34,7 +34,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { generateDltPlan, getDltDashboard, getScenes, importDltHistory } from "./api";
+import {
+  generateDltPlan,
+  getDltDashboard,
+  getDltRecords,
+  getScenes,
+  importDltHistory,
+  saveDltRecord,
+} from "./api";
 import "./styles.css";
 
 function Badge({ children, tone = "default" }) {
@@ -53,6 +60,25 @@ function StatCard({ icon: Icon, label, value, meta }) {
         {meta && <span>{meta}</span>}
       </div>
     </section>
+  );
+}
+
+function TopNumbersCard({ rows }) {
+  const [expanded, setExpanded] = useState(false);
+  const displayRows = expanded ? rows.slice(0, 20) : rows.slice(0, 5);
+  const value = displayRows.map((row) => String(row.number).padStart(2, "0")).join(" ");
+
+  return (
+    <button className={`stat-card stat-card-button ${expanded ? "expanded" : ""}`} onClick={() => setExpanded(!expanded)} type="button">
+      <div className="stat-icon">
+        <Sparkles size={18} />
+      </div>
+      <div>
+        <p>{expanded ? "Top20号码" : "Top号码"}</p>
+        <strong>{value}</strong>
+        <span>{expanded ? "点击收起" : "点击展开 Top20"}</span>
+      </div>
+    </button>
   );
 }
 
@@ -143,6 +169,26 @@ const ROADMAP_ITEMS = [
     description: "AI 评分、Attention、论坛、公众号和外部公开数据进入统一评估。",
   },
 ];
+
+const STRATEGY_LABELS = {
+  conservative: "保守",
+  balanced: "均衡",
+  aggressive: "激进",
+};
+
+function planModeLabel(mode) {
+  return mode === "dantuo" ? "胆拖" : "单式";
+}
+
+function scoreSortLabel(sortKey) {
+  const labels = {
+    total_score: "综合分",
+    heat_score: "热度分",
+    missing_score: "遗漏分",
+    balance_score: "均衡分",
+  };
+  return labels[sortKey] || "综合分";
+}
 
 function AppSidebar({ scenes, active = "DLT", onSelect }) {
   const navItems = [
@@ -369,8 +415,24 @@ function ModulePlaceholder({ scene, scenes, onBack }) {
   );
 }
 
-function TrendPanel({ dashboard }) {
+function TrendTooltip({ active, payload, scoreMap }) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0].payload;
+  const score = scoreMap.get(row.number);
+  return (
+    <div className="chart-tooltip">
+      <strong>{String(row.number).padStart(2, "0")}</strong>
+      <span>出现次数：{row.count}</span>
+      <span>当前遗漏：{row.missing} 期</span>
+      {score && <span>综合评分：{score.total_score}</span>}
+      {score && <span>排名：{score.rank}</span>}
+    </div>
+  );
+}
+
+function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
   const missingByNumber = new Map(dashboard.trends.omissions.map((item) => [item.number, item.missing]));
+  const scoreMap = new Map(scoreRows.map((item) => [item.number, item]));
   const hotFront = dashboard.trends.hot_front.slice(0, 35).map((item) => ({
     ...item,
     missing: missingByNumber.get(item.number) || 0,
@@ -387,7 +449,15 @@ function TrendPanel({ dashboard }) {
           <h2>走势分析</h2>
           <p>最近 {dashboard.trends.window} 期历史开奖数据</p>
         </div>
-        <Badge>Latest {dashboard.latest_issue}</Badge>
+        <div className="panel-actions">
+          <select value={windowSize} onChange={(event) => onWindowChange(Number(event.target.value))}>
+            <option value={30}>最近30期</option>
+            <option value={50}>最近50期</option>
+            <option value={100}>最近100期</option>
+            <option value={200}>最近200期</option>
+          </select>
+          <Badge>最新 {dashboard.latest_issue}</Badge>
+        </div>
       </div>
 
       <div className="trend-tabs">
@@ -400,13 +470,13 @@ function TrendPanel({ dashboard }) {
 
       <div className="trend-layout">
         <div className="chart-box primary-chart">
-          <h3>冷热号分布（近100期）</h3>
+          <h3>冷热号分布（近{dashboard.trends.window}期）</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={hotFront}>
               <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
               <XAxis dataKey="number" tickFormatter={(value) => `${value}`} />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip content={<TrendTooltip scoreMap={scoreMap} />} />
               <Bar dataKey="missing" fill="#ef4d3c" radius={[3, 3, 0, 0]} />
               <Bar dataKey="count" fill="#1768d7" radius={[3, 3, 0, 0]} />
             </BarChart>
@@ -468,14 +538,34 @@ function TrendPanel({ dashboard }) {
 }
 
 function ScoreTable({ rows }) {
+  const [sortKey, setSortKey] = useState("total_score");
+  const [showAll, setShowAll] = useState(false);
+  const sortedRows = useMemo(() => (
+    [...rows].sort((left, right) => {
+      const delta = (right[sortKey] || 0) - (left[sortKey] || 0);
+      return delta || left.number - right.number;
+    })
+  ), [rows, sortKey]);
+  const visibleRows = showAll ? sortedRows : sortedRows.slice(0, 15);
+
   return (
     <section className="panel">
       <div className="panel-title">
         <div>
           <h2>号码评分</h2>
-          <p>热度 0.4 · 遗漏 0.3 · 均衡 0.3</p>
+          <p>热度 0.4 · 遗漏 0.3 · 均衡 0.3，当前按{scoreSortLabel(sortKey)}排序</p>
         </div>
-        <BarChart3 size={18} />
+        <div className="panel-actions">
+          <select value={sortKey} onChange={(event) => setSortKey(event.target.value)}>
+            <option value="total_score">综合分</option>
+            <option value="heat_score">热度分</option>
+            <option value="missing_score">遗漏分</option>
+            <option value="balance_score">均衡分</option>
+          </select>
+          <button className="ghost-button compact" onClick={() => setShowAll(!showAll)} type="button">
+            {showAll ? "只看Top15" : "查看全部"}
+          </button>
+        </div>
       </div>
       <div className="table-wrap">
         <table>
@@ -487,17 +577,19 @@ function ScoreTable({ rows }) {
               <th>遗漏</th>
               <th>均衡</th>
               <th>综合</th>
+              <th>解释</th>
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, 15).map((row) => (
+            {visibleRows.map((row, index) => (
               <tr key={row.number}>
-                <td>{row.rank}</td>
+                <td>{index + 1}</td>
                 <td><strong>{String(row.number).padStart(2, "0")}</strong></td>
                 <td>{row.heat_score}</td>
                 <td>{row.missing_score}</td>
                 <td>{row.balance_score}</td>
                 <td className="score-hot">{row.total_score}</td>
+                <td className="score-explanation">{row.explanation}</td>
               </tr>
             ))}
           </tbody>
@@ -537,6 +629,10 @@ function CapitalPanel({ capital }) {
           <strong>{capital.profit} 元</strong>
         </div>
         <div>
+          <span>中断盈利</span>
+          <strong>{capital.interrupted_profit} 元</strong>
+        </div>
+        <div>
           <span>最大回撤</span>
           <strong>{capital.max_drawdown}%</strong>
         </div>
@@ -557,6 +653,10 @@ function CapitalPanel({ capital }) {
         <span className={capital.level_units === 1 ? "active" : ""}>1注</span>
         <span className={capital.level_units === 2 ? "active" : ""}>2注</span>
         <span className={capital.level_units === 4 ? "active" : ""}>4注</span>
+      </div>
+      <div className="transition-note">
+        <strong>状态转移</strong>
+        <p>{capital.transition_explanation || capital.transition?.explanation}</p>
       </div>
     </section>
   );
@@ -601,10 +701,11 @@ function PlanCard({ plan, onSave }) {
     <article className="plan-card">
       <div className="plan-head">
         <Badge tone={plan.mode === "dantuo" ? "live" : "default"}>
-          {plan.mode === "dantuo" ? "胆拖" : "单式"}
+          {STRATEGY_LABELS[plan.strategy] || "策略"} · {planModeLabel(plan.mode)}
         </Badge>
         <strong>{plan.cost} 元 · {plan.tickets} 注</strong>
       </div>
+      {plan.reason && <p className="plan-reason">{plan.reason}</p>}
       {plan.mode === "dantuo" ? (
         <div className="number-groups">
           <div>
@@ -623,8 +724,16 @@ function PlanCard({ plan, onSave }) {
       ) : (
         <div className="single-list">
           {plan.items.slice(0, 8).map((item, index) => (
-            <p key={`${item.front.join("-")}-${index}`}>{item.front_display.join(" ")} + {item.back_display.join(" ")}</p>
+            <div className="single-ticket" key={`${item.front.join("-")}-${index}`}>
+              <p>{item.front_display.join(" ")} + {item.back_display.join(" ")}</p>
+              {item.explanation?.length > 0 && <span>{item.explanation[0]}</span>}
+            </div>
           ))}
+        </div>
+      )}
+      {plan.mode === "dantuo" && plan.explanation?.length > 0 && (
+        <div className="number-explanations">
+          {plan.explanation.map((item) => <span key={item}>{item}</span>)}
         </div>
       )}
       <div className="plan-actions">
@@ -643,10 +752,56 @@ function PlanCard({ plan, onSave }) {
   );
 }
 
+function normalizeRecordPlan(record) {
+  return record?.plan || record;
+}
+
+function HistoryRecords({ records }) {
+  const visibleRecords = records.slice(0, 6);
+  return (
+    <section className="panel wide history-panel">
+      <div className="panel-title">
+        <div>
+          <h2>历史推荐记录</h2>
+          <p>保存推荐时间、预算、模式、方案、费用和解释</p>
+        </div>
+        <Badge>{records.length} 条</Badge>
+      </div>
+      {visibleRecords.length === 0 ? (
+        <p className="empty-text">暂无保存记录。生成方案后点击“保存方案”。</p>
+      ) : (
+        <div className="history-list">
+          {visibleRecords.map((record) => {
+            const plan = normalizeRecordPlan(record);
+            const savedAt = record.saved_at ? new Date(record.saved_at).toLocaleString() : "-";
+            return (
+              <article className="history-item" key={record.id || `${savedAt}-${plan.mode}-${plan.cost}`}>
+                <div>
+                  <strong>{STRATEGY_LABELS[record.strategy || plan.strategy] || "策略"} · {planModeLabel(plan.mode)}</strong>
+                  <span>{savedAt} · 期号 {record.latest_issue || "-"}</span>
+                </div>
+                <div>
+                  <b>{plan.cost} 元</b>
+                  <span>{plan.tickets} 注</span>
+                </div>
+                <p>{plan.reason || plan.explanation?.[0] || "该记录保留推荐方案和评分解释。"}</p>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Dashboard({ scenes, onBack }) {
   const [budget, setBudget] = useState(20);
   const [lastPrize, setLastPrize] = useState(0);
-  const [mode, setMode] = useState("auto");
+  const [strategy, setStrategy] = useState("balanced");
+  const [windowSize, setWindowSize] = useState(100);
+  const [principal, setPrincipal] = useState(1000);
+  const [balance, setBalance] = useState("");
+  const [levelUnits, setLevelUnits] = useState(1);
   const [dashboard, setDashboard] = useState(null);
   const [generated, setGenerated] = useState(null);
   const [savedPlans, setSavedPlans] = useState([]);
@@ -659,7 +814,15 @@ function Dashboard({ scenes, onBack }) {
     setError("");
     setNotice("");
     try {
-      const data = await getDltDashboard({ budget, lastPrize });
+      const data = await getDltDashboard({
+        budget,
+        lastPrize,
+        strategy,
+        window: windowSize,
+        principal,
+        balance,
+        levelUnits,
+      });
       setDashboard(data);
       setGenerated(null);
     } catch (err) {
@@ -671,8 +834,12 @@ function Dashboard({ scenes, onBack }) {
 
   useEffect(() => {
     loadDashboard();
-    const stored = JSON.parse(localStorage.getItem("cbgo_saved_plans") || "[]");
-    setSavedPlans(stored);
+    getDltRecords()
+      .then((records) => setSavedPlans(records))
+      .catch(() => {
+        const stored = JSON.parse(localStorage.getItem("cbgo_saved_plans") || "[]");
+        setSavedPlans(stored);
+      });
   }, []);
 
   const topNumbers = useMemo(() => {
@@ -684,27 +851,45 @@ function Dashboard({ scenes, onBack }) {
     setError("");
     setNotice("");
     try {
-      const plan = await generateDltPlan({ budget, mode, lastPrize });
+      const plan = await generateDltPlan({
+        budget,
+        strategy,
+        lastPrize,
+        window: windowSize,
+        principal,
+        balance,
+        levelUnits,
+      });
       setGenerated(plan);
     } catch (err) {
       setError(err.message);
     }
   };
 
-  const savePlan = (plan) => {
-    const nextPlans = [
-      {
-        ...plan,
-        id: `${Date.now()}-${plan.mode}`,
-        saved_at: new Date().toISOString(),
+  const savePlan = async (plan) => {
+    const localRecord = {
+      id: `${Date.now()}-${plan.strategy}-${plan.mode}`,
+      saved_at: new Date().toISOString(),
+      budget,
+      strategy,
+      latest_issue: dashboard.latest_issue,
+      plan,
+    };
+    try {
+      const result = await saveDltRecord({
         budget,
-        latest_issue: dashboard.latest_issue,
-      },
-      ...savedPlans,
-    ].slice(0, 20);
-    localStorage.setItem("cbgo_saved_plans", JSON.stringify(nextPlans));
-    setSavedPlans(nextPlans);
-    setNotice("方案已保存到本地浏览器。");
+        strategy,
+        latestIssue: dashboard.latest_issue,
+        plan,
+      });
+      setSavedPlans((items) => [result.record, ...items].slice(0, 100));
+      setNotice("方案已保存到后端历史记录。");
+    } catch {
+      const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
+      localStorage.setItem("cbgo_saved_plans", JSON.stringify(nextPlans));
+      setSavedPlans(nextPlans);
+      setNotice("后端保存失败，方案已保存到本地浏览器。");
+    }
   };
 
   const importHistory = async (event) => {
@@ -775,11 +960,27 @@ function Dashboard({ scenes, onBack }) {
             <input min="0" step="5" type="number" value={lastPrize} onChange={(event) => setLastPrize(Number(event.target.value))} />
           </label>
           <label>
-            生成模式
-            <select value={mode} onChange={(event) => setMode(event.target.value)}>
-              <option value="auto">自动</option>
-              <option value="single">单式</option>
-              <option value="dantuo">胆拖</option>
+            生成策略
+            <select value={strategy} onChange={(event) => setStrategy(event.target.value)}>
+              <option value="conservative">保守 · 控制复杂度</option>
+              <option value="balanced">均衡 · 评分与预算折中</option>
+              <option value="aggressive">激进 · 提高覆盖面</option>
+            </select>
+          </label>
+          <label>
+            初始本金
+            <input min="0" step="50" type="number" value={principal} onChange={(event) => setPrincipal(Number(event.target.value))} />
+          </label>
+          <label>
+            当前余额
+            <input min="0" step="10" type="number" value={balance} placeholder="默认等于本金" onChange={(event) => setBalance(event.target.value === "" ? "" : Number(event.target.value))} />
+          </label>
+          <label>
+            当前级别
+            <select value={levelUnits} onChange={(event) => setLevelUnits(Number(event.target.value))}>
+              <option value={1}>1注</option>
+              <option value={2}>2注</option>
+              <option value={4}>4注</option>
             </select>
           </label>
           <button className="primary-button" onClick={loadDashboard} type="button">
@@ -793,10 +994,10 @@ function Dashboard({ scenes, onBack }) {
         </section>
 
         <section className="stats">
-          <StatCard icon={Sparkles} label="Top号码" value={topNumbers} meta="当前综合评分最高前区号码" />
+          <TopNumbersCard rows={dashboard.score_table} />
           <StatCard icon={Gauge} label="当前下注状态" value={dashboard.capital_state.level} meta={`下一状态 ${dashboard.capital_state.next_level}`} />
           <StatCard icon={WalletCards} label="当前资金" value={`${dashboard.capital_state.balance} 元`} meta={`盈利 ${dashboard.capital_state.profit} 元`} />
-          <StatCard icon={Coins} label="本期预算/金额" value={`${budget} / ${dashboard.recommended_amount} 元`} meta="推荐金额不超过预算" />
+          <StatCard icon={Coins} label="本期策略/金额" value={`${STRATEGY_LABELS[dashboard.strategy] || STRATEGY_LABELS[strategy]} / ${dashboard.recommended_amount} 元`} meta="推荐金额不超过预算" />
         </section>
 
         {error && <p className="error">{error}</p>}
@@ -804,29 +1005,37 @@ function Dashboard({ scenes, onBack }) {
         <DataStatusPanel dataStatus={dashboard.data_status} onImport={importHistory} />
 
         <div className="module-grid">
-          <TrendPanel dashboard={dashboard} />
+          <TrendPanel
+            dashboard={dashboard}
+            scoreRows={dashboard.score_table}
+            windowSize={windowSize}
+            onWindowChange={setWindowSize}
+          />
           <ScoreTable rows={dashboard.score_table} />
           <section className="panel">
             <div className="panel-title">
               <div>
                 <h2>组合生成</h2>
-                <p>只保留费用小于等于预算的方案</p>
+                <p>当前策略：{STRATEGY_LABELS[dashboard.strategy] || STRATEGY_LABELS[strategy]}，只保留费用小于等于预算的方案</p>
               </div>
               <LayoutDashboard size={18} />
             </div>
             {dashboard.plans[0]?.mode === "dantuo" && <PlanCard plan={dashboard.plans[0]} onSave={savePlan} />}
             <div className="plan-stack">
               {generated && <PlanCard plan={generated} onSave={savePlan} />}
-              {dashboard.plans.slice(1).map((plan) => <PlanCard key={plan.mode} plan={plan} onSave={savePlan} />)}
+              {dashboard.plans.slice(1).map((plan) => <PlanCard key={`${plan.strategy}-${plan.mode}`} plan={plan} onSave={savePlan} />)}
             </div>
             <div className="saved-summary">
               <strong>已保存方案：{savedPlans.length}</strong>
               {savedPlans[0] && (
-                <span>最近：{savedPlans[0].mode === "dantuo" ? "胆拖" : "单式"} · {savedPlans[0].cost} 元 · {savedPlans[0].tickets} 注</span>
+                <span>
+                  最近：{STRATEGY_LABELS[savedPlans[0].strategy || normalizeRecordPlan(savedPlans[0]).strategy] || "策略"} · {planModeLabel(normalizeRecordPlan(savedPlans[0]).mode)} · {normalizeRecordPlan(savedPlans[0]).cost} 元 · {normalizeRecordPlan(savedPlans[0]).tickets} 注
+                </span>
               )}
             </div>
           </section>
           <CapitalPanel capital={dashboard.capital_state} />
+          <HistoryRecords records={savedPlans} />
         </div>
 
         <footer className="disclaimer footer-note">

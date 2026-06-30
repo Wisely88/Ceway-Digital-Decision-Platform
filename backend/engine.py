@@ -10,6 +10,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BASE_DIR.parent
 DATA_PATH = BASE_DIR / "data" / "dlt_history.csv"
+RECORDS_PATH = BASE_DIR / "data" / "dlt_records.json"
 SCENES_PATH = ROOT_DIR / "config" / "scenes.json"
 DLT_REQUIRED_COLUMNS = ["issue", "date", "f1", "f2", "f3", "f4", "f5", "b1", "b2"]
 
@@ -68,6 +69,24 @@ def save_dlt_history(csv_text: str) -> int:
     rows = parse_dlt_csv(csv_text)
     DATA_PATH.write_text(csv_text.strip() + "\n", encoding="utf-8")
     return len(rows)
+
+
+def load_dlt_records() -> list[dict]:
+    if not RECORDS_PATH.exists():
+        return []
+    with RECORDS_PATH.open("r", encoding="utf-8") as file:
+        payload = json.load(file)
+    if not isinstance(payload, list):
+        return []
+    return payload
+
+
+def save_dlt_record(record: dict) -> list[dict]:
+    records = load_dlt_records()
+    records.insert(0, record)
+    records = records[:100]
+    RECORDS_PATH.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
+    return records
 
 
 def ratio_label(left: int, total: int) -> str:

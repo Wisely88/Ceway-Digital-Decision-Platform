@@ -1,6 +1,7 @@
 backend/.venv/
 backend/__pycache__/
+backend/data/dlt_records.json
 frontend/node_modules/
 frontend/dist/
+.logs/
 .DS_Store
-

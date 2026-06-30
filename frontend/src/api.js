@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -20,17 +20,56 @@ export function getScenes() {
   return request("/scenes");
 }
 
-export function getDltDashboard({ budget, lastPrize }) {
-  return request(`/dashboard/dlt?budget=${budget}&last_prize=${lastPrize}`);
+export function getDltDashboard({
+  budget,
+  lastPrize,
+  strategy,
+  window,
+  principal,
+  balance,
+  levelUnits,
+}) {
+  const params = new URLSearchParams({
+    budget,
+    last_prize: lastPrize,
+    strategy,
+    window,
+    principal,
+    level_units: levelUnits,
+  });
+  if (balance !== "" && balance !== null && balance !== undefined) {
+    params.set("balance", balance);
+  }
+  return request(`/dashboard/dlt?${params.toString()}`);
 }
 
-export function generateDltPlan({ budget, mode, lastPrize }) {
+export function generateDltPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits }) {
   return request("/plan/dlt", {
     method: "POST",
     body: JSON.stringify({
       budget,
-      mode,
+      strategy,
       last_prize: lastPrize,
+      window,
+      principal,
+      balance: balance === "" ? null : balance,
+      level_units: levelUnits,
+    }),
+  });
+}
+
+export function getDltRecords() {
+  return request("/records/dlt");
+}
+
+export function saveDltRecord({ budget, strategy, latestIssue, plan }) {
+  return request("/records/dlt", {
+    method: "POST",
+    body: JSON.stringify({
+      budget,
+      strategy,
+      latest_issue: latestIssue,
+      plan,
     }),
   });
 }
