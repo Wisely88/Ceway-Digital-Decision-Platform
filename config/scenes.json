@@ -21,7 +21,7 @@
     "name": "双色球",
     "code": "SSQ",
     "module": "SSQ Module",
-    "status": "开发中",
+    "status": "已上线",
     "description": "红球 33 选 6，蓝球 16 选 1",
     "front": {
       "min": 1,
@@ -33,7 +33,7 @@
       "max": 16,
       "pick": 1
     },
-    "enabled": false
+    "enabled": true
   },
   "k8": {
     "name": "快乐8",

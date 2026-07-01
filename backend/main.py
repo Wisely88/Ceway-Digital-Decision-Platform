@@ -10,21 +10,38 @@ from fastapi import FastAPI, File, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from backtest import build_dlt_backtest
+from backtest import build_dlt_backtest, build_ssq_backtest
 from capital import capital_state
-from db import data_status, delete_dlt_record_db, save_review_results, search_dlt_draws
+from db import (
+    data_status,
+    delete_dlt_record_db,
+    delete_ssq_record_db,
+    load_ssq_records_db,
+    save_review_results,
+    save_ssq_review_results,
+    save_ssq_sync_run,
+    search_dlt_draws,
+    search_ssq_draws,
+    ssq_data_status,
+)
 from engine import (
     calculate_trends,
+    calculate_ssq_trends,
     load_dlt_history,
     load_dlt_records,
     load_latest_dlt_draws,
+    load_latest_ssq_draws,
     load_scenes,
+    load_ssq_history,
+    load_ssq_records,
     save_dlt_history,
     save_dlt_record,
+    save_ssq_history,
+    save_ssq_record,
 )
-from generator import generate_plans, normalize_strategy
-from review import build_review
-from scorer import score_back_numbers, score_front_numbers
+from generator import generate_plans, generate_ssq_plans, normalize_strategy
+from review import build_review, build_ssq_review, review_ssq_plan
+from scorer import score_back_numbers, score_front_numbers, score_ssq_back_numbers, score_ssq_front_numbers
 
 
 app = FastAPI(title="Ceway v1.5 Backtest API")
@@ -356,6 +373,239 @@ async def import_dlt_history(
         count = save_dlt_history(csv_text, mode=mode)
     except UnicodeDecodeError as exc:
         raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "status": "ok",
+        "filename": file.filename,
+        "mode": mode,
+        "rows": count,
+    }
+
+
+# --- SSQ 双色球路由 ---
+
+
+def build_ssq_payload(
+    budget: int,
+    last_prize: float,
+    strategy: str | None = "balanced",
+    mode: str | None = None,
+    principal: float = 1000,
+    balance: float | None = None,
+    level_units: int = 1,
+    window: int = 100,
+) -> dict:
+    selected_strategy = normalize_strategy(strategy, mode)
+    history = load_ssq_history()
+    trends = calculate_ssq_trends(history, window=window)
+    score_table = score_ssq_front_numbers(trends)
+    back_scores = score_ssq_back_numbers(trends)
+    plans = generate_ssq_plans(
+        budget=budget,
+        strategy=selected_strategy,
+        score_table=score_table,
+        back_scores=back_scores,
+        mode=mode,
+    )
+    capital = capital_state(
+        last_prize=last_prize,
+        principal=principal,
+        balance=balance,
+        level_units=level_units,
+    )
+    top_numbers = [item["number"] for item in score_table[:6]]
+    latest_row = history[-1] if history else None
+    based_on_issue = latest_row["issue"] if latest_row else None
+    recommended_issue = next_issue_label(based_on_issue)
+    for plan in plans:
+        plan["based_on_issue"] = based_on_issue
+        plan["recommended_issue"] = recommended_issue
+        plan["recommendation_label"] = (
+            f"基于第 {based_on_issue} 期开奖数据，生成第 {recommended_issue} 期推荐方案。"
+            if based_on_issue and recommended_issue
+            else "基于当前最新开奖数据，生成下一期开奖推荐方案。"
+        )
+    storage_status = ssq_data_status()
+
+    return {
+        "scene": "SSQ",
+        "product": {
+            "name": "策维",
+            "english_name": "Ceway",
+            "subtitle": "Digital Decision Platform",
+            "framework": "Powered by CBGO Framework",
+            "baseline": "v1.2 MVP",
+            "version": "v1.5 Backtest Validation",
+        },
+        "disclaimer": "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
+        "history_count": len(history),
+        "latest_issue": based_on_issue,
+        "recommended_issue": recommended_issue,
+        "plans": plans,
+        "trends": trends,
+        "scoreboard": score_table,
+        "back_scoreboard": back_scores,
+        "top_front": top_numbers,
+        "capital": capital,
+        "storage": storage_status,
+    }
+
+
+@app.get("/dashboard/ssq")
+@app.get("/api/ssq/dashboard")
+def ssq_dashboard(
+    budget: int = Query(default=20, ge=2),
+    last_prize: float = Query(default=0, ge=0),
+    strategy: str | None = Query(default="balanced", pattern="^(conservative|balanced|aggressive)$"),
+    mode: str | None = Query(default=None, pattern="^(single|dantuo|auto)$"),
+    principal: float = Query(default=1000, ge=0),
+    balance: float | None = Query(default=None, ge=0),
+    level_units: int = Query(default=1, ge=1, le=4),
+    window: int = Query(default=100, ge=30, le=200),
+) -> dict:
+    return build_ssq_payload(
+        budget=budget,
+        last_prize=last_prize,
+        strategy=strategy,
+        mode=mode,
+        principal=principal,
+        balance=balance,
+        level_units=level_units,
+        window=window,
+    )
+
+
+@app.post("/generate/ssq")
+def generate_ssq(request: GenerateRequest) -> dict:
+    plans = build_ssq_payload(
+        budget=request.budget,
+        last_prize=request.last_prize,
+        strategy=request.strategy,
+        mode=request.mode,
+        principal=request.principal,
+        balance=request.balance,
+        level_units=request.level_units,
+        window=request.window,
+    )["plans"]
+    if not plans:
+        raise HTTPException(status_code=400, detail="此预算下无法生成方案")
+    return plans[0]
+
+
+@app.post("/plan/ssq")
+def plan_ssq(request: GenerateRequest) -> dict:
+    return generate_ssq(request)
+
+
+@app.get("/records/ssq")
+def records_ssq() -> list[dict]:
+    try:
+        return load_ssq_records()
+    except Exception:
+        return []
+
+
+@app.delete("/records/ssq/{record_id}")
+def delete_record_ssq(record_id: str) -> dict:
+    deleted = delete_ssq_record_db(record_id)
+    return {"status": "ok", "deleted": deleted, "id": record_id}
+
+
+@app.post("/records/ssq")
+def create_record_ssq(request: RecordRequest) -> dict:
+    record = {
+        "id": f"ssq-{datetime.now(timezone.utc).timestamp()}",
+        "saved_at": datetime.now(timezone.utc).isoformat(),
+        "budget": request.budget,
+        "strategy": request.strategy,
+        "latest_issue": request.latest_issue,
+        "plan": request.plan,
+    }
+    records = save_ssq_record(record)
+    return {"status": "ok", "record": record, "count": len(records)}
+
+
+@app.get("/review/ssq")
+def review_ssq(limit: int = Query(default=20, ge=1, le=100)) -> dict:
+    try:
+        payload = build_ssq_review(load_ssq_records(), load_ssq_history(), limit=limit)
+        save_ssq_review_results(payload.get("items", []))
+        return payload
+    except Exception as exc:
+        return {
+            "summary": {
+                "records": 0,
+                "reviewed": 0,
+                "pending": 0,
+                "total_cost": 0,
+                "hit_records": 0,
+                "record_hit_rate": 0.0,
+                "best_hit": "-",
+                "best_prize_label": "-",
+            },
+            "items": [],
+            "disclaimer": f"SSQ复盘数据暂不可用，已跳过异常记录。原因：{exc}",
+        }
+
+
+@app.get("/backtest/ssq")
+@app.get("/api/ssq/backtest")
+def backtest_ssq_api(
+    budget: int = Query(default=20, ge=2),
+    strategy: str = Query(default="balanced", pattern="^(conservative|balanced|aggressive)$"),
+    periods: int = Query(default=100, ge=5, le=500),
+    window: int = Query(default=100, ge=30, le=200),
+) -> dict:
+    return build_ssq_backtest(
+        load_ssq_history(),
+        budget=budget,
+        strategy=strategy,
+        periods=periods,
+        window=window,
+    )
+
+
+@app.get("/data/ssq/status")
+def ssq_data_status_api() -> dict:
+    load_ssq_history()
+    return ssq_data_status()
+
+
+@app.get("/data/ssq/draws")
+def ssq_draws(
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    issue: str | None = Query(default=None),
+) -> dict:
+    return search_ssq_draws(limit=limit, offset=offset, issue=issue)
+
+
+@app.get("/data/ssq/template")
+def ssq_template() -> Response:
+    csv_text = "issue,date,f1,f2,f3,f4,f5,f6,b1\n2025001,2025-01-01,5,10,15,20,25,30,7\n"
+    return Response(
+        content=csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=ssq_history_template.csv"},
+    )
+
+
+@app.post("/data/ssq/import")
+async def import_ssq_history(
+    file: UploadFile = File(...),
+    mode: str = Query(default="replace", pattern="^(replace|append)$"),
+) -> dict:
+    if not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="仅支持 CSV 文件")
+
+    content = await file.read()
+    try:
+        csv_text = content.decode("utf-8-sig")
+        count = save_ssq_history(csv_text, mode=mode)
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=400, detail="CSV 必须为 UTF-8 编码") from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -37,17 +37,28 @@ import {
 } from "recharts";
 import {
   deleteDltRecord,
+  deleteSsqRecord,
   generateDltPlan,
-  getDltDataStatus,
+  generateSsqPlan,
+  getDltBacktest,
   getDltDashboard,
+  getDltDataStatus,
   getDltDraws,
   getDltRecords,
   getDltReview,
-  getDltBacktest,
   getScenes,
+  getSsqBacktest,
+  getSsqDashboard,
+  getSsqDataStatus,
+  getSsqDraws,
+  getSsqRecords,
+  getSsqReview,
   importDltHistory,
+  importSsqHistory,
   saveDltRecord,
+  saveSsqRecord,
   searchDltDraws,
+  searchSsqDraws,
   syncDltHistory,
 } from "./api";
 import "./styles.css";
@@ -1478,6 +1489,334 @@ function Dashboard({ scenes, onBack }) {
   );
 }
 
+function SsqDashboard({ scenes, onBack }) {
+  const [budget, setBudget] = useState(20);
+  const [lastPrize, setLastPrize] = useState(0);
+  const [strategy, setStrategy] = useState("balanced");
+  const [windowSize, setWindowSize] = useState(100);
+  const [principal, setPrincipal] = useState(1000);
+  const [balance, setBalance] = useState("");
+  const [levelUnits, setLevelUnits] = useState(1);
+  const [dashboard, setDashboard] = useState(null);
+  const [generated, setGenerated] = useState(null);
+  const [savedPlans, setSavedPlans] = useState([]);
+  const [review, setReview] = useState(null);
+  const [backtest, setBacktest] = useState(null);
+  const [dataStorage, setDataStorage] = useState(null);
+  const [draws, setDraws] = useState([]);
+  const [drawIssue, setDrawIssue] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const loadDashboard = async () => {
+    setLoading(true);
+    setError("");
+    setNotice("");
+    try {
+      const data = await getSsqDashboard({
+        budget,
+        lastPrize,
+        strategy,
+        window: windowSize,
+        principal,
+        balance,
+        levelUnits,
+      });
+      setDashboard(data);
+      setGenerated(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboard();
+    getSsqRecords()
+      .then((records) => setSavedPlans(records))
+      .catch(() => {
+        const stored = JSON.parse(localStorage.getItem("cbgo_ssq_plans") || "[]");
+        setSavedPlans(stored);
+      });
+    getSsqReview()
+      .then(setReview)
+      .catch(() => setReview({
+        summary: { reviewed: 0, pending: 0, total_cost: 0, record_hit_rate: 0, best_hit: "-", best_prize_label: "-" },
+        items: [],
+        disclaimer: "SSQ 复盘数据暂不可用。",
+      }));
+    getSsqBacktest({ budget, strategy, periods: 100, window: windowSize })
+      .then(setBacktest)
+      .catch(() => setBacktest(null));
+    getSsqDataStatus().then(setDataStorage).catch(() => setDataStorage(null));
+    getSsqDraws({ limit: 12 }).then(setDraws).catch(() => setDraws({ items: [], total: 0, limit: 12, offset: 0, issue: "" }));
+  }, []);
+
+  const refreshDataStorage = async ({ offset = 0, issue = drawIssue } = {}) => {
+    const [status, drawPayload] = await Promise.all([
+      getSsqDataStatus(),
+      searchSsqDraws({ limit: 12, offset, issue }),
+    ]);
+    setDataStorage(status);
+    setDraws(drawPayload);
+    setDrawIssue(issue);
+  };
+
+  const refreshReview = async () => {
+    try {
+      const data = await getSsqReview();
+      setReview(data);
+    } catch (err) {
+      setReview({
+        summary: { reviewed: 0, pending: 0, total_cost: 0, record_hit_rate: 0, best_hit: "-", best_prize_label: "-" },
+        items: [],
+        disclaimer: `SSQ 复盘数据暂不可用：${err.message}`,
+      });
+    }
+  };
+
+  const refreshBacktest = async () => {
+    setError("");
+    setNotice("正在运行双色球历史回测...");
+    try {
+      const data = await getSsqBacktest({ budget, strategy, periods: 100, window: windowSize });
+      setBacktest(data);
+      setNotice(`双色球回测完成：${data.summary?.periods || 0} 期，命中记录率 ${data.summary?.record_hit_rate || 0}%。`);
+    } catch (err) {
+      setError(err.message);
+      setNotice("");
+    }
+  };
+
+  const syncHistory = async () => {
+    setNotice("双色球自动同步暂未接入，请使用 CSV 导入更新开奖数据。");
+  };
+
+  const generate = async () => {
+    setNotice("");
+    setError("");
+    try {
+      const result = await generateSsqPlan({
+        budget,
+        strategy,
+        lastPrize,
+        window: windowSize,
+        principal,
+        balance: balance === "" ? null : balance,
+        levelUnits,
+      });
+      setGenerated(result);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const savePlan = async (plan) => {
+    const latestIssue = dashboard?.latest_issue || "";
+    try {
+      const result = await saveSsqRecord({ budget, strategy, latestIssue, plan });
+      setSavedPlans((items) => [result.record, ...items].slice(0, 100));
+      await refreshReview();
+      setNotice("双色球方案已保存。");
+    } catch (err) {
+      setNotice(err.message);
+    }
+  };
+
+  const deleteRecord = async (id) => {
+    try {
+      await deleteSsqRecord(id);
+      setSavedPlans((items) => items.filter((record) => record.id !== id));
+      await refreshReview();
+      setNotice("双色球历史推荐记录已删除。");
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const importHistory = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError("");
+    setNotice("");
+    try {
+      const result = await importSsqHistory(file);
+      await loadDashboard();
+      await refreshDataStorage({ offset: 0, issue: "" });
+      setNotice(`已导入 ${result.rows} 条 SSQ 开奖数据。`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const scoreRows = dashboard?.scoreboard || [];
+  const ssqView = dashboard ? {
+    ...dashboard,
+    score_table: scoreRows,
+    capital_state: dashboard.capital,
+    data_status: {
+      ...(dashboard.storage || {}),
+      source_label: "SQLite 数据库",
+      is_sample: (dashboard.history_count || 0) <= 100,
+      message: "当前双色球分析基于本地 SQLite 数据库。可通过 CSV 导入更新开奖数据。",
+    },
+    top_numbers: dashboard.top_front || [],
+    recommended_amount: Math.max(...(dashboard.plans || []).map((plan) => plan.cost), 0),
+    window: dashboard.trends?.window || windowSize,
+  } : null;
+
+  if (loading) {
+    return <main className="loading"><RefreshCw className="spin" /> 正在计算 SSQ Module 数据...</main>;
+  }
+
+  if (error && !dashboard) {
+    return (
+      <main className="loading">
+        <ShieldAlert />
+        <p>{error}</p>
+        <button className="text-button" onClick={onBack} type="button">返回场景页</button>
+      </main>
+    );
+  }
+
+  return (
+    <main className="app-shell">
+      <AppSidebar scenes={scenes} active="SSQ" onSelect={() => {}} />
+
+      <section className="workspace">
+        <header className="workspace-topbar">
+          <div>
+            <Badge tone="live">双色球 SSQ</Badge>
+            <h1>策维（Ceway）数字决策平台</h1>
+            <p>Powered by CBGO Framework · SSQ Module　当前期号：{dashboard.latest_issue}　推荐期号：{dashboard.recommended_issue || "下一期"}　<span className="status-dot" />运行状态：正常</p>
+          </div>
+          <div className="topbar-actions">
+            <button className="ghost-button" onClick={onBack} type="button">
+              <ArrowLeft size={16} />
+              返回场景页
+            </button>
+            <Badge><Database size={13} /> {dashboard.history_count} 期样本</Badge>
+            <label className="upload-button">
+              <FileUp size={16} />
+              导入CSV
+              <input accept=".csv,text/csv" type="file" onChange={importHistory} />
+            </label>
+            <button className="icon-button" onClick={loadDashboard} title="刷新" type="button">
+              <RefreshCw size={18} />
+            </button>
+          </div>
+        </header>
+
+        <section className="control-panel">
+          <label>
+            本期预算
+            <input min="2" step="2" type="number" value={budget} onChange={(event) => setBudget(Number(event.target.value))} />
+          </label>
+          <label>
+            上期奖金
+            <input min="0" step="5" type="number" value={lastPrize} onChange={(event) => setLastPrize(Number(event.target.value))} />
+          </label>
+          <label>
+            生成策略
+            <select value={strategy} onChange={(event) => setStrategy(event.target.value)}>
+              <option value="conservative">保守 · 控制复杂度</option>
+              <option value="balanced">均衡 · 评分与预算折中</option>
+              <option value="aggressive">激进 · 提高覆盖面</option>
+            </select>
+          </label>
+          <label>
+            初始本金
+            <input min="0" step="50" type="number" value={principal} onChange={(event) => setPrincipal(Number(event.target.value))} />
+          </label>
+          <label>
+            当前余额
+            <input min="0" step="10" type="number" value={balance} placeholder="默认等于本金" onChange={(event) => setBalance(event.target.value === "" ? "" : Number(event.target.value))} />
+          </label>
+          <label>
+            当前级别
+            <select value={levelUnits} onChange={(event) => setLevelUnits(Number(event.target.value))}>
+              <option value={1}>1注</option>
+              <option value={2}>2注</option>
+              <option value={4}>4注</option>
+            </select>
+          </label>
+          <button className="primary-button" onClick={loadDashboard} type="button">
+            <Activity size={16} />
+            更新总览
+          </button>
+          <button className="primary-button strong" onClick={generate} type="button">
+            <Play size={16} />
+            生成方案
+          </button>
+        </section>
+
+        <section className="stats" id="module-overview">
+          <TopNumbersCard rows={scoreRows} />
+          <StatCard icon={Gauge} label="当前下注状态" value={dashboard.capital.level} meta={`下一状态 ${dashboard.capital.next_level}`} />
+          <StatCard icon={WalletCards} label="当前资金" value={`${dashboard.capital.balance} 元`} meta={`盈利 ${dashboard.capital.profit} 元`} />
+          <StatCard icon={Coins} label="本期策略/金额" value={`${STRATEGY_LABELS[strategy]} / ${ssqView.recommended_amount} 元`} meta="推荐金额不超过预算" />
+        </section>
+
+        {error && <p className="error">{error}</p>}
+        {notice && <p className="notice">{notice}</p>}
+        <DataStatusPanel dataStatus={ssqView.data_status} onImport={importHistory} />
+        <DataManagementPanel
+          status={dataStorage}
+          draws={draws}
+          onSearchDraws={(issue) => refreshDataStorage({ offset: 0, issue })}
+          onPageDraws={(offset, issue) => refreshDataStorage({ offset, issue })}
+          onSync={syncHistory}
+        />
+        <ReviewPanel review={review} onRefresh={refreshReview} />
+        <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} />
+
+        <div className="module-grid">
+          <TrendPanel
+            dashboard={ssqView}
+            scoreRows={scoreRows}
+            windowSize={windowSize}
+            onWindowChange={setWindowSize}
+          />
+          <ScoreTable rows={scoreRows} />
+          <section className="panel" id="module-plan">
+            <div className="panel-title">
+              <div>
+                <h2>组合生成</h2>
+                <p>双色球红球 33 选 6，蓝球 16 选 1；只保留费用小于等于预算的方案</p>
+              </div>
+              <LayoutDashboard size={18} />
+            </div>
+            {dashboard.plans[0] && <PlanCard plan={dashboard.plans[0]} onSave={savePlan} />}
+            <div className="plan-stack">
+              {generated && <PlanCard plan={generated} onSave={savePlan} />}
+              {dashboard.plans.slice(1).map((plan) => <PlanCard key={`${plan.strategy}-${plan.mode}`} plan={plan} onSave={savePlan} />)}
+            </div>
+            <div className="saved-summary">
+              <strong>已保存方案：{savedPlans.length}</strong>
+              {savedPlans[0] && (
+                <span>
+                  最近：{STRATEGY_LABELS[savedPlans[0].strategy || normalizeRecordPlan(savedPlans[0]).strategy] || "策略"} · {planModeLabel(normalizeRecordPlan(savedPlans[0]).mode)} · {normalizeRecordPlan(savedPlans[0]).cost} 元
+                </span>
+              )}
+            </div>
+          </section>
+          <CapitalPanel capital={dashboard.capital} />
+          <HistoryRecords records={savedPlans} onDelete={deleteRecord} />
+        </div>
+
+        <footer className="disclaimer footer-note">
+          <ShieldAlert size={16} />
+          {dashboard.disclaimer} 彩票具有随机性，请理性娱乐，量力而行。
+        </footer>
+      </section>
+    </main>
+  );
+}
+
 function App() {
   const [scenes, setScenes] = useState([]);
   const [view, setView] = useState("scenes");
@@ -1488,7 +1827,7 @@ function App() {
       .catch(() => {
         setScenes([
           { code: "DLT", name: "大乐透", enabled: true },
-          { code: "SSQ", name: "双色球", enabled: false },
+          { code: "SSQ", name: "双色球", enabled: true },
           { code: "K8", name: "快乐8", enabled: false },
           { code: "CUSTOM", name: "自定义分析", enabled: false },
         ]);
@@ -1497,6 +1836,10 @@ function App() {
 
   if (view === "dlt") {
     return <Dashboard scenes={scenes} onBack={() => setView("scenes")} />;
+  }
+
+  if (view === "ssq") {
+    return <SsqDashboard scenes={scenes} onBack={() => setView("scenes")} />;
   }
 
   if (view !== "scenes") {
