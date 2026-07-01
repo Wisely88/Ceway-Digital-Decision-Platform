@@ -60,6 +60,7 @@ import {
   searchDltDraws,
   searchSsqDraws,
   syncDltHistory,
+  syncSsqHistory,
 } from "./api";
 import "./styles.css";
 
@@ -1590,8 +1591,18 @@ function SsqDashboard({ scenes, onBack }) {
     }
   };
 
-  const syncHistory = async () => {
-    setNotice("双色球自动同步暂未接入，请使用 CSV 导入更新开奖数据。");
+  const syncHistory = async (full = false) => {
+    setError("");
+    setNotice(full ? "正在全量校准双色球开奖数据..." : "正在更新双色球开奖数据...");
+    try {
+      const result = await syncSsqHistory({ source: "78500", full });
+      await loadDashboard();
+      await refreshDataStorage({ offset: 0, issue: "" });
+      setNotice(`双色球数据更新完成：最新期号 ${result.data_status?.latest_issue || "-"}`);
+    } catch (err) {
+      setError(err.message);
+      setNotice("");
+    }
   };
 
   const generate = async () => {
@@ -1828,8 +1839,6 @@ function App() {
         setScenes([
           { code: "DLT", name: "大乐透", enabled: true },
           { code: "SSQ", name: "双色球", enabled: true },
-          { code: "K8", name: "快乐8", enabled: false },
-          { code: "CUSTOM", name: "自定义分析", enabled: false },
         ]);
       });
   }, []);

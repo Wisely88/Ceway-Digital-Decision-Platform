@@ -615,3 +615,39 @@ async def import_ssq_history(
         "mode": mode,
         "rows": count,
     }
+
+
+@app.post("/data/ssq/sync")
+def sync_ssq_history(
+    source: str = Query(default="78500", pattern="^(78500)$"),
+    full: bool = Query(default=False),
+) -> dict:
+    command = [
+        sys.executable,
+        str(ROOT_DIR / "scripts" / "update_ssq_history.py"),
+        "--source",
+        source,
+        "--mode",
+        "replace" if full else "append",
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            cwd=ROOT_DIR,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(status_code=504, detail="双色球数据同步超时，请稍后重试。") from exc
+
+    output = (result.stdout or result.stderr).strip()
+    try:
+        payload = json.loads(output)
+    except json.JSONDecodeError:
+        payload = {"status": "failed", "message": output or "同步脚本没有返回有效结果"}
+
+    if result.returncode != 0:
+        raise HTTPException(status_code=502, detail=payload.get("message", "双色球数据同步失败"))
+    return {"status": "ok", "sync": payload, "data_status": ssq_data_status()}

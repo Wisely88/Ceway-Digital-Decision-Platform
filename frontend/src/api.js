@@ -298,6 +298,14 @@ export function searchSsqDraws({ limit = 12, offset = 0, issue = "" } = {}) {
   return request(`/data/ssq/draws?${params.toString()}`);
 }
 
+export function syncSsqHistory({ source = "78500", full = false } = {}) {
+  if (STATIC_DEMO) {
+    throw new Error("GitHub Pages 演示模式不支持联网更新，请在本地后端环境使用。");
+  }
+  const params = new URLSearchParams({ source, full });
+  return request(`/data/ssq/sync?${params.toString()}`, { method: "POST" });
+}
+
 export async function importSsqHistory(file) {
   if (STATIC_DEMO) {
     throw new Error("GitHub Pages 演示模式不支持导入 CSV，请在本地后端环境使用该功能。");
