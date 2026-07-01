@@ -57,6 +57,12 @@ class RecordRequest(BaseModel):
     plan: dict
 
 
+def next_issue_label(issue: str | None) -> str | None:
+    if not issue or not issue.isdigit():
+        return None
+    return f"{int(issue) + 1:0{len(issue)}d}"
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -110,6 +116,16 @@ def build_dlt_payload(
     )
     top_numbers = [item["number"] for item in score_table[:5]]
     latest_row = history[-1] if history else None
+    based_on_issue = latest_row["issue"] if latest_row else None
+    recommended_issue = next_issue_label(based_on_issue)
+    for plan in plans:
+        plan["based_on_issue"] = based_on_issue
+        plan["recommended_issue"] = recommended_issue
+        plan["recommendation_label"] = (
+            f"基于第 {based_on_issue} 期开奖数据，生成第 {recommended_issue} 期推荐方案。"
+            if based_on_issue and recommended_issue
+            else "基于当前最新开奖数据，生成下一期开奖推荐方案。"
+        )
     storage_status = data_status()
 
     return {
@@ -124,12 +140,13 @@ def build_dlt_payload(
         },
         "disclaimer": "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
         "history_count": len(history),
-        "latest_issue": latest_row["issue"] if latest_row else None,
+        "latest_issue": based_on_issue,
+        "recommended_issue": recommended_issue,
         "data_status": {
             "source": "sqlite",
             "source_label": "SQLite 数据库",
             "path": "backend/data/ceway.sqlite3",
-            "latest_issue": latest_row["issue"] if latest_row else None,
+            "latest_issue": based_on_issue,
             "latest_date": latest_row["date"] if latest_row else None,
             "is_sample": len(history) <= 30,
             "message": "当前走势分析基于本地 SQLite 数据库。可通过 CSV 导入更新开奖数据。",

@@ -941,6 +941,10 @@ select {
   margin-top: 0;
 }
 
+.trend-layout.single {
+  grid-template-columns: minmax(0, 1fr) 260px;
+}
+
 .chart-box {
   background: rgba(7, 18, 32, 0.66);
   border: 1px solid rgba(83, 129, 179, 0.22);
@@ -1012,6 +1016,30 @@ select {
 .trend-stats dd {
   color: #ffffff;
   margin: 0;
+}
+
+.trend-list {
+  display: grid;
+  gap: 10px;
+}
+
+.trend-list div {
+  background: rgba(7, 18, 32, 0.66);
+  border: 1px solid rgba(83, 129, 179, 0.22);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.trend-list strong {
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.trend-list span {
+  color: #a9bdd2;
+  font-size: 13px;
 }
 
 .ratio-row {
@@ -1101,6 +1129,33 @@ td {
   font-size: 13px;
   margin: 0 0 12px;
   padding: 9px 10px;
+}
+
+.plan-issue {
+  background: rgba(10, 29, 49, 0.72);
+  border: 1px solid rgba(83, 129, 179, 0.22);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+
+.plan-issue span {
+  color: #8fb6df;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.plan-issue strong {
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.plan-issue p {
+  color: #a9bdd2;
+  font-size: 13px;
+  margin: 0;
 }
 
 .number-groups,

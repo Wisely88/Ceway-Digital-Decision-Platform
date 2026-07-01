@@ -200,14 +200,20 @@ function scoreSortLabel(sortKey) {
 
 function AppSidebar({ scenes, active = "DLT", onSelect }) {
   const navItems = [
-    { label: "系统总览", icon: Home, active: true },
-    { label: "走势分析", icon: TrendingUp },
-    { label: "号码评分", icon: Table2 },
-    { label: "组合生成", icon: FileStack },
-    { label: "资金管理", icon: Coins },
-    { label: "历史记录", icon: History, muted: true },
-    { label: "系统设置", icon: Settings, muted: true },
+    { label: "系统总览", icon: Home, target: "module-overview" },
+    { label: "数据管理", icon: Database, target: "module-data" },
+    { label: "推荐复盘", icon: GitCompare, target: "module-review" },
+    { label: "历史回测", icon: Activity, target: "module-backtest" },
+    { label: "走势分析", icon: TrendingUp, target: "module-trends" },
+    { label: "号码评分", icon: Table2, target: "module-score" },
+    { label: "组合生成", icon: FileStack, target: "module-plan" },
+    { label: "资金管理", icon: Coins, target: "module-capital" },
+    { label: "历史记录", icon: History, target: "module-history" },
   ];
+
+  const jumpTo = (target) => {
+    document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <aside className="app-sidebar">
@@ -221,13 +227,13 @@ function AppSidebar({ scenes, active = "DLT", onSelect }) {
         </div>
       </div>
       <nav className="side-nav" aria-label="场景导航">
-        {navItems.map((item) => {
+        {navItems.map((item, index) => {
           const Icon = item.icon;
           return (
             <button
-              className={`side-nav-item ${item.active ? "active" : ""}`}
-              disabled={item.muted}
+              className={`side-nav-item ${index === 0 ? "active" : ""}`}
               key={item.label}
+              onClick={() => jumpTo(item.target)}
               type="button"
             >
               <Icon size={18} />
@@ -439,6 +445,7 @@ function TrendTooltip({ active, payload, scoreMap }) {
 }
 
 function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
+  const [activeTab, setActiveTab] = useState("hot");
   const missingByNumber = new Map(dashboard.trends.omissions.map((item) => [item.number, item.missing]));
   const scoreMap = new Map(scoreRows.map((item) => [item.number, item]));
   const hotFront = dashboard.trends.hot_front.slice(0, 35).map((item) => ({
@@ -449,9 +456,23 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
   const hottest = dashboard.trends.hot_front[0];
   const coldest = dashboard.trends.hot_front[dashboard.trends.hot_front.length - 1];
   const maxMissing = dashboard.trends.omissions.reduce((max, item) => item.missing > max.missing ? item : max, dashboard.trends.omissions[0]);
+  const missingRows = dashboard.trends.omissions
+    .map((item) => ({ ...item, score: scoreMap.get(item.number)?.total_score || 0 }))
+    .sort((left, right) => right.missing - left.missing || right.score - left.score);
+  const sumRangeRows = dashboard.trends.sum_values.map((item) => ({
+    ...item,
+    range: item.value < 75 ? "偏低" : item.value > 105 ? "偏高" : "均衡",
+  }));
+  const trendTabs = [
+    { key: "hot", label: "冷热号" },
+    { key: "missing", label: "遗漏" },
+    { key: "odd", label: "奇偶比" },
+    { key: "size", label: "大小比" },
+    { key: "sum", label: "和值" },
+  ];
 
   return (
-    <section className="panel wide">
+    <section className="panel wide" id="module-trends">
       <div className="panel-title">
         <div>
           <h2>走势分析</h2>
@@ -469,51 +490,133 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
       </div>
 
       <div className="trend-tabs">
-        <button className="active" type="button">冷热号</button>
-        <button type="button">遗漏</button>
-        <button type="button">奇偶比</button>
-        <button type="button">大小比</button>
-        <button type="button">和值</button>
+        {trendTabs.map((tab) => (
+          <button
+            className={activeTab === tab.key ? "active" : ""}
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            type="button"
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      <div className="trend-layout">
-        <div className="chart-box primary-chart">
-          <h3>冷热号分布（近{dashboard.trends.window}期）</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={hotFront}>
-              <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
-              <XAxis dataKey="number" tickFormatter={(value) => `${value}`} />
-              <YAxis allowDecimals={false} />
-              <Tooltip content={<TrendTooltip scoreMap={scoreMap} />} />
-              <Bar dataKey="missing" fill="#ef4d3c" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="count" fill="#1768d7" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      {activeTab === "hot" && (
+        <div className="trend-layout">
+          <div className="chart-box primary-chart">
+            <h3>冷热号分布（近{dashboard.trends.window}期）</h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={hotFront}>
+                <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
+                <XAxis dataKey="number" tickFormatter={(value) => `${value}`} />
+                <YAxis allowDecimals={false} />
+                <Tooltip content={<TrendTooltip scoreMap={scoreMap} />} />
+                <Bar dataKey="missing" fill="#ef4d3c" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="count" fill="#1768d7" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
-        <div className="trend-stats">
-          <h3>当前统计（前区）</h3>
-          <dl>
-            <div><dt>最热号码</dt><dd>{String(hottest.number).padStart(2, "0")}（{hottest.count}次）</dd></div>
-            <div><dt>最冷号码</dt><dd>{String(coldest.number).padStart(2, "0")}（{coldest.count}次）</dd></div>
-            <div><dt>最大遗漏</dt><dd>{String(maxMissing.number).padStart(2, "0")}（{maxMissing.missing}期）</dd></div>
-            <div><dt>和值均值</dt><dd>{dashboard.trends.sum_range.avg}</dd></div>
-          </dl>
-        </div>
+          <div className="trend-stats">
+            <h3>当前统计（前区）</h3>
+            <dl>
+              <div><dt>最热号码</dt><dd>{String(hottest.number).padStart(2, "0")}（{hottest.count}次）</dd></div>
+              <div><dt>最冷号码</dt><dd>{String(coldest.number).padStart(2, "0")}（{coldest.count}次）</dd></div>
+              <div><dt>最大遗漏</dt><dd>{String(maxMissing.number).padStart(2, "0")}（{maxMissing.missing}期）</dd></div>
+              <div><dt>和值均值</dt><dd>{dashboard.trends.sum_range.avg}</dd></div>
+            </dl>
+          </div>
 
-        <div className="chart-box sum-chart">
-          <h3>和值走势</h3>
-          <ResponsiveContainer width="100%" height={170}>
-            <LineChart data={sumValues}>
-              <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
-              <XAxis dataKey="issue" hide />
-              <YAxis />
-              <Tooltip />
-              <Line type="monotone" dataKey="value" stroke="#53a3ff" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="chart-box sum-chart">
+            <h3>和值走势</h3>
+            <ResponsiveContainer width="100%" height={170}>
+              <LineChart data={sumValues}>
+                <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
+                <XAxis dataKey="issue" hide />
+                <YAxis />
+                <Tooltip />
+                <Line type="monotone" dataKey="value" stroke="#53a3ff" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      </div>
+      )}
+
+      {activeTab === "missing" && (
+        <div className="trend-layout single">
+          <div className="chart-box primary-chart">
+            <h3>遗漏分布（前区35码）</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={missingRows}>
+                <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
+                <XAxis dataKey="number" tickFormatter={(value) => `${value}`} />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="missing" fill="#ef4d3c" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="trend-list">
+            {missingRows.slice(0, 10).map((item) => (
+              <div key={item.number}>
+                <strong>{String(item.number).padStart(2, "0")}</strong>
+                <span>遗漏 {item.missing} 期 · 综合分 {item.score}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(activeTab === "odd" || activeTab === "size") && (
+        <div className="trend-layout single">
+          <div className="chart-box primary-chart">
+            <h3>{activeTab === "odd" ? "奇偶比历史分布" : "大小比历史分布"}</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={activeTab === "odd" ? dashboard.trends.odd_even : dashboard.trends.big_small}>
+                <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
+                <XAxis dataKey="ratio" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" fill="#31d86b" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="trend-list">
+            {(activeTab === "odd" ? dashboard.trends.odd_even : dashboard.trends.big_small).map((item) => (
+              <div key={item.ratio}>
+                <strong>{item.ratio}</strong>
+                <span>出现 {item.count} 期</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "sum" && (
+        <div className="trend-layout single">
+          <div className="chart-box primary-chart">
+            <h3>和值走势与区间</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={sumRangeRows}>
+                <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
+                <XAxis dataKey="issue" hide />
+                <YAxis />
+                <Tooltip />
+                <Line type="monotone" dataKey="value" stroke="#53a3ff" strokeWidth={2} dot />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="trend-list">
+            {sumRangeRows.slice(-10).reverse().map((item) => (
+              <div key={item.issue}>
+                <strong>{item.issue}</strong>
+                <span>和值 {item.value} · {item.range}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="ratio-row">
         <div>
@@ -557,7 +660,7 @@ function ScoreTable({ rows }) {
   const visibleRows = showAll ? sortedRows : sortedRows.slice(0, 15);
 
   return (
-    <section className="panel">
+    <section className="panel" id="module-score">
       <div className="panel-title">
         <div>
           <h2>号码评分</h2>
@@ -615,7 +718,7 @@ function CapitalPanel({ capital }) {
   ].map((value, index) => ({ issue: index + 1, value }));
 
   return (
-    <section className="panel capital-panel">
+    <section className="panel capital-panel" id="module-capital">
       <div className="panel-title">
         <div>
           <h2>资金管理</h2>
@@ -716,6 +819,11 @@ function PlanCard({ plan, onSave }) {
         </Badge>
         <strong>{plan.cost} 元 · {plan.tickets} 注</strong>
       </div>
+      <div className="plan-issue">
+        <span>推荐期号</span>
+        <strong>{plan.recommended_issue ? `第 ${plan.recommended_issue} 期` : "下一期开奖"}</strong>
+        <p>{plan.recommendation_label || "基于当前最新开奖数据生成下一期开奖推荐方案。"}</p>
+      </div>
       {plan.reason && <p className="plan-reason">{plan.reason}</p>}
       {plan.mode === "dantuo" ? (
         <div className="number-groups">
@@ -773,7 +881,7 @@ function HistoryRecords({ records, onDelete }) {
     .filter((record) => !filter || `${record.latest_issue || ""}${record.strategy || ""}`.includes(filter))
     .slice(0, 8);
   return (
-    <section className="panel wide history-panel">
+    <section className="panel wide history-panel" id="module-history">
       <div className="panel-title">
         <div>
           <h2>历史推荐记录</h2>
@@ -818,7 +926,7 @@ function ReviewPanel({ review, onRefresh }) {
   if (!review) return null;
   const summary = review.summary || {};
   return (
-    <section className="panel wide review-panel">
+    <section className="panel wide review-panel" id="module-review">
       <div className="panel-title">
         <div>
           <h2>推荐复盘</h2>
@@ -893,7 +1001,7 @@ function BacktestPanel({ backtest, onRefresh }) {
   const baseline = backtest.baseline || {};
   const config = backtest.config || {};
   return (
-    <section className="panel wide backtest-panel">
+    <section className="panel wide backtest-panel" id="module-backtest">
       <div className="panel-title">
         <div>
           <h2>历史回测</h2>
@@ -953,7 +1061,7 @@ function DataManagementPanel({ status, draws, onSearchDraws, onPageDraws, onSync
   const limit = Array.isArray(draws) ? drawItems.length || 8 : draws.limit || 8;
   const currentIssue = Array.isArray(draws) ? "" : draws.issue || "";
   return (
-    <section className="panel wide data-management-panel">
+    <section className="panel wide data-management-panel" id="module-data">
       <div className="panel-title">
         <div>
           <h2>数据管理</h2>
@@ -1238,7 +1346,7 @@ function Dashboard({ scenes, onBack }) {
 
   return (
     <main className="app-shell">
-      <AppSidebar scenes={scenes} active="DLT" onSelect={() => {}} onBack={onBack} />
+      <AppSidebar scenes={scenes} active="DLT" onSelect={() => {}} />
 
       <section className="workspace">
         <header className="workspace-topbar">
@@ -1307,7 +1415,7 @@ function Dashboard({ scenes, onBack }) {
           </button>
         </section>
 
-        <section className="stats">
+        <section className="stats" id="module-overview">
           <TopNumbersCard rows={dashboard.score_table} />
           <StatCard icon={Gauge} label="当前下注状态" value={dashboard.capital_state.level} meta={`下一状态 ${dashboard.capital_state.next_level}`} />
           <StatCard icon={WalletCards} label="当前资金" value={`${dashboard.capital_state.balance} 元`} meta={`盈利 ${dashboard.capital_state.profit} 元`} />
@@ -1335,7 +1443,7 @@ function Dashboard({ scenes, onBack }) {
             onWindowChange={setWindowSize}
           />
           <ScoreTable rows={dashboard.score_table} />
-          <section className="panel">
+          <section className="panel" id="module-plan">
             <div className="panel-title">
               <div>
                 <h2>组合生成</h2>
