@@ -35,6 +35,29 @@ def plan_reason(strategy: str, mode: str, score: float, cost: int, budget: int) 
     return f"均衡策略在评分质量和预算使用之间折中，当前{mode_label(mode)}方案综合评分 {score}，预算占用 {ratio}%。"
 
 
+def budget_analysis(cost: int, budget: int, mode: str) -> dict:
+    unused = max(0, budget - cost)
+    utilization = round((cost / budget) * 100, 1) if budget > 0 else 0
+    if unused == 0:
+        explanation = "本方案费用刚好等于本期预算。"
+    elif mode == "dantuo":
+        explanation = f"胆拖费用由组合公式决定，当前预算内最接近的合法方案为 {cost} 元，剩余 {unused} 元不强行加注。"
+    else:
+        explanation = f"单式按 2 元/注生成，当前使用 {cost} 元，剩余 {unused} 元。"
+    return {
+        "budget": budget,
+        "cost": cost,
+        "unused": unused,
+        "utilization": utilization,
+        "explanation": explanation,
+    }
+
+
+def attach_budget_analysis(plan: dict, budget: int) -> dict:
+    plan["budget_analysis"] = budget_analysis(plan.get("cost", 0), budget, plan.get("mode", "single"))
+    return plan
+
+
 def mode_label(mode: str) -> str:
     return "胆拖" if mode == "dantuo" else "单式"
 
@@ -44,10 +67,27 @@ def top_explanations(numbers: list[int], score_table: list[dict], limit: int = 5
     return [f"{number:02d}：{explanation_by_number.get(number, '')}" for number in numbers[:limit]]
 
 
-def generate_single(budget: int, score_table: list[dict], back_scores: list[dict], strategy: str = "balanced") -> dict:
+def rotate(items: list, variant: int = 0) -> list:
+    if not items:
+        return items
+    offset = variant % len(items)
+    return items[offset:] + items[:offset]
+
+
+def budget_fit_sort_key(item: dict) -> tuple:
+    return (-item["cost"], -item.get("tickets", 0), -item.get("score", 0))
+
+
+def generate_single(
+    budget: int,
+    score_table: list[dict],
+    back_scores: list[dict],
+    strategy: str = "balanced",
+    variant: int = 0,
+) -> dict:
     ticket_count = max(1, budget // TICKET_PRICE)
-    ranked_front = [item["number"] for item in score_table]
-    ranked_back = [item["number"] for item in back_scores]
+    ranked_front = rotate([item["number"] for item in score_table], variant)
+    ranked_back = rotate([item["number"] for item in back_scores], variant)
     tickets = []
 
     for index in range(ticket_count):
@@ -68,7 +108,7 @@ def generate_single(budget: int, score_table: list[dict], back_scores: list[dict
 
     score = round(sum(item["score"] for item in tickets), 2)
     cost = ticket_count * TICKET_PRICE
-    return {
+    return attach_budget_analysis({
         "mode": "single",
         "strategy": strategy,
         "cost": cost,
@@ -76,7 +116,7 @@ def generate_single(budget: int, score_table: list[dict], back_scores: list[dict
         "items": tickets,
         "score": score,
         "reason": plan_reason(strategy, "single", score, cost, budget),
-    }
+    }, budget)
 
 
 def dantuo_cost(front_dan_count: int, front_tuo_count: int, back_count: int) -> tuple[int, int]:
@@ -91,9 +131,10 @@ def generate_dantuo(
     score_table: list[dict],
     back_scores: list[dict],
     strategy: str = "balanced",
+    variant: int = 0,
 ) -> dict:
-    ranked_front = [item["number"] for item in score_table]
-    ranked_back = [item["number"] for item in back_scores]
+    ranked_front = rotate([item["number"] for item in score_table], variant)
+    ranked_back = rotate([item["number"] for item in back_scores], variant)
     candidates = []
     dan_counts = [2, 3] if strategy == "balanced" else [1, 2, 3]
     max_tuo = 10 if strategy != "aggressive" else 12
@@ -127,23 +168,29 @@ def generate_dantuo(
                 )
 
     if not candidates:
-        return generate_single(budget, score_table, back_scores, strategy)
+        return generate_single(budget, score_table, back_scores, strategy, variant)
 
     if strategy == "aggressive":
         candidates.sort(key=lambda item: (-item["cost"], -item["tickets"], -item["score"]))
     else:
-        candidates.sort(key=lambda item: (-item["score"], -item["cost"], item["tickets"]))
+        candidates.sort(key=budget_fit_sort_key)
     selected = candidates[0]
     selected["reason"] = plan_reason(strategy, "dantuo", selected["score"], selected["cost"], budget)
-    return selected
+    return attach_budget_analysis(selected, budget)
 
 
-def generate_strategy_plans(strategy: str, budget: int, score_table: list[dict], back_scores: list[dict]) -> list[dict]:
+def generate_strategy_plans(
+    strategy: str,
+    budget: int,
+    score_table: list[dict],
+    back_scores: list[dict],
+    variant: int = 0,
+) -> list[dict]:
     if strategy == "conservative":
-        return [generate_single(budget, score_table, back_scores, strategy)]
+        return [generate_single(budget, score_table, back_scores, strategy, variant)]
 
-    single = generate_single(budget, score_table, back_scores, strategy)
-    dantuo = generate_dantuo(budget, score_table, back_scores, strategy)
+    single = generate_single(budget, score_table, back_scores, strategy, variant)
+    dantuo = generate_dantuo(budget, score_table, back_scores, strategy, variant)
     plans = [single]
     if dantuo["mode"] == "dantuo":
         plans.insert(0, dantuo)
@@ -156,19 +203,20 @@ def generate_plans(
     score_table: list[dict] | None = None,
     back_scores: list[dict] | None = None,
     mode: str | None = None,
+    variant: int = 0,
 ) -> list[dict]:
     score_table = score_table or []
     back_scores = back_scores or []
     normalized = normalize_strategy(strategy, mode)
-    plans = generate_strategy_plans(normalized, budget, score_table, back_scores)
+    plans = generate_strategy_plans(normalized, budget, score_table, back_scores, variant)
 
     legacy_request = strategy in LEGACY_STRATEGY_MAP or mode in LEGACY_STRATEGY_MAP
     requested_mode = strategy if strategy in {"single", "dantuo"} else mode
     if legacy_request and requested_mode == "single":
-        return [generate_single(budget, score_table, back_scores, normalized)]
+        return [generate_single(budget, score_table, back_scores, normalized, variant)]
     if legacy_request and requested_mode == "dantuo":
-        return [generate_dantuo(budget, score_table, back_scores, normalized)]
-    return sorted(plans, key=lambda item: (-item["cost"], item["mode"]))
+        return [generate_dantuo(budget, score_table, back_scores, normalized, variant)]
+    return plans
 
 
 # --- SSQ 双色球生成函数 ---
@@ -196,10 +244,16 @@ def ssq_top_explanations(numbers: list[int], score_table: list[dict], limit: int
     return [f"{number:02d}：{explanation_by_number.get(number, '')}" for number in numbers[:limit]]
 
 
-def generate_ssq_single(budget: int, score_table: list[dict], back_scores: list[dict], strategy: str = "balanced") -> dict:
+def generate_ssq_single(
+    budget: int,
+    score_table: list[dict],
+    back_scores: list[dict],
+    strategy: str = "balanced",
+    variant: int = 0,
+) -> dict:
     ticket_count = max(1, budget // TICKET_PRICE)
-    ranked_front = [item["number"] for item in score_table]
-    ranked_back = [item["number"] for item in back_scores]
+    ranked_front = rotate([item["number"] for item in score_table], variant)
+    ranked_back = rotate([item["number"] for item in back_scores], variant)
     tickets = []
 
     for index in range(ticket_count):
@@ -220,7 +274,7 @@ def generate_ssq_single(budget: int, score_table: list[dict], back_scores: list[
 
     score = round(sum(item["score"] for item in tickets), 2)
     cost = ticket_count * TICKET_PRICE
-    return {
+    return attach_budget_analysis({
         "mode": "single",
         "strategy": strategy,
         "cost": cost,
@@ -228,7 +282,7 @@ def generate_ssq_single(budget: int, score_table: list[dict], back_scores: list[
         "items": tickets,
         "score": score,
         "reason": ssq_plan_reason(strategy, "single", score, cost, budget),
-    }
+    }, budget)
 
 
 def ssq_dantuo_cost(front_dan_count: int, front_tuo_count: int, back_count: int) -> tuple[int, int]:
@@ -243,9 +297,10 @@ def generate_ssq_dantuo(
     score_table: list[dict],
     back_scores: list[dict],
     strategy: str = "balanced",
+    variant: int = 0,
 ) -> dict:
-    ranked_front = [item["number"] for item in score_table]
-    ranked_back = [item["number"] for item in back_scores]
+    ranked_front = rotate([item["number"] for item in score_table], variant)
+    ranked_back = rotate([item["number"] for item in back_scores], variant)
     candidates = []
     dan_counts = [2, 3] if strategy == "balanced" else [1, 2, 3]
     max_tuo = 12 if strategy != "aggressive" else 15
@@ -279,23 +334,29 @@ def generate_ssq_dantuo(
                 )
 
     if not candidates:
-        return generate_ssq_single(budget, score_table, back_scores, strategy)
+        return generate_ssq_single(budget, score_table, back_scores, strategy, variant)
 
     if strategy == "aggressive":
         candidates.sort(key=lambda item: (-item["cost"], -item["tickets"], -item["score"]))
     else:
-        candidates.sort(key=lambda item: (-item["score"], -item["cost"], item["tickets"]))
+        candidates.sort(key=budget_fit_sort_key)
     selected = candidates[0]
     selected["reason"] = ssq_plan_reason(strategy, "dantuo", selected["score"], selected["cost"], budget)
-    return selected
+    return attach_budget_analysis(selected, budget)
 
 
-def generate_ssq_strategy_plans(strategy: str, budget: int, score_table: list[dict], back_scores: list[dict]) -> list[dict]:
+def generate_ssq_strategy_plans(
+    strategy: str,
+    budget: int,
+    score_table: list[dict],
+    back_scores: list[dict],
+    variant: int = 0,
+) -> list[dict]:
     if strategy == "conservative":
-        return [generate_ssq_single(budget, score_table, back_scores, strategy)]
+        return [generate_ssq_single(budget, score_table, back_scores, strategy, variant)]
 
-    single = generate_ssq_single(budget, score_table, back_scores, strategy)
-    dantuo = generate_ssq_dantuo(budget, score_table, back_scores, strategy)
+    single = generate_ssq_single(budget, score_table, back_scores, strategy, variant)
+    dantuo = generate_ssq_dantuo(budget, score_table, back_scores, strategy, variant)
     plans = [single]
     if dantuo["mode"] == "dantuo":
         plans.insert(0, dantuo)
@@ -308,16 +369,17 @@ def generate_ssq_plans(
     score_table: list[dict] | None = None,
     back_scores: list[dict] | None = None,
     mode: str | None = None,
+    variant: int = 0,
 ) -> list[dict]:
     score_table = score_table or []
     back_scores = back_scores or []
     normalized = normalize_strategy(strategy, mode)
-    plans = generate_ssq_strategy_plans(normalized, budget, score_table, back_scores)
+    plans = generate_ssq_strategy_plans(normalized, budget, score_table, back_scores, variant)
 
     legacy_request = strategy in LEGACY_STRATEGY_MAP or mode in LEGACY_STRATEGY_MAP
     requested_mode = strategy if strategy in {"single", "dantuo"} else mode
     if legacy_request and requested_mode == "single":
-        return [generate_ssq_single(budget, score_table, back_scores, normalized)]
+        return [generate_ssq_single(budget, score_table, back_scores, normalized, variant)]
     if legacy_request and requested_mode == "dantuo":
-        return [generate_ssq_dantuo(budget, score_table, back_scores, normalized)]
-    return sorted(plans, key=lambda item: (-item["cost"], item["mode"]))
+        return [generate_ssq_dantuo(budget, score_table, back_scores, normalized, variant)]
+    return plans

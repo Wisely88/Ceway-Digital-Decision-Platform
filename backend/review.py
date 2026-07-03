@@ -3,6 +3,21 @@ from __future__ import annotations
 from itertools import combinations
 
 
+DLT_LABELS = {
+    "front": "前区",
+    "back": "后区",
+    "front_hits": "前区命中",
+    "back_hits": "后区命中",
+}
+
+SSQ_LABELS = {
+    "front": "红球",
+    "back": "蓝球",
+    "front_hits": "红球命中",
+    "back_hits": "蓝球命中",
+}
+
+
 def prize_label(front_hits: int, back_hits: int) -> str:
     if front_hits == 5 and back_hits == 2:
         return "一等奖"
@@ -104,6 +119,8 @@ def review_plan(plan: dict, draw: dict) -> dict:
 
     hit_tickets = [row for row in rows if row.get("prize_label") != "未命中固定奖级"]
     return {
+        "scene": "DLT",
+        "play_labels": plan.get("play_labels") or DLT_LABELS,
         "actual": {
             "issue": draw["issue"],
             "date": draw["date"],
@@ -125,12 +142,18 @@ def build_review(records: list[dict], history: list[dict], limit: int = 20) -> d
     for record in records[:limit]:
         draw = next_draw(history, record.get("latest_issue"))
         if not draw:
+            plan = record.get("plan", {})
             items.append(
                 {
                     "record_id": record.get("id"),
                     "saved_at": record.get("saved_at"),
                     "latest_issue": record.get("latest_issue"),
+                    "recommended_issue": plan.get("recommended_issue"),
+                    "scene": plan.get("scene", "DLT"),
+                    "play_labels": plan.get("play_labels") or DLT_LABELS,
                     "status": "pending",
+                    "status_label": "待开奖",
+                    "next_step": f"等待第 {plan.get('recommended_issue') or '下一'} 期开奖后复盘。",
                     "message": "推荐期之后暂无下一期开奖数据，暂不能复盘。",
                 }
             )
@@ -142,9 +165,12 @@ def build_review(records: list[dict], history: list[dict], limit: int = 20) -> d
                 "record_id": record.get("id"),
                 "saved_at": record.get("saved_at"),
                 "latest_issue": record.get("latest_issue"),
+                "recommended_issue": record.get("plan", {}).get("recommended_issue"),
                 "strategy": record.get("strategy"),
                 "budget": record.get("budget"),
                 "status": "reviewed",
+                "status_label": "已复盘",
+                "next_step": "已完成推荐号码与实际开奖号码对比。",
                 **result,
             }
         )
@@ -256,6 +282,8 @@ def review_ssq_plan(plan: dict, draw: dict) -> dict:
 
     hit_tickets = [row for row in rows if row.get("prize_label") != "未命中固定奖级"]
     return {
+        "scene": "SSQ",
+        "play_labels": plan.get("play_labels") or SSQ_LABELS,
         "actual": {
             "issue": draw["issue"],
             "date": draw["date"],
@@ -277,12 +305,18 @@ def build_ssq_review(records: list[dict], history: list[dict], limit: int = 20) 
     for record in records[:limit]:
         draw = next_draw(history, record.get("latest_issue"))
         if not draw:
+            plan = record.get("plan", {})
             items.append(
                 {
                     "record_id": record.get("id"),
                     "saved_at": record.get("saved_at"),
                     "latest_issue": record.get("latest_issue"),
+                    "recommended_issue": plan.get("recommended_issue"),
+                    "scene": plan.get("scene", "SSQ"),
+                    "play_labels": plan.get("play_labels") or SSQ_LABELS,
                     "status": "pending",
+                    "status_label": "待开奖",
+                    "next_step": f"等待第 {plan.get('recommended_issue') or '下一'} 期开奖后复盘。",
                     "message": "推荐期之后暂无下一期开奖数据，暂不能复盘。",
                 }
             )
@@ -294,9 +328,12 @@ def build_ssq_review(records: list[dict], history: list[dict], limit: int = 20) 
                 "record_id": record.get("id"),
                 "saved_at": record.get("saved_at"),
                 "latest_issue": record.get("latest_issue"),
+                "recommended_issue": record.get("plan", {}).get("recommended_issue"),
                 "strategy": record.get("strategy"),
                 "budget": record.get("budget"),
                 "status": "reviewed",
+                "status_label": "已复盘",
+                "next_step": "已完成推荐号码与实际开奖号码对比。",
                 **result,
             }
         )

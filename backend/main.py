@@ -65,6 +65,7 @@ class GenerateRequest(BaseModel):
     balance: float | None = Field(default=None, ge=0)
     level_units: int = Field(default=1, ge=1, le=4)
     window: int = Field(default=100, ge=30, le=200)
+    variant: int = Field(default=0, ge=0)
 
 
 class RecordRequest(BaseModel):
@@ -112,6 +113,7 @@ def build_dlt_payload(
     balance: float | None = None,
     level_units: int = 1,
     window: int = 100,
+    variant: int = 0,
 ) -> dict:
     selected_strategy = normalize_strategy(strategy, mode)
     history = load_dlt_history()
@@ -124,6 +126,7 @@ def build_dlt_payload(
         score_table=score_table,
         back_scores=back_scores,
         mode=mode,
+        variant=variant,
     )
     capital = capital_state(
         last_prize=last_prize,
@@ -136,6 +139,16 @@ def build_dlt_payload(
     based_on_issue = latest_row["issue"] if latest_row else None
     recommended_issue = next_issue_label(based_on_issue)
     for plan in plans:
+        plan["scene"] = "DLT"
+        plan["play_name"] = "大乐透"
+        plan["play_labels"] = {
+            "front": "前区",
+            "back": "后区",
+            "dan": "前区胆码",
+            "tuo": "前区拖码",
+            "single": "单式票",
+            "rule": "大乐透：前区 35 选 5，后区 12 选 2。胆拖费用 = C(拖码数, 5 - 胆码数) × C(后区号码数, 2) × 2 元。",
+        }
         plan["based_on_issue"] = based_on_issue
         plan["recommended_issue"] = recommended_issue
         plan["recommendation_label"] = (
@@ -216,6 +229,7 @@ def generate_dlt(request: GenerateRequest) -> dict:
         balance=request.balance,
         level_units=request.level_units,
         window=request.window,
+        variant=request.variant,
     )["plans"]
     if not plans:
         raise HTTPException(status_code=400, detail="No plan can be generated within this budget")
@@ -396,6 +410,7 @@ def build_ssq_payload(
     balance: float | None = None,
     level_units: int = 1,
     window: int = 100,
+    variant: int = 0,
 ) -> dict:
     selected_strategy = normalize_strategy(strategy, mode)
     history = load_ssq_history()
@@ -408,6 +423,7 @@ def build_ssq_payload(
         score_table=score_table,
         back_scores=back_scores,
         mode=mode,
+        variant=variant,
     )
     capital = capital_state(
         last_prize=last_prize,
@@ -420,6 +436,16 @@ def build_ssq_payload(
     based_on_issue = latest_row["issue"] if latest_row else None
     recommended_issue = next_issue_label(based_on_issue)
     for plan in plans:
+        plan["scene"] = "SSQ"
+        plan["play_name"] = "双色球"
+        plan["play_labels"] = {
+            "front": "红球",
+            "back": "蓝球",
+            "dan": "红球胆码",
+            "tuo": "红球拖码",
+            "single": "单式票",
+            "rule": "双色球：红球 33 选 6，蓝球 16 选 1。胆拖费用 = C(拖码数, 6 - 胆码数) × 蓝球个数 × 2 元。",
+        }
         plan["based_on_issue"] = based_on_issue
         plan["recommended_issue"] = recommended_issue
         plan["recommendation_label"] = (
@@ -488,6 +514,7 @@ def generate_ssq(request: GenerateRequest) -> dict:
         balance=request.balance,
         level_units=request.level_units,
         window=request.window,
+        variant=request.variant,
     )["plans"]
     if not plans:
         raise HTTPException(status_code=400, detail="此预算下无法生成方案")

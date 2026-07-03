@@ -836,6 +836,27 @@ button:disabled {
   padding: 16px;
 }
 
+.control-note {
+  align-self: stretch;
+  background: rgba(8, 23, 40, 0.54);
+  border: 1px solid rgba(83, 129, 179, 0.16);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.control-note strong {
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.control-note span {
+  color: #8fb0cf;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 label {
   color: #a9bdd2;
   display: grid;
@@ -858,6 +879,29 @@ select {
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
+}
+
+.module-stage {
+  display: grid;
+  gap: 18px;
+  min-height: 520px;
+}
+
+.module-stage > .panel,
+.module-stage > .data-status-panel {
+  animation: moduleFadeIn 160ms ease-out;
+}
+
+@keyframes moduleFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .wide {
@@ -1107,6 +1151,212 @@ td {
   gap: 12px;
 }
 
+.betting-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.workflow-tabs {
+  background: rgba(6, 20, 36, 0.72);
+  border: 1px solid rgba(83, 129, 179, 0.18);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.workflow-tabs button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #a9bdd2;
+  cursor: pointer;
+  display: flex;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.workflow-tabs button.active {
+  background: linear-gradient(180deg, #1b70dc, #0b55c6);
+  color: #ffffff;
+}
+
+.betting-workspace {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(280px, 0.36fr) minmax(0, 0.64fr);
+}
+
+.betting-controls,
+.manual-picker,
+.betting-result {
+  background: rgba(7, 18, 32, 0.5);
+  border: 1px solid rgba(83, 129, 179, 0.16);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.field-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.compact-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.betting-estimate {
+  border-top: 1px solid rgba(83, 129, 179, 0.16);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.betting-estimate div {
+  background: rgba(8, 23, 40, 0.56);
+  border: 1px solid rgba(83, 129, 179, 0.14);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.betting-estimate span,
+.section-kicker span {
+  color: #8fb0cf;
+  font-size: 12px;
+}
+
+.betting-estimate strong,
+.section-kicker strong {
+  color: #ffffff;
+}
+
+.betting-estimate .primary-button {
+  grid-column: 1 / -1;
+}
+
+.manual-actions {
+  border-top: 1px solid rgba(83, 129, 179, 0.16);
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.manual-actions p,
+.number-picker p {
+  color: #a9bdd2;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.manual-actions div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.manual-picker {
+  display: grid;
+  gap: 14px;
+}
+
+.number-picker {
+  display: grid;
+  gap: 10px;
+}
+
+.picker-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.picker-head strong {
+  color: #ffffff;
+}
+
+.picker-head span {
+  color: #8fb0cf;
+  font-size: 12px;
+}
+
+.picker-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+}
+
+.picker-ball {
+  background: rgba(9, 26, 45, 0.86);
+  border: 1px solid rgba(83, 129, 179, 0.22);
+  border-radius: 8px;
+  color: #dcecff;
+  cursor: pointer;
+  font-weight: 800;
+  min-height: 38px;
+}
+
+.picker-ball:hover {
+  border-color: rgba(84, 158, 255, 0.62);
+}
+
+.picker-ball.active {
+  background: linear-gradient(180deg, #1768d7, #0a4baf);
+  border-color: rgba(114, 174, 255, 0.5);
+  color: #ffffff;
+}
+
+.picker-ball.dan.active {
+  background: linear-gradient(180deg, #e64d45, #a92522);
+  border-color: rgba(255, 133, 121, 0.5);
+}
+
+.picker-ball.back.active {
+  background: linear-gradient(180deg, #1f9c58, #0e6538);
+  border-color: rgba(75, 225, 130, 0.5);
+}
+
+.form-warning,
+.form-success {
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+}
+
+.form-warning {
+  background: rgba(117, 71, 18, 0.34);
+  border: 1px solid rgba(255, 176, 62, 0.34);
+  color: #ffd590;
+}
+
+.form-success {
+  background: rgba(20, 129, 86, 0.18);
+  border: 1px solid rgba(55, 223, 120, 0.26);
+  color: #a9f3c2;
+}
+
+.betting-result {
+  display: grid;
+  gap: 12px;
+}
+
+.section-kicker {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
 .plan-card {
   background: rgba(7, 18, 32, 0.66);
   border: 1px solid rgba(83, 129, 179, 0.22);
@@ -1158,6 +1408,51 @@ td {
   margin: 0;
 }
 
+.plan-rule {
+  background: rgba(8, 23, 40, 0.58);
+  border: 1px solid rgba(83, 129, 179, 0.16);
+  border-radius: 8px;
+  color: #8fb0cf;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+  padding: 9px 10px;
+}
+
+.budget-fit {
+  background: rgba(4, 16, 29, 0.72);
+  border: 1px solid rgba(49, 216, 107, 0.2);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+
+.budget-fit div {
+  display: grid;
+  gap: 3px;
+}
+
+.budget-fit span {
+  color: #8fb0cf;
+  font-size: 12px;
+}
+
+.budget-fit strong {
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.budget-fit p {
+  color: #a9bdd2;
+  font-size: 12px;
+  grid-column: 1 / -1;
+  line-height: 1.6;
+  margin: 0;
+}
+
 .number-groups,
 .single-list {
   display: grid;
@@ -1187,6 +1482,17 @@ td {
 .single-ticket p {
   color: #e8f2ff;
   font-weight: 700;
+}
+
+.single-ticket p span {
+  color: #7cc2ff;
+  display: inline-block;
+  font-size: 12px;
+  margin: 0 5px 0 0;
+}
+
+.single-ticket p span:not(:first-child) {
+  margin-left: 10px;
 }
 
 .single-ticket span {
@@ -1286,7 +1592,7 @@ td {
   border-radius: 8px;
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   padding: 12px;
 }
 
@@ -1309,6 +1615,11 @@ td {
 .history-item p {
   grid-column: 1 / -1;
   margin: 0;
+}
+
+.history-item .badge {
+  align-self: start;
+  justify-self: end;
 }
 
 .empty-text {
@@ -1743,6 +2054,34 @@ td {
   padding: 12px 14px;
 }
 
+.error-panel {
+  align-items: center;
+  background: rgba(93, 22, 18, 0.44);
+  border: 1px solid rgba(255, 126, 91, 0.36);
+  border-radius: 12px;
+  color: #ffe1dc;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.error-panel div {
+  display: grid;
+  gap: 6px;
+}
+
+.error-panel strong {
+  font-size: 15px;
+}
+
+.error-panel p {
+  color: #ffc5bc;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+}
+
 .notice {
   background: rgba(20, 129, 86, 0.18);
   border: 1px solid rgba(55, 223, 120, 0.34);
@@ -1819,6 +2158,10 @@ td {
   }
 
   .trend-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .betting-workspace {
     grid-template-columns: 1fr;
   }
 
@@ -1938,6 +2281,20 @@ td {
     display: grid;
   }
 
+  .workflow-tabs,
+  .compact-fields,
+  .betting-estimate {
+    grid-template-columns: 1fr;
+  }
+
+  .picker-grid {
+    grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+  }
+
+  .picker-ball {
+    min-height: 40px;
+  }
+
   .panel-actions {
     justify-content: stretch;
   }
@@ -1990,6 +2347,7 @@ td {
   }
 
   .plan-head,
+  .budget-fit,
   .review-item,
   .history-item {
     grid-template-columns: 1fr;
@@ -2001,7 +2359,7 @@ td {
     gap: 8px;
   }
 
-.review-summary {
+  .review-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

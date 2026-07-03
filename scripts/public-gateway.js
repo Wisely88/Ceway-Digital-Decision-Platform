@@ -82,8 +82,14 @@ function serveCeway(req, res) {
       send(res, 404, "Not Found");
       return;
     }
-    const ext = path.extname(filePath);
-    res.writeHead(200, { "Content-Type": MIME_TYPES[ext] || "application/octet-stream" });
+  const ext = path.extname(filePath);
+    const headers = { "Content-Type": MIME_TYPES[ext] || "application/octet-stream" };
+    if (ext === ".html") {
+      headers["Cache-Control"] = "no-store, no-cache, must-revalidate, proxy-revalidate";
+      headers.Pragma = "no-cache";
+      headers.Expires = "0";
+    }
+    res.writeHead(200, headers);
     res.end(data);
   });
 }

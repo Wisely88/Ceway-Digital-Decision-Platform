@@ -9,21 +9,47 @@ import {
   saveDemoRecord,
 } from "./demoData";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+const RAW_API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === "true"
   || window.location.hostname.endsWith("github.io");
 
+function getApiBase() {
+  if (/^https?:\/\//i.test(RAW_API_BASE)) {
+    return RAW_API_BASE.replace(/\/$/, "");
+  }
+  const basePath = RAW_API_BASE.startsWith("/") ? RAW_API_BASE : `/${RAW_API_BASE}`;
+  return `${window.location.origin}${basePath.replace(/\/$/, "")}`;
+}
+
+function buildApiUrl(path) {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${getApiBase()}${cleanPath}`;
+}
+
+function toQueryString(values) {
+  const params = new URLSearchParams();
+  Object.entries(values).forEach(([key, value]) => {
+    if (value === "" || value === null || value === undefined) return;
+    params.set(key, String(value));
+  });
+  return params.toString();
+}
+
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
+  const hasBody = options.body !== undefined && !(options.body instanceof FormData);
+  const response = await fetch(buildApiUrl(path), {
+    headers: hasBody
+      ? {
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+        }
+      : options.headers,
     ...options,
   });
 
   if (!response.ok) {
-    throw new Error(`API ${response.status}: ${response.statusText}`);
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.detail || `API ${response.status}: ${response.statusText} (${path})`);
   }
 
   return response.json();
@@ -46,21 +72,19 @@ export function getDltDashboard({
   if (STATIC_DEMO) {
     return getDemoDashboard({ budget, lastPrize, strategy, window, principal, balance, levelUnits });
   }
-  const params = new URLSearchParams({
+  const params = toQueryString({
     budget,
     last_prize: lastPrize,
     strategy,
     window,
     principal,
     level_units: levelUnits,
+    balance,
   });
-  if (balance !== "" && balance !== null && balance !== undefined) {
-    params.set("balance", balance);
-  }
-  return request(`/dashboard/dlt?${params.toString()}`);
+  return request(`/dashboard/dlt?${params}`);
 }
 
-export function generateDltPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits }) {
+export function generateDltPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits, variant = 0 }) {
   if (STATIC_DEMO) {
     return getDemoPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits });
   }
@@ -74,6 +98,7 @@ export function generateDltPlan({ budget, strategy, lastPrize, window, principal
       principal,
       balance: balance === "" ? null : balance,
       level_units: levelUnits,
+      variant,
     }),
   });
 }
@@ -113,8 +138,8 @@ export function getDltReview() {
 
 export function getDltBacktest({ budget = 20, strategy = "balanced", periods = 100, window = 100 } = {}) {
   if (STATIC_DEMO) return getDemoBacktest({ budget, strategy, periods, window });
-  const params = new URLSearchParams({ budget, strategy, periods, window });
-  return request(`/backtest/dlt?${params.toString()}`);
+  const params = toQueryString({ budget, strategy, periods, window });
+  return request(`/backtest/dlt?${params}`);
 }
 
 export function getDltDataStatus() {
@@ -147,7 +172,7 @@ export function getDltDraws({ limit = 10 } = {}) {
   if (STATIC_DEMO) {
     return getDemoDraws(limit).then((items) => ({ items, total: items.length, limit, offset: 0, issue: "" }));
   }
-  return request(`/data/dlt/draws?limit=${limit}`);
+  return request(`/data/dlt/draws?${toQueryString({ limit })}`);
 }
 
 export function searchDltDraws({ limit = 12, offset = 0, issue = "" } = {}) {
@@ -157,17 +182,16 @@ export function searchDltDraws({ limit = 12, offset = 0, issue = "" } = {}) {
       return { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset, issue };
     });
   }
-  const params = new URLSearchParams({ limit, offset });
-  if (issue) params.set("issue", issue);
-  return request(`/data/dlt/draws?${params.toString()}`);
+  const params = toQueryString({ limit, offset, issue });
+  return request(`/data/dlt/draws?${params}`);
 }
 
 export function syncDltHistory({ source = "sporttery", full = false } = {}) {
   if (STATIC_DEMO) {
     throw new Error("GitHub Pages 演示模式不支持联网更新，请在本地后端环境使用。");
   }
-  const params = new URLSearchParams({ source, full });
-  return request(`/data/dlt/sync?${params.toString()}`, { method: "POST" });
+  const params = toQueryString({ source, full });
+  return request(`/data/dlt/sync?${params}`, { method: "POST" });
 }
 
 export function getSsqDashboard({
@@ -182,21 +206,19 @@ export function getSsqDashboard({
   if (STATIC_DEMO) {
     return getDemoDashboard({ budget, lastPrize, strategy, window, principal, balance, levelUnits });
   }
-  const params = new URLSearchParams({
+  const params = toQueryString({
     budget,
     last_prize: lastPrize,
     strategy,
     window,
     principal,
     level_units: levelUnits,
+    balance,
   });
-  if (balance !== "" && balance !== null && balance !== undefined) {
-    params.set("balance", balance);
-  }
-  return request(`/dashboard/ssq?${params.toString()}`);
+  return request(`/dashboard/ssq?${params}`);
 }
 
-export function generateSsqPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits }) {
+export function generateSsqPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits, variant = 0 }) {
   if (STATIC_DEMO) {
     return getDemoPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits });
   }
@@ -210,6 +232,7 @@ export function generateSsqPlan({ budget, strategy, lastPrize, window, principal
       principal,
       balance: balance === "" ? null : balance,
       level_units: levelUnits,
+      variant,
     }),
   });
 }
@@ -249,8 +272,8 @@ export function getSsqReview() {
 
 export function getSsqBacktest({ budget = 20, strategy = "balanced", periods = 100, window = 100 } = {}) {
   if (STATIC_DEMO) return getDemoBacktest({ budget, strategy, periods, window });
-  const params = new URLSearchParams({ budget, strategy, periods, window });
-  return request(`/backtest/ssq?${params.toString()}`);
+  const params = toQueryString({ budget, strategy, periods, window });
+  return request(`/backtest/ssq?${params}`);
 }
 
 export function getSsqDataStatus() {
@@ -283,7 +306,7 @@ export function getSsqDraws({ limit = 10 } = {}) {
   if (STATIC_DEMO) {
     return getDemoDraws(limit).then((items) => ({ items, total: items.length, limit, offset: 0, issue: "" }));
   }
-  return request(`/data/ssq/draws?limit=${limit}`);
+  return request(`/data/ssq/draws?${toQueryString({ limit })}`);
 }
 
 export function searchSsqDraws({ limit = 12, offset = 0, issue = "" } = {}) {
@@ -293,17 +316,16 @@ export function searchSsqDraws({ limit = 12, offset = 0, issue = "" } = {}) {
       return { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset, issue };
     });
   }
-  const params = new URLSearchParams({ limit, offset });
-  if (issue) params.set("issue", issue);
-  return request(`/data/ssq/draws?${params.toString()}`);
+  const params = toQueryString({ limit, offset, issue });
+  return request(`/data/ssq/draws?${params}`);
 }
 
 export function syncSsqHistory({ source = "78500", full = false } = {}) {
   if (STATIC_DEMO) {
     throw new Error("GitHub Pages 演示模式不支持联网更新，请在本地后端环境使用。");
   }
-  const params = new URLSearchParams({ source, full });
-  return request(`/data/ssq/sync?${params.toString()}`, { method: "POST" });
+  const params = toQueryString({ source, full });
+  return request(`/data/ssq/sync?${params}`, { method: "POST" });
 }
 
 export async function importSsqHistory(file) {
@@ -313,7 +335,7 @@ export async function importSsqHistory(file) {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API_BASE}/data/ssq/import`, {
+  const response = await fetch(buildApiUrl("/data/ssq/import"), {
     method: "POST",
     body: formData,
   });
@@ -333,7 +355,7 @@ export async function importDltHistory(file) {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API_BASE}/data/dlt/import`, {
+  const response = await fetch(buildApiUrl("/data/dlt/import"), {
     method: "POST",
     body: formData,
   });

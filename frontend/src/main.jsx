@@ -13,7 +13,6 @@ import {
   Gauge,
   History,
   Home,
-  LayoutDashboard,
   Play,
   RefreshCw,
   Save,
@@ -38,8 +37,6 @@ import {
 import {
   deleteDltRecord,
   deleteSsqRecord,
-  generateDltPlan,
-  generateSsqPlan,
   getDltBacktest,
   getDltDashboard,
   getDltDataStatus,
@@ -194,10 +191,343 @@ const STRATEGY_LABELS = {
   conservative: "保守",
   balanced: "均衡",
   aggressive: "激进",
+  manual_workbench: "系统建议",
+  manual_selection: "人工选号",
 };
 
 function planModeLabel(mode) {
   return mode === "dantuo" ? "胆拖" : "单式";
+}
+
+function lotteryLabels(source = {}) {
+  return {
+    front: "前区",
+    back: "后区",
+    front_hits: "前区命中",
+    back_hits: "后区命中",
+    ...(source.play_labels || {}),
+  };
+}
+
+function classifyError(error, fallback = "操作失败") {
+  const message = error?.message || String(error || fallback);
+  if (/Failed to fetch|NetworkError|Load failed|Network request failed|ERR_NGROK|offline/i.test(message)) {
+    return {
+      title: "网络或网关异常",
+      detail: "无法连接本地后端或公网网关。请确认本地服务、网关和 ngrok 隧道在线后重试。",
+      layer: "网关",
+    };
+  }
+  if (/API 4\d\d|422|validation|预算|CSV|参数|不符合/i.test(message)) {
+    return { title: "输入或数据不符合规则", detail: message, layer: "输入" };
+  }
+  if (/API 5\d\d|Internal Server Error|Traceback/i.test(message)) {
+    return { title: "后端服务异常", detail: message, layer: "后端" };
+  }
+  if (/clipboard|permission|not allowed|denied/i.test(message)) {
+    return { title: "浏览器权限限制", detail: message, layer: "浏览器" };
+  }
+  return { title: fallback, detail: message, layer: "未知" };
+}
+
+function ErrorNotice({ error, onRetry }) {
+  if (!error) return null;
+  const info = classifyError(error);
+  return (
+    <section className="error-panel" role="alert">
+      <div>
+        <Badge>{info.layer}</Badge>
+        <strong>{info.title}</strong>
+        <p>{info.detail}</p>
+      </div>
+      {onRetry && (
+        <button className="ghost-button compact" onClick={onRetry} type="button">
+          <RefreshCw size={14} />
+          重试
+        </button>
+      )}
+    </section>
+  );
+}
+
+function reviewStatusMap(review) {
+  return new Map(
+    (review?.items || []).map((item) => [
+      item.record_id,
+      {
+        label: item.status_label || (item.status === "reviewed" ? "已复盘" : "待开奖"),
+        nextStep: item.next_step || item.message || "",
+      },
+    ]),
+  );
+}
+
+function formatNumber(number) {
+  return String(number).padStart(2, "0");
+}
+
+function rangeNumbers(max) {
+  return Array.from({ length: max }, (_, index) => index + 1);
+}
+
+function combinationCount(total, pick) {
+  if (pick < 0 || pick > total) return 0;
+  if (pick === 0 || pick === total) return 1;
+  const safePick = Math.min(pick, total - pick);
+  let result = 1;
+  for (let index = 1; index <= safePick; index += 1) {
+    result = (result * (total - safePick + index)) / index;
+  }
+  return Math.round(result);
+}
+
+function rotateItems(items, variant = 0) {
+  if (!items.length) return [];
+  const shift = variant % items.length;
+  return [...items.slice(shift), ...items.slice(0, shift)];
+}
+
+function topScoreNumbers(rows, max, variant = 0) {
+  const ranked = [...(rows || [])]
+    .sort((left, right) => (right.total_score || 0) - (left.total_score || 0))
+    .map((row) => Number(row.number))
+    .filter((number) => number >= 1 && number <= max);
+  const fallback = rangeNumbers(max);
+  return rotateItems([...new Set([...ranked, ...fallback])], variant);
+}
+
+function displayNumbers(numbers) {
+  return [...numbers].sort((left, right) => left - right).map(formatNumber);
+}
+
+function planLabelsForScene(scene) {
+  if (scene === "SSQ") {
+    return {
+      front: "红球",
+      back: "蓝球",
+      dan: "红球胆码",
+      tuo: "红球拖码",
+      single: "单式票",
+      rule: "双色球红球 33 选 6，蓝球 16 选 1；方案仅用于流程管理和复盘。",
+      front_hits: "红球命中",
+      back_hits: "蓝球命中",
+    };
+  }
+  return {
+    front: "前区",
+    back: "后区",
+    dan: "前区胆码",
+    tuo: "前区拖码",
+    single: "单式票",
+    rule: "大乐透前区 35 选 5，后区 12 选 2；方案仅用于流程管理和复盘。",
+    front_hits: "前区命中",
+    back_hits: "后区命中",
+  };
+}
+
+function sceneRules(scene) {
+  return scene === "SSQ"
+    ? { scene: "SSQ", playName: "双色球", frontMax: 33, backMax: 16, frontPick: 6, backPick: 1 }
+    : { scene: "DLT", playName: "大乐透", frontMax: 35, backMax: 12, frontPick: 5, backPick: 2 };
+}
+
+function buildSingleItems({ rules, frontPool, backPool, count }) {
+  const items = [];
+  for (let index = 0; index < count; index += 1) {
+    const front = frontPool.slice(index, index + rules.frontPick);
+    const back = backPool.slice(index, index + rules.backPick);
+    if (front.length < rules.frontPick || back.length < rules.backPick) break;
+    items.push({
+      front: [...front].sort((left, right) => left - right),
+      back: [...back].sort((left, right) => left - right),
+      front_display: displayNumbers(front),
+      back_display: displayNumbers(back),
+      explanation: ["按评分池顺位轮换生成，避免每组完全重复。"],
+    });
+  }
+  return items;
+}
+
+function aiCommentaryForPlan(plan, labels) {
+  if (plan.mode === "dantuo") {
+    return [
+      `${labels.dan}来自当前评分靠前号码，适合作为核心观察位。`,
+      `${labels.tuo}用于扩展覆盖，预算越高可适当增加拖码数量。`,
+      `${labels.back}按评分和分散度选择，保存后会进入待开奖复盘队列。`,
+    ];
+  }
+  return [
+    "单式方案更适合小预算，费用清晰、复盘直接。",
+    "每注号码按评分池轮换生成，避免多组号码完全重叠。",
+    "保存后可在推荐复盘中与下一期开奖做对比。",
+  ];
+}
+
+function buildAiBettingPlan({ scene, scoreRows, budget, mode, ticketCount, danCount, tuoCount, backCount, latestIssue, recommendedIssue, variant }) {
+  const rules = sceneRules(scene);
+  const labels = planLabelsForScene(scene);
+  const frontPool = topScoreNumbers(scoreRows, rules.frontMax, variant);
+  const backPool = rotateItems(rangeNumbers(rules.backMax), variant);
+
+  if (mode === "single") {
+    const affordable = Math.max(1, Math.floor(Number(budget || 0) / 2));
+    const count = Math.max(1, Math.min(Number(ticketCount || 1), affordable));
+    const items = buildSingleItems({ rules, frontPool, backPool, count });
+    return {
+      scene,
+      play_name: rules.playName,
+      play_labels: labels,
+      mode: "single",
+      source: "ai_suggestion",
+      strategy: "manual_workbench",
+      based_on_issue: latestIssue,
+      recommended_issue: recommendedIssue,
+      recommendation_label: `基于第 ${latestIssue || "-"} 期开奖数据，生成第 ${recommendedIssue || "下一"} 期 AI 建议单式方案。`,
+      cost: items.length * 2,
+      tickets: items.length,
+      items,
+      reason: `按用户设置生成 ${items.length} 注单式，费用 ${items.length * 2} 元。`,
+      explanation: aiCommentaryForPlan({ mode: "single" }, labels),
+      budget_analysis: {
+        budget: Number(budget || 0),
+        cost: items.length * 2,
+        unused: Math.max(0, Number(budget || 0) - items.length * 2),
+        utilization: Number(budget || 0) ? Math.round((items.length * 2 / Number(budget || 0)) * 10000) / 100 : 0,
+        explanation: "按照手动填写注数生成；如预算不足，系统自动压缩到预算范围内。",
+      },
+    };
+  }
+
+  const safeDan = Math.max(1, Math.min(Number(danCount || 1), rules.frontPick - 1));
+  const safeTuo = Math.max(rules.frontPick - safeDan, Number(tuoCount || rules.frontPick));
+  const safeBack = Math.max(rules.backPick, Number(backCount || rules.backPick));
+  const frontDan = frontPool.slice(0, safeDan).sort((left, right) => left - right);
+  const frontTuo = frontPool.slice(safeDan, safeDan + safeTuo).sort((left, right) => left - right);
+  const back = backPool.slice(0, safeBack).sort((left, right) => left - right);
+  const tickets = combinationCount(frontTuo.length, rules.frontPick - frontDan.length) * combinationCount(back.length, rules.backPick);
+  const cost = tickets * 2;
+  return {
+    scene,
+    play_name: rules.playName,
+    play_labels: labels,
+    mode: "dantuo",
+    source: "ai_suggestion",
+    strategy: "manual_workbench",
+    based_on_issue: latestIssue,
+    recommended_issue: recommendedIssue,
+    recommendation_label: `基于第 ${latestIssue || "-"} 期开奖数据，生成第 ${recommendedIssue || "下一"} 期 AI 建议胆拖方案。`,
+    front_dan: frontDan,
+    front_tuo: frontTuo,
+    back,
+    front_dan_display: displayNumbers(frontDan),
+    front_tuo_display: displayNumbers(frontTuo),
+    back_display: displayNumbers(back),
+    cost,
+    tickets,
+    reason: `按用户指定的 ${frontDan.length} 胆 ${frontTuo.length} 拖生成，费用 ${cost} 元。`,
+    explanation: aiCommentaryForPlan({ mode: "dantuo" }, labels),
+    budget_analysis: {
+      budget: Number(budget || 0),
+      cost,
+      unused: Math.max(0, Number(budget || 0) - cost),
+      utilization: Number(budget || 0) ? Math.round((cost / Number(budget || 0)) * 10000) / 100 : 0,
+      explanation: cost <= Number(budget || 0) ? "该胆拖结构符合当前预算。" : "该胆拖结构已超过预算，请减少拖码或后区数量。",
+    },
+  };
+}
+
+function manualCommentary({ plan, scoreRows, labels }) {
+  const scoreMap = new Map((scoreRows || []).map((row) => [Number(row.number), row]));
+  const frontNumbers = plan.mode === "dantuo" ? [...plan.front_dan, ...plan.front_tuo] : plan.items?.[0]?.front || [];
+  const scored = frontNumbers.map((number) => scoreMap.get(number)?.total_score || 0).filter(Boolean);
+  const average = scored.length ? scored.reduce((sum, value) => sum + value, 0) / scored.length : 0;
+  const oddCount = frontNumbers.filter((number) => number % 2 === 1).length;
+  const bigCount = frontNumbers.filter((number) => number > Math.ceil(Math.max(...frontNumbers, 1) / 2)).length;
+  const notes = [
+    `本方案${labels.front}平均评分约 ${average ? average.toFixed(1) : "-"}，可作为保存前的参考。`,
+    `${labels.front}奇偶结构为 ${oddCount}:${frontNumbers.length - oddCount}，大号数量 ${bigCount} 个。`,
+    plan.cost <= plan.budget_analysis.budget ? "费用在预算范围内，可以保存后等待开奖复盘。" : "费用超过预算，建议减少拖码或降低注数。",
+  ];
+  if (plan.mode === "dantuo" && plan.front_dan.length >= plan.front_tuo.length) {
+    notes.push("胆码数量偏多，会降低拖码覆盖弹性，建议只把最有把握的号码放入胆码。");
+  }
+  return notes;
+}
+
+function buildManualBettingPlan({ scene, mode, selectedFront, selectedBack, frontDan, frontTuo, latestIssue, recommendedIssue, budget, scoreRows }) {
+  const rules = sceneRules(scene);
+  const labels = planLabelsForScene(scene);
+  if (mode === "single") {
+    if (selectedFront.length !== rules.frontPick || selectedBack.length !== rules.backPick) {
+      throw new Error(`单式需要选择 ${rules.frontPick} 个${labels.front}和 ${rules.backPick} 个${labels.back}。`);
+    }
+    const item = {
+      front: [...selectedFront].sort((left, right) => left - right),
+      back: [...selectedBack].sort((left, right) => left - right),
+      front_display: displayNumbers(selectedFront),
+      back_display: displayNumbers(selectedBack),
+      explanation: ["人工选号，系统按评分和结构给出点评。"],
+    };
+    const plan = {
+      scene,
+      play_name: rules.playName,
+      play_labels: labels,
+      mode: "single",
+      source: "manual_selection",
+      strategy: "manual_selection",
+      based_on_issue: latestIssue,
+      recommended_issue: recommendedIssue,
+      recommendation_label: `人工选择第 ${recommendedIssue || "下一"} 期单式方案，保存后等待开奖复盘。`,
+      budget_analysis: { budget: Number(budget || 0), cost: 2, unused: Math.max(0, Number(budget || 0) - 2), utilization: Number(budget || 0) ? Math.round((2 / Number(budget || 0)) * 10000) / 100 : 0 },
+      cost: 2,
+      tickets: 1,
+      items: [item],
+      reason: "人工选号方案，AI 仅做结构点评，不预测开奖结果。",
+    };
+    plan.explanation = manualCommentary({ plan, scoreRows, labels });
+    return plan;
+  }
+
+  if (frontDan.length < 1 || frontDan.length >= rules.frontPick) {
+    throw new Error(`胆拖需要至少 1 个${labels.dan}，且胆码少于 ${rules.frontPick} 个。`);
+  }
+  if (frontTuo.length < rules.frontPick - frontDan.length) {
+    throw new Error(`${labels.tuo}数量不足，至少需要 ${rules.frontPick - frontDan.length} 个。`);
+  }
+  if (selectedBack.length < rules.backPick) {
+    throw new Error(`${labels.back}至少需要选择 ${rules.backPick} 个。`);
+  }
+  const tickets = combinationCount(frontTuo.length, rules.frontPick - frontDan.length) * combinationCount(selectedBack.length, rules.backPick);
+  const cost = tickets * 2;
+  const plan = {
+    scene,
+    play_name: rules.playName,
+    play_labels: labels,
+    mode: "dantuo",
+    source: "manual_selection",
+    strategy: "manual_selection",
+    based_on_issue: latestIssue,
+    recommended_issue: recommendedIssue,
+    recommendation_label: `人工选择第 ${recommendedIssue || "下一"} 期胆拖方案，保存后等待开奖复盘。`,
+    front_dan: [...frontDan].sort((left, right) => left - right),
+    front_tuo: [...frontTuo].sort((left, right) => left - right),
+    back: [...selectedBack].sort((left, right) => left - right),
+    front_dan_display: displayNumbers(frontDan),
+    front_tuo_display: displayNumbers(frontTuo),
+    back_display: displayNumbers(selectedBack),
+    budget_analysis: {
+      budget: Number(budget || 0),
+      cost,
+      unused: Math.max(0, Number(budget || 0) - cost),
+      utilization: Number(budget || 0) ? Math.round((cost / Number(budget || 0)) * 10000) / 100 : 0,
+      explanation: cost <= Number(budget || 0) ? "人工胆拖方案符合当前预算。" : "人工胆拖方案超过预算，请减少拖码或后区数量。",
+    },
+    cost,
+    tickets,
+    reason: "人工选号方案，AI 仅做结构点评，不预测开奖结果。",
+  };
+  plan.explanation = manualCommentary({ plan, scoreRows, labels });
+  return plan;
 }
 
 function scoreSortLabel(sortKey) {
@@ -210,23 +540,23 @@ function scoreSortLabel(sortKey) {
   return labels[sortKey] || "综合分";
 }
 
-function AppSidebar({ scenes, active = "DLT", onSelect }) {
-  const navItems = [
-    { label: "系统总览", icon: Home, target: "module-overview" },
-    { label: "数据管理", icon: Database, target: "module-data" },
-    { label: "推荐复盘", icon: GitCompare, target: "module-review" },
-    { label: "历史回测", icon: Activity, target: "module-backtest" },
-    { label: "走势分析", icon: TrendingUp, target: "module-trends" },
-    { label: "号码评分", icon: Table2, target: "module-score" },
-    { label: "组合生成", icon: FileStack, target: "module-plan" },
-    { label: "资金管理", icon: Coins, target: "module-capital" },
-    { label: "历史记录", icon: History, target: "module-history" },
-  ];
+const MODULE_NAV_ITEMS = [
+  { key: "overview", label: "系统总览", icon: Home },
+  { key: "data", label: "投注方案", icon: FileStack },
+  { key: "review", label: "推荐复盘", icon: GitCompare },
+  { key: "backtest", label: "历史回测", icon: Activity },
+  { key: "trends", label: "走势分析", icon: TrendingUp },
+  { key: "score", label: "号码评分", icon: Table2 },
+  { key: "capital", label: "资金管理", icon: Coins },
+  { key: "history", label: "历史记录", icon: History },
+];
 
-  const jumpTo = (target) => {
-    document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+const MODULE_TITLES = MODULE_NAV_ITEMS.reduce((items, item) => ({
+  ...items,
+  [item.key]: item.label,
+}), {});
 
+function AppSidebar({ scenes, active = "DLT", activeModule = "overview", onModuleChange, onSelect }) {
   return (
     <aside className="app-sidebar">
       <div className="brand-block">
@@ -239,13 +569,14 @@ function AppSidebar({ scenes, active = "DLT", onSelect }) {
         </div>
       </div>
       <nav className="side-nav" aria-label="场景导航">
-        {navItems.map((item, index) => {
+        {MODULE_NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           return (
             <button
-              className={`side-nav-item ${index === 0 ? "active" : ""}`}
+              aria-current={activeModule === item.key ? "page" : undefined}
+              className={`side-nav-item ${activeModule === item.key ? "active" : ""}`}
               key={item.label}
-              onClick={() => jumpTo(item.target)}
+              onClick={() => onModuleChange(item.key)}
               type="button"
             >
               <Icon size={18} />
@@ -813,14 +1144,40 @@ function DataStatusPanel({ dataStatus, onImport }) {
 }
 
 function PlanCard({ plan, onSave }) {
+  const [saving, setSaving] = useState(false);
   if (!plan) return null;
 
+  const labels = {
+    front: "前区",
+    back: "后区",
+    dan: "前区胆码",
+    tuo: "前区拖码",
+    single: "单式票",
+    rule: "按当前场景规则生成预算内方案。",
+    ...(plan.play_labels || {}),
+  };
+  const playName = plan.play_name || (plan.scene === "SSQ" ? "双色球" : "大乐透");
+
   const text = plan.mode === "dantuo"
-    ? `前区胆码：${plan.front_dan_display.join(" ")}\n前区拖码：${plan.front_tuo_display.join(" ")}\n后区号码：${plan.back_display.join(" ")}\n共 ${plan.tickets} 注，费用 ${plan.cost} 元`
-    : plan.items.map((item, index) => `${index + 1}. ${item.front_display.join(" ")} + ${item.back_display.join(" ")}`).join("\n");
+    ? `${playName} ${planModeLabel(plan.mode)}\n${labels.dan}：${plan.front_dan_display.join(" ")}\n${labels.tuo}：${plan.front_tuo_display.join(" ")}\n${labels.back}：${plan.back_display.join(" ")}\n共 ${plan.tickets} 注，费用 ${plan.cost} 元`
+    : `${playName} ${planModeLabel(plan.mode)}\n${plan.items.map((item, index) => `${index + 1}. ${labels.front} ${item.front_display.join(" ")} + ${labels.back} ${item.back_display.join(" ")}`).join("\n")}`;
 
   const copy = async () => {
-    await navigator.clipboard.writeText(text);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      window.prompt("当前浏览器不允许自动复制，请长按全选后复制：", text);
+    }
+  };
+
+  const save = async () => {
+    if (!onSave || saving) return;
+    setSaving(true);
+    try {
+      await onSave(plan);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -836,19 +1193,37 @@ function PlanCard({ plan, onSave }) {
         <strong>{plan.recommended_issue ? `第 ${plan.recommended_issue} 期` : "下一期开奖"}</strong>
         <p>{plan.recommendation_label || "基于当前最新开奖数据生成下一期开奖推荐方案。"}</p>
       </div>
+      {plan.budget_analysis && (
+        <div className="budget-fit">
+          <div>
+            <span>预算匹配</span>
+            <strong>{plan.budget_analysis.cost} / {plan.budget_analysis.budget} 元</strong>
+          </div>
+          <div>
+            <span>预算占用</span>
+            <strong>{plan.budget_analysis.utilization}%</strong>
+          </div>
+          <div>
+            <span>未使用</span>
+            <strong>{plan.budget_analysis.unused} 元</strong>
+          </div>
+          <p>{plan.budget_analysis.explanation}</p>
+        </div>
+      )}
+      <p className="plan-rule">{labels.rule}</p>
       {plan.reason && <p className="plan-reason">{plan.reason}</p>}
       {plan.mode === "dantuo" ? (
         <div className="number-groups">
           <div>
-            <p>前区胆码（{plan.front_dan_display.length}个）</p>
+            <p>{labels.dan}（{plan.front_dan_display.length}个）</p>
             <div>{plan.front_dan_display.map((item) => <NumberBall key={item} tone="dan">{item}</NumberBall>)}</div>
           </div>
           <div>
-            <p>前区拖码（{plan.front_tuo_display.length}个）</p>
+            <p>{labels.tuo}（{plan.front_tuo_display.length}个）</p>
             <div>{plan.front_tuo_display.map((item) => <NumberBall key={item}>{item}</NumberBall>)}</div>
           </div>
           <div>
-            <p>后区（{plan.back_display.length}个）</p>
+            <p>{labels.back}（{plan.back_display.length}个）</p>
             <div>{plan.back_display.map((item) => <NumberBall key={item} tone="back">{item}</NumberBall>)}</div>
           </div>
         </div>
@@ -856,7 +1231,7 @@ function PlanCard({ plan, onSave }) {
         <div className="single-list">
           {plan.items.slice(0, 8).map((item, index) => (
             <div className="single-ticket" key={`${item.front.join("-")}-${index}`}>
-              <p>{item.front_display.join(" ")} + {item.back_display.join(" ")}</p>
+              <p><span>{labels.front}</span> {item.front_display.join(" ")} <span>{labels.back}</span> {item.back_display.join(" ")}</p>
               {item.explanation?.length > 0 && <span>{item.explanation[0]}</span>}
             </div>
           ))}
@@ -873,9 +1248,9 @@ function PlanCard({ plan, onSave }) {
           复制方案
         </button>
         {onSave && (
-          <button className="icon-button text-button" onClick={() => onSave(plan)} type="button">
+          <button className="icon-button text-button" disabled={saving} onClick={save} type="button">
             <Save size={16} />
-            保存方案
+            {saving ? "保存中..." : "保存方案"}
           </button>
         )}
       </div>
@@ -887,8 +1262,9 @@ function normalizeRecordPlan(record) {
   return record?.plan || record;
 }
 
-function HistoryRecords({ records, onDelete }) {
+function HistoryRecords({ records, onDelete, review }) {
   const [filter, setFilter] = useState("");
+  const statusByRecord = useMemo(() => reviewStatusMap(review), [review]);
   const visibleRecords = records
     .filter((record) => !filter || `${record.latest_issue || ""}${record.strategy || ""}`.includes(filter))
     .slice(0, 8);
@@ -905,23 +1281,26 @@ function HistoryRecords({ records, onDelete }) {
         <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="搜索期号或策略" />
       </div>
       {visibleRecords.length === 0 ? (
-        <p className="empty-text">暂无保存记录。生成方案后点击“保存方案”。</p>
+        <p className="empty-text">暂无保存记录。进入“投注方案”生成系统建议或人工选号点评后，点击“保存方案”。</p>
       ) : (
         <div className="history-list">
           {visibleRecords.map((record) => {
             const plan = normalizeRecordPlan(record);
             const savedAt = record.saved_at ? new Date(record.saved_at).toLocaleString() : "-";
+            const status = statusByRecord.get(record.id) || {};
+            const statusText = record.review_status || status.label || "待复盘";
             return (
               <article className="history-item" key={record.id || `${savedAt}-${plan.mode}-${plan.cost}`}>
                 <div>
                   <strong>{STRATEGY_LABELS[record.strategy || plan.strategy] || "策略"} · {planModeLabel(plan.mode)}</strong>
-                  <span>{savedAt} · 期号 {record.latest_issue || "-"}</span>
+                  <span>{savedAt} · 推荐期号 {plan.recommended_issue || record.latest_issue || "-"}</span>
                 </div>
                 <div>
                   <b>{plan.cost} 元</b>
                   <span>{plan.tickets} 注</span>
                 </div>
-                <p>{plan.reason || plan.explanation?.[0] || "该记录保留推荐方案和评分解释。"}</p>
+                <Badge>{statusText}</Badge>
+                <p>{status.nextStep || plan.reason || plan.explanation?.[0] || "该记录保留推荐方案和评分解释。"}</p>
                 {record.id && (
                   <button className="ghost-button compact danger" onClick={() => onDelete(record.id)} type="button">删除记录</button>
                 )}
@@ -957,48 +1336,52 @@ function ReviewPanel({ review, onRefresh }) {
       <div className="review-list">
         {(review.items || []).slice(0, 6).map((item) => (
           <article className="review-item" key={item.record_id || item.saved_at}>
-            {item.status === "pending" ? (
-              <>
-                <div>
-                  <strong>期号 {item.latest_issue || "-"}</strong>
-                  <span>{item.message}</span>
-                </div>
-                <Badge>待复盘</Badge>
-              </>
-            ) : (
-              <>
-                <div>
-                  <strong>实际开奖 {item.actual.issue}</strong>
-                  <span>前区 {item.actual.front.map((number) => String(number).padStart(2, "0")).join(" ")} · 后区 {item.actual.back.map((number) => String(number).padStart(2, "0")).join(" ")}</span>
-                </div>
-                <div>
-                  <b>{item.best?.hit_label || "-"}</b>
-                  <span>{item.best?.prize_label || "-"}</span>
-                </div>
-                <div className="review-compare">
+            {(() => {
+              const labels = lotteryLabels(item);
+              return item.status === "pending" ? (
+                <>
                   <div>
-                    <span>推荐号码</span>
-                    <p>
-                      前区 {(item.best?.front || []).map((number) => String(number).padStart(2, "0")).join(" ")}
-                      <br />
-                      后区 {(item.best?.back || []).map((number) => String(number).padStart(2, "0")).join(" ")}
-                    </p>
+                    <strong>推荐期号 {item.recommended_issue || item.latest_issue || "-"}</strong>
+                    <span>{item.next_step || item.message} 保存后会在这里进入“待开奖/待复盘”队列。</span>
+                  </div>
+                  <Badge>{item.status_label || "待开奖"}</Badge>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <strong>实际开奖 {item.actual.issue}</strong>
+                    <span>{labels.front} {item.actual.front.map((number) => String(number).padStart(2, "0")).join(" ")} · {labels.back} {item.actual.back.map((number) => String(number).padStart(2, "0")).join(" ")}</span>
                   </div>
                   <div>
-                    <span>开奖号码</span>
-                    <p>
-                      前区 {item.actual.front.map((number) => String(number).padStart(2, "0")).join(" ")}
-                      <br />
-                      后区 {item.actual.back.map((number) => String(number).padStart(2, "0")).join(" ")}
-                    </p>
+                    <b>{item.best?.hit_label || "-"}</b>
+                    <span>{item.best?.prize_label || "-"}</span>
                   </div>
-                </div>
-                <p>
-                  推荐期号 {item.latest_issue || "-"} · {planModeLabel(item.mode)} · {item.cost} 元 ·
-                  命中票数 {item.hit_tickets}/{item.tickets} · 命中率 {item.hit_rate}%
-                </p>
-              </>
-            )}
+                  <Badge>{item.status_label || "已复盘"}</Badge>
+                  <div className="review-compare">
+                    <div>
+                      <span>推荐号码</span>
+                      <p>
+                        {labels.front} {(item.best?.front || []).map((number) => String(number).padStart(2, "0")).join(" ")}
+                        <br />
+                        {labels.back} {(item.best?.back || []).map((number) => String(number).padStart(2, "0")).join(" ")}
+                      </p>
+                    </div>
+                    <div>
+                      <span>开奖号码</span>
+                      <p>
+                        {labels.front} {item.actual.front.map((number) => String(number).padStart(2, "0")).join(" ")}
+                        <br />
+                        {labels.back} {item.actual.back.map((number) => String(number).padStart(2, "0")).join(" ")}
+                      </p>
+                    </div>
+                  </div>
+                  <p>
+                    推荐期号 {item.recommended_issue || item.latest_issue || "-"} · {planModeLabel(item.mode)} · {item.cost} 元 ·
+                    命中票数 {item.hit_tickets}/{item.tickets} · 命中率 {item.hit_rate}%
+                  </p>
+                </>
+              );
+            })()}
           </article>
         ))}
       </div>
@@ -1147,6 +1530,274 @@ function DataManagementPanel({ status, draws, onSearchDraws, onPageDraws, onSync
   );
 }
 
+function NumberPicker({ title, max, selected, onToggle, tone = "front", helper }) {
+  return (
+    <div className="number-picker">
+      <div className="picker-head">
+        <strong>{title}</strong>
+        <span>{selected.length} 个已选</span>
+      </div>
+      {helper && <p>{helper}</p>}
+      <div className="picker-grid">
+        {rangeNumbers(max).map((number) => {
+          const active = selected.includes(number);
+          return (
+            <button
+              className={`picker-ball ${tone} ${active ? "active" : ""}`}
+              key={number}
+              onClick={() => onToggle(number)}
+              type="button"
+            >
+              {formatNumber(number)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function BettingPlanPanel({ scene, dashboard, scoreRows, budget, onBudgetChange, onSave, generated, onGenerated }) {
+  const rules = sceneRules(scene);
+  const labels = planLabelsForScene(scene);
+  const [flow, setFlow] = useState("ai");
+  const [mode, setMode] = useState("dantuo");
+  const [ticketCount, setTicketCount] = useState(5);
+  const [danCount, setDanCount] = useState(scene === "SSQ" ? 3 : 2);
+  const [tuoCount, setTuoCount] = useState(scene === "SSQ" ? 5 : 5);
+  const [backCount, setBackCount] = useState(rules.backPick);
+  const [manualFront, setManualFront] = useState([]);
+  const [manualBack, setManualBack] = useState([]);
+  const [manualDan, setManualDan] = useState([]);
+  const [manualTuo, setManualTuo] = useState([]);
+  const [message, setMessage] = useState("");
+  const [variant, setVariant] = useState(0);
+
+  const toggleNumber = (list, setList, number, limit = Infinity) => {
+    setMessage("");
+    setList((items) => {
+      if (items.includes(number)) return items.filter((item) => item !== number);
+      if (items.length >= limit) return items;
+      return [...items, number].sort((left, right) => left - right);
+    });
+  };
+
+  const toggleDan = (number) => {
+    setMessage("");
+    setManualTuo((items) => items.filter((item) => item !== number));
+    toggleNumber(manualDan, setManualDan, number, rules.frontPick - 1);
+  };
+
+  const toggleTuo = (number) => {
+    setMessage("");
+    setManualDan((items) => items.filter((item) => item !== number));
+    toggleNumber(manualTuo, setManualTuo, number);
+  };
+
+  const createAiPlan = () => {
+    try {
+      const nextVariant = variant + 1;
+      const plan = buildAiBettingPlan({
+        scene,
+        scoreRows,
+        budget,
+        mode,
+        ticketCount,
+        danCount,
+        tuoCount,
+        backCount,
+        latestIssue: dashboard.latest_issue,
+        recommendedIssue: dashboard.recommended_issue,
+        variant: nextVariant,
+      });
+      setVariant(nextVariant);
+      onGenerated(plan);
+      setMessage(plan.cost <= Number(budget || 0) ? "AI 建议方案已生成，可复制或保存。" : "方案已生成，但费用超过预算，请调整胆拖数量。");
+    } catch (err) {
+      setMessage(err.message);
+    }
+  };
+
+  const createManualPlan = () => {
+    try {
+      const plan = buildManualBettingPlan({
+        scene,
+        mode,
+        selectedFront: manualFront,
+        selectedBack: manualBack,
+        frontDan: manualDan,
+        frontTuo: manualTuo,
+        latestIssue: dashboard.latest_issue,
+        recommendedIssue: dashboard.recommended_issue,
+        budget,
+        scoreRows,
+      });
+      onGenerated(plan);
+      setMessage("人工方案已生成点评，可保存后进入待开奖复盘。");
+    } catch (err) {
+      setMessage(err.message);
+    }
+  };
+
+  const clearManual = () => {
+    setManualFront([]);
+    setManualBack([]);
+    setManualDan([]);
+    setManualTuo([]);
+    setMessage("");
+  };
+
+  const estimatedTickets = mode === "dantuo"
+    ? combinationCount(Number(tuoCount || 0), rules.frontPick - Number(danCount || 0)) * combinationCount(Number(backCount || 0), rules.backPick)
+    : Number(ticketCount || 0);
+  const estimatedCost = Math.max(0, estimatedTickets * 2);
+
+  return (
+    <section className="panel wide betting-panel" id="module-data">
+      <div className="panel-title">
+        <div>
+          <h2>投注方案</h2>
+          <p>先选择系统建议或人工选号，再生成方案、保存记录，等待开奖后自动复盘。</p>
+        </div>
+        <Badge tone="live">第 {dashboard.recommended_issue || "下一"} 期</Badge>
+      </div>
+
+      <div className="workflow-tabs">
+        <button className={flow === "ai" ? "active" : ""} onClick={() => setFlow("ai")} type="button">
+          <Sparkles size={16} />
+          系统建议
+        </button>
+        <button className={flow === "manual" ? "active" : ""} onClick={() => setFlow("manual")} type="button">
+          <Table2 size={16} />
+          人工选号点评
+        </button>
+      </div>
+
+      <div className="betting-workspace">
+        <div className="betting-controls">
+          <div className="field-grid compact-fields">
+            <label>
+              本期预算
+              <input min="2" step="2" type="number" value={budget} onChange={(event) => onBudgetChange(Number(event.target.value))} />
+            </label>
+            <label>
+              玩法
+              <select value={mode} onChange={(event) => setMode(event.target.value)}>
+                <option value="dantuo">胆拖</option>
+                <option value="single">单式</option>
+              </select>
+            </label>
+            {flow === "ai" && mode === "single" && (
+              <label>
+                注数
+                <input min="1" step="1" type="number" value={ticketCount} onChange={(event) => setTicketCount(Number(event.target.value))} />
+              </label>
+            )}
+            {flow === "ai" && mode === "dantuo" && (
+              <>
+                <label>
+                  胆数
+                  <input min="1" max={rules.frontPick - 1} step="1" type="number" value={danCount} onChange={(event) => setDanCount(Number(event.target.value))} />
+                </label>
+                <label>
+                  拖数
+                  <input min={rules.frontPick - danCount} step="1" type="number" value={tuoCount} onChange={(event) => setTuoCount(Number(event.target.value))} />
+                </label>
+                <label>
+                  {labels.back}数量
+                  <input min={rules.backPick} max={rules.backMax} step="1" type="number" value={backCount} onChange={(event) => setBackCount(Number(event.target.value))} />
+                </label>
+              </>
+            )}
+          </div>
+
+          {flow === "ai" ? (
+            <div className="betting-estimate">
+              <div><span>预计注数</span><strong>{estimatedTickets || 0} 注</strong></div>
+              <div><span>预计费用</span><strong>{estimatedCost || 0} 元</strong></div>
+              <div><span>预算状态</span><strong>{estimatedCost <= Number(budget || 0) ? "符合" : "超出"}</strong></div>
+              <button className="primary-button strong" onClick={createAiPlan} type="button">
+                <Play size={16} />
+                生成系统建议
+              </button>
+            </div>
+          ) : (
+            <div className="manual-actions">
+              <p>人工选号不会预测开奖，只根据你选的号码做结构点评，并保存到复盘队列。</p>
+              <div>
+                <button className="primary-button strong" onClick={createManualPlan} type="button">
+                  <Sparkles size={16} />
+                  生成点评
+                </button>
+                <button className="ghost-button" onClick={clearManual} type="button">清空选择</button>
+              </div>
+            </div>
+          )}
+          {message && <p className={message.includes("超过") || message.includes("需要") || message.includes("不足") ? "form-warning" : "form-success"}>{message}</p>}
+        </div>
+
+        {flow === "manual" && (
+          <div className="manual-picker">
+            {mode === "single" ? (
+              <>
+                <NumberPicker
+                  title={`${labels.front}（选 ${rules.frontPick} 个）`}
+                  max={rules.frontMax}
+                  selected={manualFront}
+                  onToggle={(number) => toggleNumber(manualFront, setManualFront, number, rules.frontPick)}
+                  helper="用于生成一注人工单式方案。"
+                />
+                <NumberPicker
+                  title={`${labels.back}（选 ${rules.backPick} 个）`}
+                  max={rules.backMax}
+                  selected={manualBack}
+                  onToggle={(number) => toggleNumber(manualBack, setManualBack, number, rules.backPick)}
+                  tone="back"
+                />
+              </>
+            ) : (
+              <>
+                <NumberPicker
+                  title={labels.dan}
+                  max={rules.frontMax}
+                  selected={manualDan}
+                  onToggle={toggleDan}
+                  tone="dan"
+                  helper={`胆码少于 ${rules.frontPick} 个，只放最想保留的核心号码。`}
+                />
+                <NumberPicker
+                  title={labels.tuo}
+                  max={rules.frontMax}
+                  selected={manualTuo}
+                  onToggle={toggleTuo}
+                  helper="拖码用于扩展组合覆盖，拖码越多费用越高。"
+                />
+                <NumberPicker
+                  title={labels.back}
+                  max={rules.backMax}
+                  selected={manualBack}
+                  onToggle={(number) => toggleNumber(manualBack, setManualBack, number)}
+                  tone="back"
+                />
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {generated && (
+        <div className="betting-result">
+          <div className="section-kicker">
+            <span>{generated.source === "manual_selection" ? "人工方案点评" : "系统建议结果"}</span>
+            <strong>{generated.cost} 元 · {generated.tickets} 注</strong>
+          </div>
+          <PlanCard plan={generated} onSave={onSave} />
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Dashboard({ scenes, onBack }) {
   const [budget, setBudget] = useState(20);
   const [lastPrize, setLastPrize] = useState(0);
@@ -1155,6 +1806,7 @@ function Dashboard({ scenes, onBack }) {
   const [principal, setPrincipal] = useState(1000);
   const [balance, setBalance] = useState("");
   const [levelUnits, setLevelUnits] = useState(1);
+  const [activeModule, setActiveModule] = useState("overview");
   const [dashboard, setDashboard] = useState(null);
   const [generated, setGenerated] = useState(null);
   const [savedPlans, setSavedPlans] = useState([]);
@@ -1278,25 +1930,6 @@ function Dashboard({ scenes, onBack }) {
     return dashboard.top_numbers.map((number) => String(number).padStart(2, "0")).join(" ");
   }, [dashboard]);
 
-  const generate = async () => {
-    setError("");
-    setNotice("");
-    try {
-      const plan = await generateDltPlan({
-        budget,
-        strategy,
-        lastPrize,
-        window: windowSize,
-        principal,
-        balance,
-        levelUnits,
-      });
-      setGenerated(plan);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
   const savePlan = async (plan) => {
     const localRecord = {
       id: `${Date.now()}-${plan.strategy}-${plan.mode}`,
@@ -1315,13 +1948,15 @@ function Dashboard({ scenes, onBack }) {
       });
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
       await refreshReview();
+      setActiveModule("history");
       setNotice("方案已保存到后端历史记录。");
-    } catch {
+    } catch (err) {
       const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
       localStorage.setItem("cbgo_saved_plans", JSON.stringify(nextPlans));
       setSavedPlans(nextPlans);
       await refreshReview();
-      setNotice("后端保存失败，方案已保存到本地浏览器。");
+      setActiveModule("history");
+      setNotice(`后端保存失败，方案已保存到本地浏览器。${err?.message ? `原因：${err.message}` : ""}`);
     }
   };
 
@@ -1347,10 +1982,12 @@ function Dashboard({ scenes, onBack }) {
   }
 
   if (error && !dashboard) {
+    const fatalError = classifyError(error, "数据加载失败");
     return (
       <main className="loading">
         <ShieldAlert />
-        <p>{error}</p>
+        <strong>{fatalError.title}</strong>
+        <p>{fatalError.detail}</p>
         <button className="text-button" onClick={onBack} type="button">返回</button>
       </main>
     );
@@ -1358,7 +1995,13 @@ function Dashboard({ scenes, onBack }) {
 
   return (
     <main className="app-shell">
-      <AppSidebar scenes={scenes} active="DLT" onSelect={() => {}} />
+      <AppSidebar
+        scenes={scenes}
+        active="DLT"
+        activeModule={activeModule}
+        onModuleChange={setActiveModule}
+        onSelect={() => {}}
+      />
 
       <section className="workspace">
         <header className="workspace-topbar">
@@ -1385,6 +2028,10 @@ function Dashboard({ scenes, onBack }) {
         </header>
 
         <section className="control-panel">
+          <div className="control-note">
+            <strong>状态参数</strong>
+            <span>用于刷新总览、资金状态和回测口径；选号与保存统一在“投注方案”完成。</span>
+          </div>
           <label>
             本期预算
             <input min="2" step="2" type="number" value={budget} onChange={(event) => setBudget(Number(event.target.value))} />
@@ -1394,7 +2041,7 @@ function Dashboard({ scenes, onBack }) {
             <input min="0" step="5" type="number" value={lastPrize} onChange={(event) => setLastPrize(Number(event.target.value))} />
           </label>
           <label>
-            生成策略
+            分析口径
             <select value={strategy} onChange={(event) => setStrategy(event.target.value)}>
               <option value="conservative">保守 · 控制复杂度</option>
               <option value="balanced">均衡 · 评分与预算折中</option>
@@ -1419,67 +2066,53 @@ function Dashboard({ scenes, onBack }) {
           </label>
           <button className="primary-button" onClick={loadDashboard} type="button">
             <Activity size={16} />
-            更新总览
-          </button>
-          <button className="primary-button strong" onClick={generate} type="button">
-            <Play size={16} />
-            生成方案
+            应用参数
           </button>
         </section>
 
-        <section className="stats" id="module-overview">
-          <TopNumbersCard rows={dashboard.score_table} />
-          <StatCard icon={Gauge} label="当前下注状态" value={dashboard.capital_state.level} meta={`下一状态 ${dashboard.capital_state.next_level}`} />
-          <StatCard icon={WalletCards} label="当前资金" value={`${dashboard.capital_state.balance} 元`} meta={`盈利 ${dashboard.capital_state.profit} 元`} />
-          <StatCard icon={Coins} label="本期策略/金额" value={`${STRATEGY_LABELS[dashboard.strategy] || STRATEGY_LABELS[strategy]} / ${dashboard.recommended_amount} 元`} meta="推荐金额不超过预算" />
-        </section>
-
-        {error && <p className="error">{error}</p>}
+        <ErrorNotice error={error} onRetry={loadDashboard} />
         {notice && <p className="notice">{notice}</p>}
-        <DataStatusPanel dataStatus={dashboard.data_status} onImport={importHistory} />
-        <DataManagementPanel
-          status={dataStorage}
-          draws={draws}
-          onSearchDraws={(issue) => refreshDataStorage({ offset: 0, issue })}
-          onPageDraws={(offset, issue) => refreshDataStorage({ offset, issue })}
-          onSync={syncHistory}
-        />
-        <ReviewPanel review={review} onRefresh={refreshReview} />
-        <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} />
 
-        <div className="module-grid">
-          <TrendPanel
-            dashboard={dashboard}
-            scoreRows={dashboard.score_table}
-            windowSize={windowSize}
-            onWindowChange={setWindowSize}
-          />
-          <ScoreTable rows={dashboard.score_table} />
-          <section className="panel" id="module-plan">
-            <div className="panel-title">
-              <div>
-                <h2>组合生成</h2>
-                <p>当前策略：{STRATEGY_LABELS[dashboard.strategy] || STRATEGY_LABELS[strategy]}，只保留费用小于等于预算的方案</p>
-              </div>
-              <LayoutDashboard size={18} />
-            </div>
-            {dashboard.plans[0]?.mode === "dantuo" && <PlanCard plan={dashboard.plans[0]} onSave={savePlan} />}
-            <div className="plan-stack">
-              {generated && <PlanCard plan={generated} onSave={savePlan} />}
-              {dashboard.plans.slice(1).map((plan) => <PlanCard key={`${plan.strategy}-${plan.mode}`} plan={plan} onSave={savePlan} />)}
-            </div>
-            <div className="saved-summary">
-              <strong>已保存方案：{savedPlans.length}</strong>
-              {savedPlans[0] && (
-                <span>
-                  最近：{STRATEGY_LABELS[savedPlans[0].strategy || normalizeRecordPlan(savedPlans[0]).strategy] || "策略"} · {planModeLabel(normalizeRecordPlan(savedPlans[0]).mode)} · {normalizeRecordPlan(savedPlans[0]).cost} 元 · {normalizeRecordPlan(savedPlans[0]).tickets} 注
-                </span>
-              )}
-            </div>
-          </section>
-          <CapitalPanel capital={dashboard.capital_state} />
-          <HistoryRecords records={savedPlans} onDelete={deleteRecord} />
-        </div>
+        <section className="module-stage" aria-label={MODULE_TITLES[activeModule]}>
+          {activeModule === "overview" && (
+            <>
+              <section className="stats" id="module-overview">
+                <TopNumbersCard rows={dashboard.score_table} />
+                <StatCard icon={Gauge} label="当前下注状态" value={dashboard.capital_state.level} meta={`下一状态 ${dashboard.capital_state.next_level}`} />
+                <StatCard icon={WalletCards} label="当前资金" value={`${dashboard.capital_state.balance} 元`} meta={`盈利 ${dashboard.capital_state.profit} 元`} />
+                <StatCard icon={Coins} label="本期预算" value={`${budget} 元`} meta="进入投注方案生成或人工选号" />
+              </section>
+              <DataStatusPanel dataStatus={dashboard.data_status} onImport={importHistory} />
+            </>
+          )}
+
+          {activeModule === "data" && (
+            <BettingPlanPanel
+              scene="DLT"
+              dashboard={dashboard}
+              scoreRows={dashboard.score_table}
+              budget={budget}
+              onBudgetChange={setBudget}
+              generated={generated}
+              onGenerated={setGenerated}
+              onSave={savePlan}
+            />
+          )}
+
+          {activeModule === "review" && <ReviewPanel review={review} onRefresh={refreshReview} />}
+          {activeModule === "backtest" && <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} />}
+          {activeModule === "trends" && (
+            <TrendPanel
+              dashboard={dashboard}
+              scoreRows={dashboard.score_table}
+              windowSize={windowSize}
+              onWindowChange={setWindowSize}
+            />
+          )}
+          {activeModule === "score" && <ScoreTable rows={dashboard.score_table} />}
+          {activeModule === "capital" && <CapitalPanel capital={dashboard.capital_state} />}
+          {activeModule === "history" && <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} />}
+        </section>
 
         <footer className="disclaimer footer-note">
           <ShieldAlert size={16} />
@@ -1498,6 +2131,7 @@ function SsqDashboard({ scenes, onBack }) {
   const [principal, setPrincipal] = useState(1000);
   const [balance, setBalance] = useState("");
   const [levelUnits, setLevelUnits] = useState(1);
+  const [activeModule, setActiveModule] = useState("overview");
   const [dashboard, setDashboard] = useState(null);
   const [generated, setGenerated] = useState(null);
   const [savedPlans, setSavedPlans] = useState([]);
@@ -1605,34 +2239,16 @@ function SsqDashboard({ scenes, onBack }) {
     }
   };
 
-  const generate = async () => {
-    setNotice("");
-    setError("");
-    try {
-      const result = await generateSsqPlan({
-        budget,
-        strategy,
-        lastPrize,
-        window: windowSize,
-        principal,
-        balance: balance === "" ? null : balance,
-        levelUnits,
-      });
-      setGenerated(result);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
   const savePlan = async (plan) => {
     const latestIssue = dashboard?.latest_issue || "";
     try {
       const result = await saveSsqRecord({ budget, strategy, latestIssue, plan });
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
       await refreshReview();
+      setActiveModule("history");
       setNotice("双色球方案已保存。");
     } catch (err) {
-      setNotice(err.message);
+      setError(err.message);
     }
   };
 
@@ -1685,10 +2301,12 @@ function SsqDashboard({ scenes, onBack }) {
   }
 
   if (error && !dashboard) {
+    const fatalError = classifyError(error, "数据加载失败");
     return (
       <main className="loading">
         <ShieldAlert />
-        <p>{error}</p>
+        <strong>{fatalError.title}</strong>
+        <p>{fatalError.detail}</p>
         <button className="text-button" onClick={onBack} type="button">返回场景页</button>
       </main>
     );
@@ -1696,7 +2314,13 @@ function SsqDashboard({ scenes, onBack }) {
 
   return (
     <main className="app-shell">
-      <AppSidebar scenes={scenes} active="SSQ" onSelect={() => {}} />
+      <AppSidebar
+        scenes={scenes}
+        active="SSQ"
+        activeModule={activeModule}
+        onModuleChange={setActiveModule}
+        onSelect={() => {}}
+      />
 
       <section className="workspace">
         <header className="workspace-topbar">
@@ -1723,6 +2347,10 @@ function SsqDashboard({ scenes, onBack }) {
         </header>
 
         <section className="control-panel">
+          <div className="control-note">
+            <strong>状态参数</strong>
+            <span>用于刷新总览、资金状态和回测口径；选号与保存统一在“投注方案”完成。</span>
+          </div>
           <label>
             本期预算
             <input min="2" step="2" type="number" value={budget} onChange={(event) => setBudget(Number(event.target.value))} />
@@ -1732,7 +2360,7 @@ function SsqDashboard({ scenes, onBack }) {
             <input min="0" step="5" type="number" value={lastPrize} onChange={(event) => setLastPrize(Number(event.target.value))} />
           </label>
           <label>
-            生成策略
+            分析口径
             <select value={strategy} onChange={(event) => setStrategy(event.target.value)}>
               <option value="conservative">保守 · 控制复杂度</option>
               <option value="balanced">均衡 · 评分与预算折中</option>
@@ -1757,67 +2385,53 @@ function SsqDashboard({ scenes, onBack }) {
           </label>
           <button className="primary-button" onClick={loadDashboard} type="button">
             <Activity size={16} />
-            更新总览
-          </button>
-          <button className="primary-button strong" onClick={generate} type="button">
-            <Play size={16} />
-            生成方案
+            应用参数
           </button>
         </section>
 
-        <section className="stats" id="module-overview">
-          <TopNumbersCard rows={scoreRows} />
-          <StatCard icon={Gauge} label="当前下注状态" value={dashboard.capital.level} meta={`下一状态 ${dashboard.capital.next_level}`} />
-          <StatCard icon={WalletCards} label="当前资金" value={`${dashboard.capital.balance} 元`} meta={`盈利 ${dashboard.capital.profit} 元`} />
-          <StatCard icon={Coins} label="本期策略/金额" value={`${STRATEGY_LABELS[strategy]} / ${ssqView.recommended_amount} 元`} meta="推荐金额不超过预算" />
-        </section>
-
-        {error && <p className="error">{error}</p>}
+        <ErrorNotice error={error} onRetry={loadDashboard} />
         {notice && <p className="notice">{notice}</p>}
-        <DataStatusPanel dataStatus={ssqView.data_status} onImport={importHistory} />
-        <DataManagementPanel
-          status={dataStorage}
-          draws={draws}
-          onSearchDraws={(issue) => refreshDataStorage({ offset: 0, issue })}
-          onPageDraws={(offset, issue) => refreshDataStorage({ offset, issue })}
-          onSync={syncHistory}
-        />
-        <ReviewPanel review={review} onRefresh={refreshReview} />
-        <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} />
 
-        <div className="module-grid">
-          <TrendPanel
-            dashboard={ssqView}
-            scoreRows={scoreRows}
-            windowSize={windowSize}
-            onWindowChange={setWindowSize}
-          />
-          <ScoreTable rows={scoreRows} />
-          <section className="panel" id="module-plan">
-            <div className="panel-title">
-              <div>
-                <h2>组合生成</h2>
-                <p>双色球红球 33 选 6，蓝球 16 选 1；只保留费用小于等于预算的方案</p>
-              </div>
-              <LayoutDashboard size={18} />
-            </div>
-            {dashboard.plans[0] && <PlanCard plan={dashboard.plans[0]} onSave={savePlan} />}
-            <div className="plan-stack">
-              {generated && <PlanCard plan={generated} onSave={savePlan} />}
-              {dashboard.plans.slice(1).map((plan) => <PlanCard key={`${plan.strategy}-${plan.mode}`} plan={plan} onSave={savePlan} />)}
-            </div>
-            <div className="saved-summary">
-              <strong>已保存方案：{savedPlans.length}</strong>
-              {savedPlans[0] && (
-                <span>
-                  最近：{STRATEGY_LABELS[savedPlans[0].strategy || normalizeRecordPlan(savedPlans[0]).strategy] || "策略"} · {planModeLabel(normalizeRecordPlan(savedPlans[0]).mode)} · {normalizeRecordPlan(savedPlans[0]).cost} 元
-                </span>
-              )}
-            </div>
-          </section>
-          <CapitalPanel capital={dashboard.capital} />
-          <HistoryRecords records={savedPlans} onDelete={deleteRecord} />
-        </div>
+        <section className="module-stage" aria-label={MODULE_TITLES[activeModule]}>
+          {activeModule === "overview" && (
+            <>
+              <section className="stats" id="module-overview">
+                <TopNumbersCard rows={scoreRows} />
+                <StatCard icon={Gauge} label="当前下注状态" value={dashboard.capital.level} meta={`下一状态 ${dashboard.capital.next_level}`} />
+                <StatCard icon={WalletCards} label="当前资金" value={`${dashboard.capital.balance} 元`} meta={`盈利 ${dashboard.capital.profit} 元`} />
+                <StatCard icon={Coins} label="本期预算" value={`${budget} 元`} meta="进入投注方案生成或人工选号" />
+              </section>
+              <DataStatusPanel dataStatus={ssqView.data_status} onImport={importHistory} />
+            </>
+          )}
+
+          {activeModule === "data" && (
+            <BettingPlanPanel
+              scene="SSQ"
+              dashboard={dashboard}
+              scoreRows={scoreRows}
+              budget={budget}
+              onBudgetChange={setBudget}
+              generated={generated}
+              onGenerated={setGenerated}
+              onSave={savePlan}
+            />
+          )}
+
+          {activeModule === "review" && <ReviewPanel review={review} onRefresh={refreshReview} />}
+          {activeModule === "backtest" && <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} />}
+          {activeModule === "trends" && (
+            <TrendPanel
+              dashboard={ssqView}
+              scoreRows={scoreRows}
+              windowSize={windowSize}
+              onWindowChange={setWindowSize}
+            />
+          )}
+          {activeModule === "score" && <ScoreTable rows={scoreRows} />}
+          {activeModule === "capital" && <CapitalPanel capital={dashboard.capital} />}
+          {activeModule === "history" && <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} />}
+        </section>
 
         <footer className="disclaimer footer-note">
           <ShieldAlert size={16} />
