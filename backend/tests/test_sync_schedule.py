@@ -7,6 +7,7 @@ from scripts.update_dlt_history import (
     merge_rows as merge_dlt_rows,
     parse_78500_payload,
 )
+from scripts.run_draw_update import scheduled_game
 from scripts.update_ssq_history import (
     expected_draw_date,
     fill_latest_new_draw_date,
@@ -34,6 +35,20 @@ class DltSyncScheduleTests(unittest.TestCase):
     def test_uses_previous_dlt_draw_day_for_after_midnight_retry(self):
         now = datetime(2026, 7, 12, 0, 30, tzinfo=SHANGHAI_TZ)
         self.assertEqual(expected_dlt_draw_date(now), "2026-07-11")
+
+
+class LocalAutomationScheduleTests(unittest.TestCase):
+    def test_selects_dlt_on_monday_evening(self):
+        now = datetime(2026, 7, 13, 22, 30, tzinfo=SHANGHAI_TZ)
+        self.assertEqual(scheduled_game(now), "dlt")
+
+    def test_after_midnight_retry_uses_previous_ssq_draw_day(self):
+        now = datetime(2026, 7, 15, 0, 30, tzinfo=SHANGHAI_TZ)
+        self.assertEqual(scheduled_game(now), "ssq")
+
+    def test_skips_when_previous_day_has_no_supported_draw(self):
+        now = datetime(2026, 7, 18, 0, 30, tzinfo=SHANGHAI_TZ)
+        self.assertIsNone(scheduled_game(now))
 
 
 class SsqSyncScheduleTests(unittest.TestCase):
