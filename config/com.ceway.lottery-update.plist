@@ -8,13 +8,10 @@
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/python3</string>
-    <string>/Volumes/wisely data/Projects/CBGO决策系统/scripts/run_draw_update.py</string>
+    <string>/Users/wisely/Library/Caches/Ceway-Automation/scripts/run_draw_update.py</string>
     <string>--game</string>
     <string>auto</string>
   </array>
-
-  <key>WorkingDirectory</key>
-  <string>/Volumes/wisely data/Projects/CBGO决策系统</string>
 
   <key>EnvironmentVariables</key>
   <dict>
@@ -22,6 +19,8 @@
     <string>/Users/wisely/.npm-global/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     <key>TZ</key>
     <string>Asia/Shanghai</string>
+    <key>CEWAY_ROOT</key>
+    <string>/Users/wisely/Library/Caches/Ceway-Automation</string>
   </dict>
 
   <key>StartCalendarInterval</key>
@@ -51,8 +50,8 @@
   <key>ThrottleInterval</key>
   <integer>60</integer>
   <key>StandardOutPath</key>
-  <string>/Volumes/wisely data/Projects/CBGO决策系统/.logs/lottery-update.log</string>
+  <string>/Users/wisely/Library/Logs/Ceway/lottery-update.log</string>
   <key>StandardErrorPath</key>
-  <string>/Volumes/wisely data/Projects/CBGO决策系统/.logs/lottery-update-error.log</string>
+  <string>/Users/wisely/Library/Logs/Ceway/lottery-update-error.log</string>
 </dict>
 </plist>

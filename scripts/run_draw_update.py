@@ -13,7 +13,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(os.environ.get("CEWAY_ROOT", Path(__file__).resolve().parents[1])).expanduser().resolve()
 FRONTEND_DIR = ROOT_DIR / "frontend"
 DATA_FILES = [
     Path("backend/data/dlt_history.csv"),
@@ -96,6 +96,17 @@ def ensure_safe_worktree() -> None:
         raise RuntimeError("工作区存在未处理变更，为避免误提交已停止自动更新：" + "、".join(unsafe))
 
 
+def refresh_checkout() -> None:
+    if data_changed():
+        log("检测到上次未完成的数据更新，先继续本地恢复流程")
+        return
+    run(["git", "fetch", "origin", "main"], timeout=120)
+    run(["git", "merge", "--ff-only", "origin/main"])
+    ahead = run(["git", "rev-list", "--count", "origin/main..HEAD"]).stdout.strip()
+    if ahead and int(ahead) > 0:
+        run(["git", "push", "origin", "main"], timeout=120)
+
+
 def update_history(game: str) -> None:
     commands = {
         "dlt": [sys.executable, "scripts/update_dlt_history.py", "--source", "78500", "--mode", "append"],
@@ -117,6 +128,8 @@ def data_changed() -> bool:
 
 
 def commit_data(game: str) -> None:
+    run(["git", "config", "user.name", "Ceway Data Updater"])
+    run(["git", "config", "user.email", "ceway-updater@local.invalid"])
     run(["git", "add", *[str(path) for path in DATA_FILES]])
     today = datetime.now(SHANGHAI_TZ).date().isoformat()
     run(["git", "commit", "-m", f"Update {game} lottery history ({today})"])
@@ -190,6 +203,7 @@ def main() -> int:
 
         try:
             ensure_safe_worktree()
+            refresh_checkout()
             update_history(game)
             if data_changed():
                 log("发现新期号，保存历史数据到 GitHub")
