@@ -2363,7 +2363,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
     setError("");
     setNotice(full ? "正在全量校准双色球开奖数据..." : "正在更新双色球开奖数据...");
     try {
-      const result = await syncSsqHistory({ source: "78500", full });
+      const result = await syncSsqHistory({ source: "auto", full });
       await loadDashboard();
       await refreshDataStorage({ offset: 0, issue: "" });
       setNotice(`双色球数据更新完成：最新期号 ${result.data_status?.latest_issue || "-"}`);

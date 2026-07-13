@@ -281,7 +281,7 @@ export function searchSsqDraws({ limit = 12, offset = 0, issue = "" } = {}) {
   return request(`/data/ssq/draws?${params}`);
 }
 
-export function syncSsqHistory({ source = "78500", full = false } = {}) {
+export function syncSsqHistory({ source = "auto", full = false } = {}) {
   if (STATIC_DEMO) {
     throw new Error("公开网页使用已发布的完整历史快照，联网更新需在本地后端环境执行。");
   }

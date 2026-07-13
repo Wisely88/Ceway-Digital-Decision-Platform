@@ -1,6 +1,5 @@
 backend/.venv/
-backend/__pycache__/
-scripts/__pycache__/
+**/__pycache__/
 backend/data/dlt_records.json
 backend/data/ceway.sqlite3
 frontend/node_modules/
