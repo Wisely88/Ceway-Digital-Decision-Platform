@@ -16,6 +16,8 @@ import {
   getDemoSsqStatus,
   saveDemoRecord,
   saveDemoSsqRecord,
+  searchDemoDltDraws,
+  searchDemoSsqDraws,
 } from "./demoData";
 
 const RAW_API_BASE = import.meta.env.VITE_API_BASE || "/api";
@@ -165,10 +167,7 @@ export function getDltDraws({ limit = 10 } = {}) {
 
 export function searchDltDraws({ limit = 12, offset = 0, issue = "" } = {}) {
   if (STATIC_DEMO) {
-    return getDemoDraws(30).then((items) => {
-      const filtered = issue ? items.filter((item) => item.issue.includes(issue)) : items;
-      return { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset, issue };
-    });
+    return searchDemoDltDraws({ limit, offset, issue });
   }
   const params = toQueryString({ limit, offset, issue });
   return request(`/data/dlt/draws?${params}`);
@@ -176,7 +175,7 @@ export function searchDltDraws({ limit = 12, offset = 0, issue = "" } = {}) {
 
 export function syncDltHistory({ source = "sporttery", full = false } = {}) {
   if (STATIC_DEMO) {
-    throw new Error("GitHub Pages 演示模式不支持联网更新，请在本地后端环境使用。");
+    throw new Error("公开网页使用已发布的完整历史快照，联网更新需在本地后端环境执行。");
   }
   const params = toQueryString({ source, full });
   return request(`/data/dlt/sync?${params}`, { method: "POST" });
@@ -276,10 +275,7 @@ export function getSsqDraws({ limit = 10 } = {}) {
 
 export function searchSsqDraws({ limit = 12, offset = 0, issue = "" } = {}) {
   if (STATIC_DEMO) {
-    return getDemoSsqDraws(100).then((items) => {
-      const filtered = issue ? items.filter((item) => item.issue.includes(issue)) : items;
-      return { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset, issue };
-    });
+    return searchDemoSsqDraws({ limit, offset, issue });
   }
   const params = toQueryString({ limit, offset, issue });
   return request(`/data/ssq/draws?${params}`);
@@ -287,7 +283,7 @@ export function searchSsqDraws({ limit = 12, offset = 0, issue = "" } = {}) {
 
 export function syncSsqHistory({ source = "78500", full = false } = {}) {
   if (STATIC_DEMO) {
-    throw new Error("GitHub Pages 演示模式不支持联网更新，请在本地后端环境使用。");
+    throw new Error("公开网页使用已发布的完整历史快照，联网更新需在本地后端环境执行。");
   }
   const params = toQueryString({ source, full });
   return request(`/data/ssq/sync?${params}`, { method: "POST" });
@@ -295,7 +291,7 @@ export function syncSsqHistory({ source = "78500", full = false } = {}) {
 
 export async function importSsqHistory(file) {
   if (STATIC_DEMO) {
-    throw new Error("GitHub Pages 演示模式不支持导入 CSV，请在本地后端环境使用该功能。");
+    throw new Error("公开网页不直接修改发布数据，CSV 导入需在本地后端环境执行。");
   }
   const formData = new FormData();
   formData.append("file", file);
@@ -315,7 +311,7 @@ export async function importSsqHistory(file) {
 
 export async function importDltHistory(file) {
   if (STATIC_DEMO) {
-    throw new Error("GitHub Pages 演示模式不支持导入 CSV，请在本地后端环境使用该功能。");
+    throw new Error("公开网页不直接修改发布数据，CSV 导入需在本地后端环境执行。");
   }
   const formData = new FormData();
   formData.append("file", file);

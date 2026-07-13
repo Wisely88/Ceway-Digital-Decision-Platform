@@ -1,39 +1,6 @@
 import dltHistoryCsv from "../../backend/data/dlt_history.csv?raw";
 import ssqHistoryCsv from "../../backend/data/ssq_history.csv?raw";
 
-const SAMPLE_HISTORY = [
-  ["2025001", "2025-01-01", [3, 7, 18, 22, 31], [4, 11]],
-  ["2025002", "2025-01-03", [1, 9, 16, 24, 35], [2, 8]],
-  ["2025003", "2025-01-06", [5, 12, 18, 27, 33], [3, 10]],
-  ["2025004", "2025-01-08", [2, 7, 14, 23, 31], [1, 11]],
-  ["2025005", "2025-01-10", [6, 13, 19, 28, 34], [5, 12]],
-  ["2025006", "2025-01-13", [4, 11, 18, 25, 30], [3, 9]],
-  ["2025007", "2025-01-15", [7, 15, 20, 26, 32], [6, 11]],
-  ["2025008", "2025-01-17", [3, 10, 17, 24, 35], [2, 7]],
-  ["2025009", "2025-01-20", [8, 14, 21, 29, 34], [4, 10]],
-  ["2025010", "2025-01-22", [1, 7, 18, 23, 31], [3, 11]],
-  ["2025011", "2025-01-24", [5, 12, 19, 27, 33], [1, 8]],
-  ["2025012", "2025-01-27", [2, 9, 16, 25, 30], [5, 12]],
-  ["2025013", "2025-01-29", [6, 13, 20, 28, 35], [2, 9]],
-  ["2025014", "2025-01-31", [4, 11, 17, 24, 32], [6, 10]],
-  ["2025015", "2025-02-03", [7, 14, 18, 26, 34], [3, 11]],
-  ["2025016", "2025-02-05", [3, 10, 21, 29, 31], [4, 12]],
-  ["2025017", "2025-02-07", [8, 15, 19, 27, 33], [1, 7]],
-  ["2025018", "2025-02-10", [1, 12, 16, 23, 35], [5, 9]],
-  ["2025019", "2025-02-12", [5, 13, 20, 28, 34], [2, 11]],
-  ["2025020", "2025-02-14", [2, 9, 18, 25, 30], [3, 10]],
-  ["2025021", "2025-02-17", [6, 14, 21, 29, 32], [4, 8]],
-  ["2025022", "2025-02-19", [4, 11, 17, 24, 31], [6, 12]],
-  ["2025023", "2025-02-21", [7, 15, 19, 26, 33], [1, 11]],
-  ["2025024", "2025-02-24", [3, 10, 18, 27, 35], [5, 9]],
-  ["2025025", "2025-02-26", [8, 12, 20, 28, 34], [2, 10]],
-  ["2025026", "2025-02-28", [1, 9, 16, 23, 30], [3, 7]],
-  ["2025027", "2025-03-03", [5, 13, 21, 29, 32], [4, 11]],
-  ["2025028", "2025-03-05", [2, 14, 17, 24, 31], [6, 8]],
-  ["2025029", "2025-03-07", [6, 11, 19, 26, 33], [1, 12]],
-  ["2025030", "2025-03-10", [4, 15, 18, 27, 35], [3, 9]],
-].map(([issue, date, front, back]) => ({ issue, date, front, back }));
-
 const PARSED_DLT_HISTORY = dltHistoryCsv
   .trim()
   .split(/\r?\n/)
@@ -44,7 +11,7 @@ const PARSED_DLT_HISTORY = dltHistoryCsv
     return { issue, date, front: numbers.slice(0, 5), back: numbers.slice(5, 7) };
   })
   .filter((row) => row.issue && row.front.length === 5 && row.back.length === 2);
-const HISTORY = PARSED_DLT_HISTORY.length ? PARSED_DLT_HISTORY : SAMPLE_HISTORY;
+const HISTORY = PARSED_DLT_HISTORY;
 
 const SSQ_HISTORY = ssqHistoryCsv
   .trim()
@@ -438,19 +405,19 @@ export function getDemoDashboard({ budget = 20, lastPrize = 0, strategy = "balan
   });
   return Promise.resolve({
     scene: "DLT",
-    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.6 Static Demo" },
+    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.6 Decision Risk" },
     disclaimer: "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
     history_count: HISTORY.length,
     latest_issue: latest.issue,
     recommended_issue: recommendedIssue,
     data_status: {
-      source: "static_demo",
-      source_label: "静态演示数据",
-      path: "内置 DLT CSV 快照",
+      source: "published_snapshot",
+      source_label: "完整历史快照",
+      path: "DLT 历史开奖 CSV",
       latest_issue: latest.issue,
       latest_date: latest.date,
       is_sample: false,
-      message: "当前页面运行在 GitHub Pages 静态演示模式，使用发布时打包的完整 DLT CSV 快照。",
+      message: `当前分析基于发布时校验的 ${HISTORY.length} 期大乐透历史开奖数据。`,
     },
     top_numbers: scoreTable.slice(0, 5).map((row) => row.number),
     budget: Number(budget),
@@ -500,8 +467,8 @@ export function getDemoSsqDashboard({ budget = 20, lastPrize = 0, strategy = "ba
   });
   return Promise.resolve({
     scene: "SSQ",
-    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.6 Static Demo" },
-    disclaimer: "策维不预测开奖结果，不承诺提高中奖概率；静态演示只用于验证流程。",
+    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.6 Decision Risk" },
+    disclaimer: "策维不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
     history_count: SSQ_HISTORY.length,
     latest_issue: latest.issue,
     recommended_issue: recommendedIssue,
@@ -512,12 +479,13 @@ export function getDemoSsqDashboard({ budget = 20, lastPrize = 0, strategy = "ba
     top_front: scoreboard.slice(0, 6).map((row) => row.number),
     capital: buildCapital(lastPrize, Number(principal), balance, levelUnits),
     storage: {
-      storage: "static_demo",
-      path: "内置 SSQ CSV 快照",
+      storage: "published_snapshot",
+      source_label: "完整历史快照",
+      path: "SSQ 历史开奖 CSV",
       draw_count: SSQ_HISTORY.length,
       latest_issue: latest.issue,
       latest_date: latest.date,
-      quality: { level: "snapshot", label: "静态快照", message: "数据随 GitHub Pages 发布版本更新，不会在浏览器内自动联网。", missing_count: 0, missing_issues: [] },
+      quality: { level: "snapshot", label: "连续完整", message: `已打包 ${SSQ_HISTORY.length} 期双色球历史记录，数据随网站发布版本更新。`, missing_count: 0, missing_issues: [] },
     },
   });
 }
@@ -922,11 +890,30 @@ export function getDemoSsqDraws(limit = 10) {
   return Promise.resolve(SSQ_HISTORY.slice(-limit).reverse());
 }
 
+function paginateDraws(history, { limit = 12, offset = 0, issue = "" } = {}) {
+  const normalizedIssue = String(issue || "").trim();
+  const filtered = history
+    .slice()
+    .reverse()
+    .filter((row) => !normalizedIssue || row.issue.includes(normalizedIssue));
+  return {
+    items: filtered.slice(offset, offset + limit),
+    total: filtered.length,
+    limit,
+    offset,
+    issue: normalizedIssue,
+  };
+}
+
+export function searchDemoSsqDraws(params = {}) {
+  return Promise.resolve(paginateDraws(SSQ_HISTORY, params));
+}
+
 export function getDemoSsqStatus() {
   const latest = SSQ_HISTORY.at(-1);
   return Promise.resolve({
-    storage: "static_demo",
-    path: "内置 SSQ CSV 快照",
+    storage: "published_snapshot",
+    path: "SSQ 历史开奖 CSV",
     draw_count: SSQ_HISTORY.length,
     record_count: JSON.parse(localStorage.getItem("ceway_demo_ssq_records") || "[]").length,
     review_count: 0,
@@ -934,7 +921,7 @@ export function getDemoSsqStatus() {
     first_date: SSQ_HISTORY[0]?.date,
     latest_issue: latest?.issue,
     latest_date: latest?.date,
-    quality: { level: "snapshot", label: "静态快照", message: "静态演示数据更新至当前发布版本。", missing_count: 0, missing_issues: [] },
+    quality: { level: "snapshot", label: "连续完整", message: `已打包 ${SSQ_HISTORY.length} 期双色球历史记录，数据随网站发布版本更新。`, missing_count: 0, missing_issues: [] },
     last_sync: null,
   });
 }
@@ -950,11 +937,15 @@ export function getDemoDraws(limit = 10) {
   );
 }
 
+export function searchDemoDltDraws(params = {}) {
+  return Promise.resolve(paginateDraws(HISTORY, params));
+}
+
 export function getDemoDltStatus() {
   const latest = HISTORY.at(-1);
   return Promise.resolve({
-    storage: "static_demo",
-    path: "内置 DLT CSV 快照",
+    storage: "published_snapshot",
+    path: "DLT 历史开奖 CSV",
     draw_count: HISTORY.length,
     record_count: JSON.parse(localStorage.getItem("ceway_demo_records") || "[]").length,
     review_count: 0,
@@ -962,7 +953,7 @@ export function getDemoDltStatus() {
     first_date: HISTORY[0]?.date,
     latest_issue: latest?.issue,
     latest_date: latest?.date,
-    quality: { level: "snapshot", label: "静态快照", message: "静态演示数据更新至当前发布版本。", missing_count: 0, missing_issues: [] },
+    quality: { level: "snapshot", label: "连续完整", message: `已打包 ${HISTORY.length} 期大乐透历史记录，数据随网站发布版本更新。`, missing_count: 0, missing_issues: [] },
     last_sync: null,
   });
 }

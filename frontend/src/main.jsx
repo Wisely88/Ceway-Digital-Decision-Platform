@@ -1220,6 +1220,8 @@ function CapitalPanel({
 function DataStatusPanel({ dataStatus, onImport }) {
   if (!dataStatus) return null;
   const quality = dataStatus.quality;
+  const isPublishedSnapshot = dataStatus.source === "published_snapshot"
+    || dataStatus.storage === "published_snapshot";
 
   return (
     <section className={`data-status-panel ${dataStatus.is_sample ? "sample" : ""}`}>
@@ -1235,11 +1237,15 @@ function DataStatusPanel({ dataStatus, onImport }) {
         {quality && <div><dt>完整性</dt><dd>{quality.label}</dd></div>}
         <div><dt>数据文件</dt><dd>{dataStatus.path}</dd></div>
       </dl>
-      <label className="upload-button data-upload">
-        <FileUp size={16} />
-        导入最新CSV
-        <input accept=".csv,text/csv" type="file" onChange={onImport} />
-      </label>
+      {isPublishedSnapshot ? (
+        <Badge>数据随网站版本更新</Badge>
+      ) : (
+        <label className="upload-button data-upload">
+          <FileUp size={16} />
+          导入最新CSV
+          <input accept=".csv,text/csv" type="file" onChange={onImport} />
+        </label>
+      )}
     </section>
   );
 }
@@ -1564,6 +1570,7 @@ function DataManagementPanel({ status, draws, onSearchDraws, onPageDraws, onSync
   if (!status) return null;
   const quality = status.quality;
   const lastSync = status.last_sync;
+  const isPublishedSnapshot = status.storage === "published_snapshot";
   const drawItems = Array.isArray(draws) ? draws : draws.items || [];
   const total = Array.isArray(draws) ? draws.length : draws.total || 0;
   const offset = Array.isArray(draws) ? 0 : draws.offset || 0;
@@ -1574,12 +1581,16 @@ function DataManagementPanel({ status, draws, onSearchDraws, onPageDraws, onSync
       <div className="panel-title">
         <div>
           <h2>数据管理</h2>
-          <p>SQLite 开奖数据、推荐记录、复盘结果与完整性检查</p>
+          <p>{isPublishedSnapshot ? "完整历史开奖快照、全量查询与完整性检查" : "SQLite 开奖数据、推荐记录、复盘结果与完整性检查"}</p>
         </div>
         <div className="panel-actions">
-          <button className="ghost-button compact" onClick={() => onSync(false)} type="button">更新最新开奖</button>
-          <button className="ghost-button compact" onClick={() => onSync(true)} type="button">全量校准</button>
-          <Badge>{status.storage === "sqlite" ? "SQLite" : "演示数据"}</Badge>
+          {!isPublishedSnapshot && (
+            <>
+              <button className="ghost-button compact" onClick={() => onSync(false)} type="button">更新最新开奖</button>
+              <button className="ghost-button compact" onClick={() => onSync(true)} type="button">全量校准</button>
+            </>
+          )}
+          <Badge>{status.storage === "sqlite" ? "SQLite" : "完整历史快照"}</Badge>
         </div>
       </div>
       <div className="data-management-summary">
@@ -2109,6 +2120,8 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
     }
   };
 
+  const isPublishedSnapshot = dashboard?.data_status?.source === "published_snapshot";
+
   if (loading) {
     return <main className="loading"><RefreshCw className="spin" /> 正在计算 DLT Module 数据...</main>;
   }
@@ -2147,12 +2160,14 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
               <ArrowLeft size={16} />
               返回场景页
             </button>
-            <Badge><Database size={13} /> {dashboard.history_count} 期样本</Badge>
-            <label className="upload-button">
-              <FileUp size={16} />
-              导入CSV
-              <input accept=".csv,text/csv" type="file" onChange={importHistory} />
-            </label>
+            <Badge><Database size={13} /> {dashboard.history_count} 期历史记录</Badge>
+            {!isPublishedSnapshot && (
+              <label className="upload-button">
+                <FileUp size={16} />
+                导入CSV
+                <input accept=".csv,text/csv" type="file" onChange={importHistory} />
+              </label>
+            )}
             <button className="icon-button" onClick={loadDashboard} title="刷新" type="button">
               <RefreshCw size={18} />
             </button>
@@ -2412,15 +2427,18 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
   };
 
   const scoreRows = dashboard?.scoreboard || [];
+  const isPublishedSnapshot = dashboard?.storage?.storage === "published_snapshot";
   const ssqView = dashboard ? {
     ...dashboard,
     score_table: scoreRows,
     capital_state: dashboard.capital,
     data_status: {
       ...(dashboard.storage || {}),
-      source_label: "SQLite 数据库",
-      is_sample: (dashboard.history_count || 0) <= 100,
-      message: "当前双色球分析基于本地 SQLite 数据库。可通过 CSV 导入更新开奖数据。",
+      source_label: dashboard.storage?.source_label || (isPublishedSnapshot ? "完整历史快照" : "SQLite 数据库"),
+      is_sample: !isPublishedSnapshot && (dashboard.history_count || 0) <= 100,
+      message: isPublishedSnapshot
+        ? `当前分析基于发布时校验的 ${dashboard.history_count} 期双色球历史开奖数据。`
+        : "当前双色球分析基于本地 SQLite 数据库。可通过 CSV 导入更新开奖数据。",
     },
     top_numbers: dashboard.top_front || [],
     recommended_amount: Math.max(...(dashboard.plans || []).map((plan) => plan.cost), 0),
@@ -2465,12 +2483,14 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
               <ArrowLeft size={16} />
               返回场景页
             </button>
-            <Badge><Database size={13} /> {dashboard.history_count} 期样本</Badge>
-            <label className="upload-button">
-              <FileUp size={16} />
-              导入CSV
-              <input accept=".csv,text/csv" type="file" onChange={importHistory} />
-            </label>
+            <Badge><Database size={13} /> {dashboard.history_count} 期历史记录</Badge>
+            {!isPublishedSnapshot && (
+              <label className="upload-button">
+                <FileUp size={16} />
+                导入CSV
+                <input accept=".csv,text/csv" type="file" onChange={importHistory} />
+              </label>
+            )}
             <button className="icon-button" onClick={loadDashboard} title="刷新" type="button">
               <RefreshCw size={18} />
             </button>
