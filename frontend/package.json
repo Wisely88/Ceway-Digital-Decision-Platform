@@ -7,7 +7,8 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "build:pages": "VITE_STATIC_DEMO=true vite build --base /Ceway-Digital-Decision-Platform/",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test src/*.test.js"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",

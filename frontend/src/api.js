@@ -1,12 +1,21 @@
 import {
   getDemoDashboard,
+  getDemoDltStatus,
   getDemoPlan,
   getDemoRecords,
   getDemoReview,
   getDemoBacktest,
   getDemoScenes,
   getDemoDraws,
+  getDemoSsqBacktest,
+  getDemoSsqDashboard,
+  getDemoSsqDraws,
+  getDemoSsqPlan,
+  getDemoSsqRecords,
+  getDemoSsqReview,
+  getDemoSsqStatus,
   saveDemoRecord,
+  saveDemoSsqRecord,
 } from "./demoData";
 
 const RAW_API_BASE = import.meta.env.VITE_API_BASE || "/api";
@@ -143,28 +152,7 @@ export function getDltBacktest({ budget = 20, strategy = "balanced", periods = 1
 }
 
 export function getDltDataStatus() {
-  if (STATIC_DEMO) {
-    return Promise.resolve({
-      storage: "static_demo",
-      path: "GitHub Pages demo",
-      draw_count: 30,
-      record_count: JSON.parse(localStorage.getItem("ceway_demo_records") || "[]").length,
-      review_count: 1,
-      first_issue: "2025001",
-      first_date: "2025-01-01",
-      latest_issue: "2025030",
-      latest_date: "2025-03-10",
-      quality: {
-        level: "sample",
-        label: "样例数据",
-        message: "GitHub Pages 演示环境使用内置样例数据，本地环境可通过 CSV 或脚本更新 SQLite。",
-        missing_count: 0,
-        missing_issues: [],
-        year_ranges: [{ year: "2025", first: "2025001", last: "2025030", count: 30, missing_count: 0 }],
-      },
-      last_sync: null,
-    });
-  }
+  if (STATIC_DEMO) return getDemoDltStatus();
   return request("/data/dlt/status");
 }
 
@@ -204,7 +192,7 @@ export function getSsqDashboard({
   levelUnits,
 }) {
   if (STATIC_DEMO) {
-    return getDemoDashboard({ budget, lastPrize, strategy, window, principal, balance, levelUnits });
+    return getDemoSsqDashboard({ budget, lastPrize, strategy, window, principal, balance, levelUnits });
   }
   const params = toQueryString({
     budget,
@@ -220,7 +208,7 @@ export function getSsqDashboard({
 
 export function generateSsqPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits, variant = 0 }) {
   if (STATIC_DEMO) {
-    return getDemoPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits });
+    return getDemoSsqPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits });
   }
   return request("/plan/ssq", {
     method: "POST",
@@ -238,22 +226,22 @@ export function generateSsqPlan({ budget, strategy, lastPrize, window, principal
 }
 
 export function getSsqRecords() {
-  if (STATIC_DEMO) return getDemoRecords();
+  if (STATIC_DEMO) return getDemoSsqRecords();
   return request("/records/ssq");
 }
 
 export function deleteSsqRecord(id) {
   if (STATIC_DEMO) {
-    const records = JSON.parse(localStorage.getItem("ceway_demo_records") || "[]")
+    const records = JSON.parse(localStorage.getItem("ceway_demo_ssq_records") || "[]")
       .filter((record) => record.id !== id);
-    localStorage.setItem("ceway_demo_records", JSON.stringify(records));
+    localStorage.setItem("ceway_demo_ssq_records", JSON.stringify(records));
     return Promise.resolve({ status: "ok", deleted: true, id });
   }
   return request(`/records/ssq/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export function saveSsqRecord({ budget, strategy, latestIssue, plan }) {
-  if (STATIC_DEMO) return saveDemoRecord({ budget, strategy, latestIssue, plan });
+  if (STATIC_DEMO) return saveDemoSsqRecord({ budget, strategy, latestIssue, plan });
   return request("/records/ssq", {
     method: "POST",
     body: JSON.stringify({
@@ -266,52 +254,29 @@ export function saveSsqRecord({ budget, strategy, latestIssue, plan }) {
 }
 
 export function getSsqReview() {
-  if (STATIC_DEMO) return getDemoReview();
+  if (STATIC_DEMO) return getDemoSsqReview();
   return request("/review/ssq");
 }
 
 export function getSsqBacktest({ budget = 20, strategy = "balanced", periods = 100, window = 100 } = {}) {
-  if (STATIC_DEMO) return getDemoBacktest({ budget, strategy, periods, window });
+  if (STATIC_DEMO) return getDemoSsqBacktest({ budget, strategy, periods, window });
   const params = toQueryString({ budget, strategy, periods, window });
   return request(`/backtest/ssq?${params}`);
 }
 
 export function getSsqDataStatus() {
-  if (STATIC_DEMO) {
-    return Promise.resolve({
-      storage: "static_demo",
-      path: "GitHub Pages demo",
-      draw_count: 100,
-      record_count: 0,
-      review_count: 0,
-      first_issue: "2025001",
-      first_date: "2025-01-02",
-      latest_issue: "2025100",
-      latest_date: "2025-08-21",
-      quality: {
-        level: "sample",
-        label: "样例数据",
-        message: "SSQ 演示环境使用样例数据。",
-        missing_count: 0,
-        missing_issues: [],
-        year_ranges: [{ year: "2025", first: "2025001", last: "2025100", count: 100, missing_count: 0 }],
-      },
-      last_sync: null,
-    });
-  }
+  if (STATIC_DEMO) return getDemoSsqStatus();
   return request("/data/ssq/status");
 }
 
 export function getSsqDraws({ limit = 10 } = {}) {
-  if (STATIC_DEMO) {
-    return getDemoDraws(limit).then((items) => ({ items, total: items.length, limit, offset: 0, issue: "" }));
-  }
+  if (STATIC_DEMO) return getDemoSsqDraws(limit).then((items) => ({ items, total: items.length, limit, offset: 0, issue: "" }));
   return request(`/data/ssq/draws?${toQueryString({ limit })}`);
 }
 
 export function searchSsqDraws({ limit = 12, offset = 0, issue = "" } = {}) {
   if (STATIC_DEMO) {
-    return getDemoDraws(30).then((items) => {
+    return getDemoSsqDraws(100).then((items) => {
       const filtered = issue ? items.filter((item) => item.issue.includes(issue)) : items;
       return { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset, issue };
     });

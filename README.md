@@ -1,11 +1,13 @@
-# 策维（Ceway）数字决策平台
+# 策维（Ceway）数字决策平台 v1.6
 
 Digital Decision Platform  
 Powered by CBGO Framework
 
-v1.2 MVP 是本项目的 Baseline 冻结版本，面向大乐透 DLT Module 完成历史数据分析、号码评分、预算控制、组合生成与资金管理。
+当前版本为“决策风控版”，已支持大乐透 DLT 与双色球 SSQ。
 
-策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。
+产品主线：选号只是入口，决策解释和风险控制才是核心。系统会说明本期实际支出、组合覆盖、投注倍率、资金暴露、近 30 日投入、连续加码迹象和历史回测表现。
+
+策维不预测开奖结果，不承诺提高中奖概率。历史评分和回测只能描述历史匹配，不能证明未来收益。
 
 ## 目录
 
@@ -38,6 +40,7 @@ ceway/
 
 - [v1.2 Baseline 开发方案](docs/ceway_v1_2_baseline.md)
 - [v1.3 开发计划](docs/ceway_v1_3_plan.md)
+- [v1.6 决策风控说明](docs/ceway_v1_6_decision_risk.md)
 - [Backlog](docs/backlog.md)
 - [数据导入说明](docs/data_import.md)
 
@@ -60,6 +63,23 @@ npm run dev
 ```
 
 前端默认读取 `http://localhost:8000`。
+
+## 验证
+
+```bash
+cd frontend
+npm test
+npm run build:pages
+
+cd ..
+backend/.venv/bin/python -m unittest discover -s backend/tests -v
+```
+
+当前数据快照：
+
+- 大乐透：2895 期，最新 `26077`。
+- 双色球：3476 期，最新 `2026079`。
+- 两份数据均通过当前期号范围连续性检查。
 
 ## 同时公网展示 ClawScore 与策维
 

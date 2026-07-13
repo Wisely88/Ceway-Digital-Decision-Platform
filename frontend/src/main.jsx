@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
+  CircleCheck,
   Clipboard,
   Coins,
   Database,
@@ -59,6 +61,7 @@ import {
   syncDltHistory,
   syncSsqHistory,
 } from "./api";
+import { buildDecisionBrief, cumulativeSpending, recentSpending } from "./decision";
 import "./styles.css";
 
 function Badge({ children, tone = "default" }) {
@@ -146,20 +149,20 @@ const PRODUCT_STATUS = [
   },
   {
     label: "当前版本",
-    value: "V1.5 回测验证版",
-    detail: "历史回测与随机对照已接入",
+    value: "V1.6 决策风控版",
+    detail: "决策解释、风险控制与复盘闭环",
     tone: "green",
   },
   {
-    label: "下一阶段",
-    value: "V2.0 行为分析版",
-    detail: "外部数据 · Attention · 行为模型",
+    label: "核心原则",
+    value: "看清随机性",
+    detail: "不预测、不追投、不用历史结果承诺未来",
     tone: "purple",
   },
   {
     label: "更新日志",
-    value: "MVP 盘点完成",
-    detail: "新想法统一进入 Backlog",
+    value: "DLT + SSQ",
+    detail: "双场景核心链路已进入验收",
     tone: "orange",
   },
 ];
@@ -178,12 +181,12 @@ const ROADMAP_ITEMS = [
   {
     version: "V1.5",
     title: "回测验证版",
-    description: "历史回测、随机选号对照组、ROI、覆盖率和最大回撤分析。",
+    description: "历史回测、随机选号对照组、覆盖统计和历史匹配表现。",
   },
   {
-    version: "V2.0",
-    title: "行为分析版",
-    description: "AI 评分、Attention、论坛、公众号和外部公开数据进入统一评估。",
+    version: "V1.6",
+    title: "决策风控版",
+    description: "支出解释、覆盖与倍率、资金暴露、周期上限、连续加码提醒和长期表现说明。",
   },
 ];
 
@@ -378,11 +381,11 @@ function buildAiBettingPlan({ scene, scoreRows, budget, mode, ticketCount, danCo
       play_name: rules.playName,
       play_labels: labels,
       mode: "single",
-      source: "ai_suggestion",
+      source: "rule_suggestion",
       strategy: "manual_workbench",
       based_on_issue: latestIssue,
       recommended_issue: recommendedIssue,
-      recommendation_label: `基于第 ${latestIssue || "-"} 期开奖数据，生成第 ${recommendedIssue || "下一"} 期 AI 建议单式方案。`,
+      recommendation_label: `基于第 ${latestIssue || "-"} 期开奖数据，生成第 ${recommendedIssue || "下一"} 期历史规则单式方案。`,
       cost: items.length * 2,
       tickets: items.length,
       items,
@@ -411,11 +414,11 @@ function buildAiBettingPlan({ scene, scoreRows, budget, mode, ticketCount, danCo
     play_name: rules.playName,
     play_labels: labels,
     mode: "dantuo",
-    source: "ai_suggestion",
+    source: "rule_suggestion",
     strategy: "manual_workbench",
     based_on_issue: latestIssue,
     recommended_issue: recommendedIssue,
-    recommendation_label: `基于第 ${latestIssue || "-"} 期开奖数据，生成第 ${recommendedIssue || "下一"} 期 AI 建议胆拖方案。`,
+    recommendation_label: `基于第 ${latestIssue || "-"} 期开奖数据，生成第 ${recommendedIssue || "下一"} 期历史规则胆拖方案。`,
     front_dan: frontDan,
     front_tuo: frontTuo,
     back,
@@ -482,7 +485,7 @@ function buildManualBettingPlan({ scene, mode, selectedFront, selectedBack, fron
       cost: 2,
       tickets: 1,
       items: [item],
-      reason: "人工选号方案，AI 仅做结构点评，不预测开奖结果。",
+      reason: "人工选号方案，系统仅按历史评分和结构规则点评，不预测开奖结果。",
     };
     plan.explanation = manualCommentary({ plan, scoreRows, labels });
     return plan;
@@ -524,7 +527,7 @@ function buildManualBettingPlan({ scene, mode, selectedFront, selectedBack, fron
     },
     cost,
     tickets,
-    reason: "人工选号方案，AI 仅做结构点评，不预测开奖结果。",
+    reason: "人工选号方案，系统仅按历史评分和结构规则点评，不预测开奖结果。",
   };
   plan.explanation = manualCommentary({ plan, scoreRows, labels });
   return plan;
@@ -547,7 +550,7 @@ const MODULE_NAV_ITEMS = [
   { key: "backtest", label: "历史回测", icon: Activity },
   { key: "trends", label: "走势分析", icon: TrendingUp },
   { key: "score", label: "号码评分", icon: Table2 },
-  { key: "capital", label: "资金管理", icon: Coins },
+  { key: "capital", label: "风险控制", icon: Coins },
   { key: "history", label: "历史记录", icon: History },
 ];
 
@@ -555,6 +558,17 @@ const MODULE_TITLES = MODULE_NAV_ITEMS.reduce((items, item) => ({
   ...items,
   [item.key]: item.label,
 }), {});
+
+function initialModuleFromUrl() {
+  const requested = new URLSearchParams(window.location.search).get("module");
+  return MODULE_NAV_ITEMS.some((item) => item.key === requested) ? requested : "overview";
+}
+
+function updateModuleUrl(module) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("module", module);
+  window.history.replaceState({}, "", url);
+}
 
 function AppSidebar({ scenes, active = "DLT", activeModule = "overview", onModuleChange, onSelect }) {
   return (
@@ -620,7 +634,7 @@ function SceneSelect({ scenes, onEnter }) {
     SSQ: {
       title: "双色球",
       code: "SSQ",
-      action: "即将上线",
+      action: "进入系统",
     },
     K8: {
       title: "快乐8",
@@ -651,7 +665,7 @@ function SceneSelect({ scenes, onEnter }) {
           <div>
             <Badge tone="live">场景选择页（所有版本通用）</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
-            <p>Digital Decision Platform · Powered by CBGO Framework。当前版本为 v1.3 Decision Pipeline，v1.2 Baseline 已完成冻结。</p>
+            <p>Digital Decision Platform · Powered by CBGO Framework。当前版本为 v1.6 决策风控版，DLT 与 SSQ 共用完整决策闭环。</p>
           </div>
         </div>
 
@@ -685,27 +699,27 @@ function SceneSelect({ scenes, onEnter }) {
 
       <section className="baseline-panel">
         <div>
-          <Badge tone="live">v1.3 Decision Pipeline</Badge>
+          <Badge tone="live">v1.6 决策风控版</Badge>
           <h2>当前交付范围</h2>
-          <p>当前版本完成 DLT Module 的历史分析、评分链路、预算组合、资金状态机、历史记录与推荐复盘。</p>
+          <p>选号只是入口；本版重点解释支出、覆盖、倍率、资金暴露、长期回测和连续加码风险。</p>
         </div>
         <div className="baseline-grid">
           <article>
             <h3>本版必须完成</h3>
             <ul>
-              <li>场景中心与大乐透仪表盘</li>
+              <li>大乐透与双色球双场景</li>
               <li>冷热号、遗漏、奇偶比、大小比、和值</li>
               <li>号码评分、单式、胆拖、预算控制</li>
-              <li>Anti-Martingale 资金状态机</li>
+              <li>保存、复盘、历史回测与风险控制</li>
             </ul>
           </article>
           <article>
             <h3>本版不开发</h3>
             <ul>
               <li>AI、论坛、舆情、外部数据 API</li>
-              <li>双色球正式支持与自动更新开奖</li>
-              <li>历史回测平台与收益率验证</li>
-              <li>任何超出 Baseline 的新增模块</li>
+              <li>任何中奖率或收益率承诺</li>
+              <li>用历史命中结果预测下一期</li>
+              <li>诱导追投、翻倍或亏损后加码</li>
             </ul>
           </article>
         </div>
@@ -1053,22 +1067,104 @@ function ScoreTable({ rows }) {
   );
 }
 
-function CapitalPanel({ capital }) {
-  const curve = [
-    200, 226, 241, 260, 210, 206, 155, 195, 252, 206,
-    184, 268, 315, 374, 312, 246, 226, 302, 438, 332,
-    296, 331, 286, 231, 292, 368, 432,
-  ].map((value, index) => ({ issue: index + 1, value }));
+function DecisionBrief({ brief }) {
+  if (!brief) return null;
+  const RiskIcon = brief.risk_tone === "safe" ? CircleCheck : AlertTriangle;
 
   return (
-    <section className="panel capital-panel" id="module-capital">
+    <section className={`decision-brief risk-${brief.risk_tone}`} aria-label="本期决策体检">
+      <div className="decision-brief-head">
+        <div>
+          <span>本期决策体检</span>
+          <strong>{brief.risk_level}风险</strong>
+        </div>
+        <RiskIcon size={20} />
+      </div>
+      <div className="decision-metrics">
+        <div><span>实际支出</span><strong>{brief.cost} / {brief.budget} 元</strong></div>
+        <div><span>买的是什么</span><strong>{brief.coverage_label}</strong></div>
+        <div><span>投注倍率</span><strong>{brief.multiplier} 倍</strong></div>
+        <div><span>本金暴露</span><strong>{brief.principal_exposure}%</strong></div>
+        <div><span>近30日预计投入</span><strong>{brief.projected_period_spend} / {brief.period_cap} 元</strong></div>
+        <div><span>连续加码</span><strong>{brief.escalation_detected ? "已触发提醒" : "未发现"}</strong></div>
+      </div>
+      <div className="decision-conclusion">
+        <strong>系统结论</strong>
+        <p>{brief.action}</p>
+        <ul>{brief.signals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
+      </div>
+      <div className="long-term-note">
+        <strong>长期会怎样</strong>
+        <p>{brief.history_message}</p>
+      </div>
+    </section>
+  );
+}
+
+function CapitalPanel({
+  capital,
+  budget,
+  principal,
+  balance,
+  lastPrize,
+  levelUnits,
+  periodCap,
+  records,
+  generated,
+  backtest,
+  onBudgetChange,
+  onPrincipalChange,
+  onBalanceChange,
+  onLastPrizeChange,
+  onLevelChange,
+  onPeriodCapChange,
+  onApply,
+}) {
+  const curve = cumulativeSpending(records).slice(-20);
+  const currentPlan = generated || normalizeRecordPlan(records[0]);
+  const brief = buildDecisionBrief({
+    plan: currentPlan,
+    budget,
+    principal,
+    periodCap,
+    records: generated ? records : records.slice(1),
+    backtest,
+    capital,
+  });
+  const spent = recentSpending(records);
+
+  return (
+    <section className="panel wide capital-panel" id="module-capital">
       <div className="panel-title">
         <div>
-          <h2>资金管理</h2>
-          <p>Anti-Martingale：输了不加码，赢了才加码</p>
+          <h2>风险控制</h2>
+          <p>看清支出、资金暴露和加码行为；未中奖不追投</p>
         </div>
-        <Coins size={18} />
+        <Badge tone={brief?.risk_tone === "safe" ? "live" : "default"}>
+          {brief ? `${brief.risk_level}风险` : "等待方案"}
+        </Badge>
       </div>
+
+      <div className="risk-settings">
+        <label>本期上限<input min="2" step="2" type="number" value={budget} onChange={(event) => onBudgetChange(Number(event.target.value))} /></label>
+        <label>近30日上限<input min="2" step="10" type="number" value={periodCap} onChange={(event) => onPeriodCapChange(Number(event.target.value))} /></label>
+        <label>初始本金<input min="0" step="50" type="number" value={principal} onChange={(event) => onPrincipalChange(Number(event.target.value))} /></label>
+        <label>当前余额<input min="0" step="10" type="number" value={balance} placeholder="默认等于本金" onChange={(event) => onBalanceChange(event.target.value === "" ? "" : Number(event.target.value))} /></label>
+        <label>上期奖金<input min="0" step="1" type="number" value={lastPrize} onChange={(event) => onLastPrizeChange(Number(event.target.value))} /></label>
+        <label>
+          当前级别
+          <select value={levelUnits} onChange={(event) => onLevelChange(Number(event.target.value))}>
+            <option value={1}>1注</option>
+            <option value={2}>2注</option>
+            <option value={4}>4注</option>
+          </select>
+        </label>
+        <button className="primary-button" onClick={onApply} type="button">
+          <Activity size={16} />
+          更新风险状态
+        </button>
+      </div>
+
       <div className="capital-grid">
         <div>
           <span>初始本金</span>
@@ -1083,25 +1179,30 @@ function CapitalPanel({ capital }) {
           <strong>{capital.profit} 元</strong>
         </div>
         <div>
-          <span>中断盈利</span>
-          <strong>{capital.interrupted_profit} 元</strong>
+          <span>近30日已投入</span>
+          <strong>{spent} 元</strong>
         </div>
         <div>
           <span>最大回撤</span>
           <strong>{capital.max_drawdown}%</strong>
         </div>
       </div>
+
+      <DecisionBrief brief={brief} />
+
       <div className="capital-chart">
-        <h3>资金曲线（近50期）</h3>
-        <ResponsiveContainer width="100%" height={170}>
-          <LineChart data={curve}>
-            <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
-            <XAxis dataKey="issue" />
-            <YAxis />
-            <Tooltip />
-            <Line type="monotone" dataKey="value" stroke="#31d86b" strokeWidth={2} />
-          </LineChart>
-        </ResponsiveContainer>
+        <h3>累计投入（来自已保存方案）</h3>
+        {curve.length > 0 ? (
+          <ResponsiveContainer width="100%" height={190}>
+            <LineChart data={curve}>
+              <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
+              <XAxis dataKey="issue" />
+              <YAxis />
+              <Tooltip formatter={(value, name, item) => [`${value} 元（本期 ${item.payload.cost} 元）`, "累计投入"]} />
+              <Line type="monotone" dataKey="value" stroke="#4ca6ff" strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : <p className="empty-text">保存投注方案后，这里才会显示真实累计投入；系统不再展示示例资金曲线。</p>}
       </div>
       <div className="state-machine">
         <span className={capital.level_units === 1 ? "active" : ""}>1注</span>
@@ -1145,7 +1246,9 @@ function DataStatusPanel({ dataStatus, onImport }) {
 
 function PlanCard({ plan, onSave }) {
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
   if (!plan) return null;
+  const saveBlocked = plan.decision_brief?.risk_tone === "stop";
 
   const labels = {
     front: "前区",
@@ -1165,6 +1268,8 @@ function PlanCard({ plan, onSave }) {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
     } catch {
       window.prompt("当前浏览器不允许自动复制，请长按全选后复制：", text);
     }
@@ -1242,18 +1347,20 @@ function PlanCard({ plan, onSave }) {
           {plan.explanation.map((item) => <span key={item}>{item}</span>)}
         </div>
       )}
+      <DecisionBrief brief={plan.decision_brief} />
       <div className="plan-actions">
         <button className="icon-button text-button" onClick={copy} type="button">
           <Clipboard size={16} />
-          复制方案
+          {copied ? "已复制" : "复制方案"}
         </button>
         {onSave && (
-          <button className="icon-button text-button" disabled={saving} onClick={save} type="button">
+          <button className="icon-button text-button" disabled={saving || saveBlocked} onClick={save} title={saveBlocked ? "请先按风险提示降低预算或停止连续加码" : "保存后等待开奖复盘"} type="button">
             <Save size={16} />
-            {saving ? "保存中..." : "保存方案"}
+            {saving ? "保存中..." : saveBlocked ? "风险过高，暂不保存" : "保存方案"}
           </button>
         )}
       </div>
+      {saveBlocked && <p className="save-blocked-note">先处理上方风险信号，再保存为待开奖方案。</p>}
     </article>
   );
 }
@@ -1390,7 +1497,7 @@ function ReviewPanel({ review, onRefresh }) {
   );
 }
 
-function BacktestPanel({ backtest, onRefresh }) {
+function BacktestPanel({ backtest, onRefresh, strategy, onStrategyChange }) {
   if (!backtest) return null;
   const summary = backtest.summary || {};
   const baseline = backtest.baseline || {};
@@ -1402,10 +1509,17 @@ function BacktestPanel({ backtest, onRefresh }) {
           <h2>历史回测</h2>
           <p>滚动使用历史数据生成方案，并与下一期开奖和随机选号对照</p>
         </div>
-        <button className="ghost-button compact" onClick={onRefresh} type="button">
-          <GitCompare size={14} />
-          运行回测
-        </button>
+        <div className="panel-actions">
+          <select aria-label="回测策略" value={strategy} onChange={(event) => onStrategyChange(event.target.value)}>
+            <option value="conservative">保守策略</option>
+            <option value="balanced">均衡策略</option>
+            <option value="aggressive">覆盖策略</option>
+          </select>
+          <button className="ghost-button compact" onClick={onRefresh} type="button">
+            <GitCompare size={14} />
+            运行回测
+          </button>
+        </div>
       </div>
       <div className="backtest-summary">
         <div><span>回测期数</span><strong>{summary.periods || 0}</strong></div>
@@ -1557,7 +1671,17 @@ function NumberPicker({ title, max, selected, onToggle, tone = "front", helper }
   );
 }
 
-function BettingPlanPanel({ scene, dashboard, scoreRows, budget, onBudgetChange, onSave, generated, onGenerated }) {
+function BettingPlanPanel({
+  scene,
+  dashboard,
+  scoreRows,
+  budget,
+  onBudgetChange,
+  onSave,
+  generated,
+  onGenerated,
+  decisionContext,
+}) {
   const rules = sceneRules(scene);
   const labels = planLabelsForScene(scene);
   const [flow, setFlow] = useState("ai");
@@ -1611,8 +1735,9 @@ function BettingPlanPanel({ scene, dashboard, scoreRows, budget, onBudgetChange,
         variant: nextVariant,
       });
       setVariant(nextVariant);
-      onGenerated(plan);
-      setMessage(plan.cost <= Number(budget || 0) ? "AI 建议方案已生成，可复制或保存。" : "方案已生成，但费用超过预算，请调整胆拖数量。");
+      const decisionBrief = buildDecisionBrief({ plan, budget, ...decisionContext });
+      onGenerated({ ...plan, decision_brief: decisionBrief });
+      setMessage(plan.cost <= Number(budget || 0) ? "规则建议方案已生成，可复制或保存。" : "方案已生成，但费用超过预算，请调整胆拖数量。");
     } catch (err) {
       setMessage(err.message);
     }
@@ -1632,7 +1757,8 @@ function BettingPlanPanel({ scene, dashboard, scoreRows, budget, onBudgetChange,
         budget,
         scoreRows,
       });
-      onGenerated(plan);
+      const decisionBrief = buildDecisionBrief({ plan, budget, ...decisionContext });
+      onGenerated({ ...plan, decision_brief: decisionBrief });
       setMessage("人工方案已生成点评，可保存后进入待开奖复盘。");
     } catch (err) {
       setMessage(err.message);
@@ -1673,7 +1799,7 @@ function BettingPlanPanel({ scene, dashboard, scoreRows, budget, onBudgetChange,
         </button>
       </div>
 
-      <div className="betting-workspace">
+      <div className={`betting-workspace ${flow === "ai" ? "ai-workspace" : "manual-workspace"}`}>
         <div className="betting-controls">
           <div className="field-grid compact-fields">
             <label>
@@ -1798,7 +1924,7 @@ function BettingPlanPanel({ scene, dashboard, scoreRows, budget, onBudgetChange,
   );
 }
 
-function Dashboard({ scenes, onBack }) {
+function Dashboard({ scenes, onBack, onSceneSelect }) {
   const [budget, setBudget] = useState(20);
   const [lastPrize, setLastPrize] = useState(0);
   const [strategy, setStrategy] = useState("balanced");
@@ -1806,7 +1932,8 @@ function Dashboard({ scenes, onBack }) {
   const [principal, setPrincipal] = useState(1000);
   const [balance, setBalance] = useState("");
   const [levelUnits, setLevelUnits] = useState(1);
-  const [activeModule, setActiveModule] = useState("overview");
+  const [periodCap, setPeriodCap] = useState(200);
+  const [activeModule, setActiveModule] = useState(initialModuleFromUrl);
   const [dashboard, setDashboard] = useState(null);
   const [generated, setGenerated] = useState(null);
   const [savedPlans, setSavedPlans] = useState([]);
@@ -1819,7 +1946,12 @@ function Dashboard({ scenes, onBack }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const loadDashboard = async () => {
+  const changeModule = (module) => {
+    setActiveModule(module);
+    updateModuleUrl(module);
+  };
+
+  const loadDashboard = async (overrides = {}) => {
     setLoading(true);
     setError("");
     setNotice("");
@@ -1828,7 +1960,7 @@ function Dashboard({ scenes, onBack }) {
         budget,
         lastPrize,
         strategy,
-        window: windowSize,
+        window: typeof overrides.window === "number" ? overrides.window : windowSize,
         principal,
         balance,
         levelUnits,
@@ -1948,14 +2080,14 @@ function Dashboard({ scenes, onBack }) {
       });
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
       await refreshReview();
-      setActiveModule("history");
+      changeModule("history");
       setNotice("方案已保存到后端历史记录。");
     } catch (err) {
       const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
       localStorage.setItem("cbgo_saved_plans", JSON.stringify(nextPlans));
       setSavedPlans(nextPlans);
       await refreshReview();
-      setActiveModule("history");
+      changeModule("history");
       setNotice(`后端保存失败，方案已保存到本地浏览器。${err?.message ? `原因：${err.message}` : ""}`);
     }
   };
@@ -1999,8 +2131,8 @@ function Dashboard({ scenes, onBack }) {
         scenes={scenes}
         active="DLT"
         activeModule={activeModule}
-        onModuleChange={setActiveModule}
-        onSelect={() => {}}
+        onModuleChange={changeModule}
+        onSelect={onSceneSelect}
       />
 
       <section className="workspace">
@@ -2008,7 +2140,7 @@ function Dashboard({ scenes, onBack }) {
           <div>
             <Badge tone="live">大乐透 DLT</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
-            <p>Powered by CBGO Framework · DLT Module　当前期号：{dashboard.latest_issue}　更新时间：2025-05-20 09:30:30　<span className="status-dot" />运行状态：正常</p>
+            <p>Powered by CBGO Framework · DLT Module　当前期号：{dashboard.latest_issue}　数据截至：{dashboard.data_status?.latest_date || "-"}　<span className="status-dot" />运行状态：正常</p>
           </div>
           <div className="topbar-actions">
             <button className="ghost-button" onClick={onBack} type="button">
@@ -2026,49 +2158,6 @@ function Dashboard({ scenes, onBack }) {
             </button>
           </div>
         </header>
-
-        <section className="control-panel">
-          <div className="control-note">
-            <strong>状态参数</strong>
-            <span>用于刷新总览、资金状态和回测口径；选号与保存统一在“投注方案”完成。</span>
-          </div>
-          <label>
-            本期预算
-            <input min="2" step="2" type="number" value={budget} onChange={(event) => setBudget(Number(event.target.value))} />
-          </label>
-          <label>
-            上期奖金
-            <input min="0" step="5" type="number" value={lastPrize} onChange={(event) => setLastPrize(Number(event.target.value))} />
-          </label>
-          <label>
-            分析口径
-            <select value={strategy} onChange={(event) => setStrategy(event.target.value)}>
-              <option value="conservative">保守 · 控制复杂度</option>
-              <option value="balanced">均衡 · 评分与预算折中</option>
-              <option value="aggressive">激进 · 提高覆盖面</option>
-            </select>
-          </label>
-          <label>
-            初始本金
-            <input min="0" step="50" type="number" value={principal} onChange={(event) => setPrincipal(Number(event.target.value))} />
-          </label>
-          <label>
-            当前余额
-            <input min="0" step="10" type="number" value={balance} placeholder="默认等于本金" onChange={(event) => setBalance(event.target.value === "" ? "" : Number(event.target.value))} />
-          </label>
-          <label>
-            当前级别
-            <select value={levelUnits} onChange={(event) => setLevelUnits(Number(event.target.value))}>
-              <option value={1}>1注</option>
-              <option value={2}>2注</option>
-              <option value={4}>4注</option>
-            </select>
-          </label>
-          <button className="primary-button" onClick={loadDashboard} type="button">
-            <Activity size={16} />
-            应用参数
-          </button>
-        </section>
 
         <ErrorNotice error={error} onRetry={loadDashboard} />
         {notice && <p className="notice">{notice}</p>}
@@ -2096,21 +2185,45 @@ function Dashboard({ scenes, onBack }) {
               generated={generated}
               onGenerated={setGenerated}
               onSave={savePlan}
+              decisionContext={{ principal, periodCap, records: savedPlans, backtest, capital: dashboard.capital_state }}
             />
           )}
 
           {activeModule === "review" && <ReviewPanel review={review} onRefresh={refreshReview} />}
-          {activeModule === "backtest" && <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} />}
+          {activeModule === "backtest" && <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} strategy={strategy} onStrategyChange={setStrategy} />}
           {activeModule === "trends" && (
             <TrendPanel
               dashboard={dashboard}
               scoreRows={dashboard.score_table}
               windowSize={windowSize}
-              onWindowChange={setWindowSize}
+              onWindowChange={(value) => {
+                setWindowSize(value);
+                loadDashboard({ window: value });
+              }}
             />
           )}
           {activeModule === "score" && <ScoreTable rows={dashboard.score_table} />}
-          {activeModule === "capital" && <CapitalPanel capital={dashboard.capital_state} />}
+          {activeModule === "capital" && (
+            <CapitalPanel
+              capital={dashboard.capital_state}
+              budget={budget}
+              principal={principal}
+              balance={balance}
+              lastPrize={lastPrize}
+              levelUnits={levelUnits}
+              periodCap={periodCap}
+              records={savedPlans}
+              generated={generated}
+              backtest={backtest}
+              onBudgetChange={setBudget}
+              onPrincipalChange={setPrincipal}
+              onBalanceChange={setBalance}
+              onLastPrizeChange={setLastPrize}
+              onLevelChange={setLevelUnits}
+              onPeriodCapChange={setPeriodCap}
+              onApply={loadDashboard}
+            />
+          )}
           {activeModule === "history" && <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} />}
         </section>
 
@@ -2123,7 +2236,7 @@ function Dashboard({ scenes, onBack }) {
   );
 }
 
-function SsqDashboard({ scenes, onBack }) {
+function SsqDashboard({ scenes, onBack, onSceneSelect }) {
   const [budget, setBudget] = useState(20);
   const [lastPrize, setLastPrize] = useState(0);
   const [strategy, setStrategy] = useState("balanced");
@@ -2131,7 +2244,8 @@ function SsqDashboard({ scenes, onBack }) {
   const [principal, setPrincipal] = useState(1000);
   const [balance, setBalance] = useState("");
   const [levelUnits, setLevelUnits] = useState(1);
-  const [activeModule, setActiveModule] = useState("overview");
+  const [periodCap, setPeriodCap] = useState(200);
+  const [activeModule, setActiveModule] = useState(initialModuleFromUrl);
   const [dashboard, setDashboard] = useState(null);
   const [generated, setGenerated] = useState(null);
   const [savedPlans, setSavedPlans] = useState([]);
@@ -2144,7 +2258,12 @@ function SsqDashboard({ scenes, onBack }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const loadDashboard = async () => {
+  const changeModule = (module) => {
+    setActiveModule(module);
+    updateModuleUrl(module);
+  };
+
+  const loadDashboard = async (overrides = {}) => {
     setLoading(true);
     setError("");
     setNotice("");
@@ -2153,7 +2272,7 @@ function SsqDashboard({ scenes, onBack }) {
         budget,
         lastPrize,
         strategy,
-        window: windowSize,
+        window: typeof overrides.window === "number" ? overrides.window : windowSize,
         principal,
         balance,
         levelUnits,
@@ -2241,14 +2360,26 @@ function SsqDashboard({ scenes, onBack }) {
 
   const savePlan = async (plan) => {
     const latestIssue = dashboard?.latest_issue || "";
+    const localRecord = {
+      id: `ssq-${Date.now()}-${plan.strategy}-${plan.mode}`,
+      saved_at: new Date().toISOString(),
+      budget,
+      strategy,
+      latest_issue: latestIssue,
+      plan,
+    };
     try {
       const result = await saveSsqRecord({ budget, strategy, latestIssue, plan });
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
       await refreshReview();
-      setActiveModule("history");
+      changeModule("history");
       setNotice("双色球方案已保存。");
     } catch (err) {
-      setError(err.message);
+      const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
+      localStorage.setItem("cbgo_ssq_plans", JSON.stringify(nextPlans));
+      setSavedPlans(nextPlans);
+      changeModule("history");
+      setNotice(`后端保存失败，双色球方案已保存到本地浏览器。${err?.message ? `原因：${err.message}` : ""}`);
     }
   };
 
@@ -2318,8 +2449,8 @@ function SsqDashboard({ scenes, onBack }) {
         scenes={scenes}
         active="SSQ"
         activeModule={activeModule}
-        onModuleChange={setActiveModule}
-        onSelect={() => {}}
+        onModuleChange={changeModule}
+        onSelect={onSceneSelect}
       />
 
       <section className="workspace">
@@ -2327,7 +2458,7 @@ function SsqDashboard({ scenes, onBack }) {
           <div>
             <Badge tone="live">双色球 SSQ</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
-            <p>Powered by CBGO Framework · SSQ Module　当前期号：{dashboard.latest_issue}　推荐期号：{dashboard.recommended_issue || "下一期"}　<span className="status-dot" />运行状态：正常</p>
+            <p>Powered by CBGO Framework · SSQ Module　当前期号：{dashboard.latest_issue}　数据截至：{dashboard.storage?.latest_date || "-"}　推荐期号：{dashboard.recommended_issue || "下一期"}　<span className="status-dot" />运行状态：正常</p>
           </div>
           <div className="topbar-actions">
             <button className="ghost-button" onClick={onBack} type="button">
@@ -2345,49 +2476,6 @@ function SsqDashboard({ scenes, onBack }) {
             </button>
           </div>
         </header>
-
-        <section className="control-panel">
-          <div className="control-note">
-            <strong>状态参数</strong>
-            <span>用于刷新总览、资金状态和回测口径；选号与保存统一在“投注方案”完成。</span>
-          </div>
-          <label>
-            本期预算
-            <input min="2" step="2" type="number" value={budget} onChange={(event) => setBudget(Number(event.target.value))} />
-          </label>
-          <label>
-            上期奖金
-            <input min="0" step="5" type="number" value={lastPrize} onChange={(event) => setLastPrize(Number(event.target.value))} />
-          </label>
-          <label>
-            分析口径
-            <select value={strategy} onChange={(event) => setStrategy(event.target.value)}>
-              <option value="conservative">保守 · 控制复杂度</option>
-              <option value="balanced">均衡 · 评分与预算折中</option>
-              <option value="aggressive">激进 · 提高覆盖面</option>
-            </select>
-          </label>
-          <label>
-            初始本金
-            <input min="0" step="50" type="number" value={principal} onChange={(event) => setPrincipal(Number(event.target.value))} />
-          </label>
-          <label>
-            当前余额
-            <input min="0" step="10" type="number" value={balance} placeholder="默认等于本金" onChange={(event) => setBalance(event.target.value === "" ? "" : Number(event.target.value))} />
-          </label>
-          <label>
-            当前级别
-            <select value={levelUnits} onChange={(event) => setLevelUnits(Number(event.target.value))}>
-              <option value={1}>1注</option>
-              <option value={2}>2注</option>
-              <option value={4}>4注</option>
-            </select>
-          </label>
-          <button className="primary-button" onClick={loadDashboard} type="button">
-            <Activity size={16} />
-            应用参数
-          </button>
-        </section>
 
         <ErrorNotice error={error} onRetry={loadDashboard} />
         {notice && <p className="notice">{notice}</p>}
@@ -2415,21 +2503,45 @@ function SsqDashboard({ scenes, onBack }) {
               generated={generated}
               onGenerated={setGenerated}
               onSave={savePlan}
+              decisionContext={{ principal, periodCap, records: savedPlans, backtest, capital: dashboard.capital }}
             />
           )}
 
           {activeModule === "review" && <ReviewPanel review={review} onRefresh={refreshReview} />}
-          {activeModule === "backtest" && <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} />}
+          {activeModule === "backtest" && <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} strategy={strategy} onStrategyChange={setStrategy} />}
           {activeModule === "trends" && (
             <TrendPanel
               dashboard={ssqView}
               scoreRows={scoreRows}
               windowSize={windowSize}
-              onWindowChange={setWindowSize}
+              onWindowChange={(value) => {
+                setWindowSize(value);
+                loadDashboard({ window: value });
+              }}
             />
           )}
           {activeModule === "score" && <ScoreTable rows={scoreRows} />}
-          {activeModule === "capital" && <CapitalPanel capital={dashboard.capital} />}
+          {activeModule === "capital" && (
+            <CapitalPanel
+              capital={dashboard.capital}
+              budget={budget}
+              principal={principal}
+              balance={balance}
+              lastPrize={lastPrize}
+              levelUnits={levelUnits}
+              periodCap={periodCap}
+              records={savedPlans}
+              generated={generated}
+              backtest={backtest}
+              onBudgetChange={setBudget}
+              onPrincipalChange={setPrincipal}
+              onBalanceChange={setBalance}
+              onLastPrizeChange={setLastPrize}
+              onLevelChange={setLevelUnits}
+              onPeriodCapChange={setPeriodCap}
+              onApply={loadDashboard}
+            />
+          )}
           {activeModule === "history" && <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} />}
         </section>
 
@@ -2444,7 +2556,20 @@ function SsqDashboard({ scenes, onBack }) {
 
 function App() {
   const [scenes, setScenes] = useState([]);
-  const [view, setView] = useState("scenes");
+  const [view, setView] = useState(() => new URLSearchParams(window.location.search).get("scene") || "scenes");
+
+  const navigate = (nextView, module = "overview") => {
+    const url = new URL(window.location.href);
+    if (nextView === "scenes") {
+      url.searchParams.delete("scene");
+      url.searchParams.delete("module");
+    } else {
+      url.searchParams.set("scene", nextView.toLowerCase());
+      url.searchParams.set("module", module);
+    }
+    window.history.pushState({}, "", url);
+    setView(nextView.toLowerCase());
+  };
 
   useEffect(() => {
     getScenes()
@@ -2457,20 +2582,26 @@ function App() {
       });
   }, []);
 
+  useEffect(() => {
+    const handlePopState = () => setView(new URLSearchParams(window.location.search).get("scene") || "scenes");
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   if (view === "dlt") {
-    return <Dashboard scenes={scenes} onBack={() => setView("scenes")} />;
+    return <Dashboard scenes={scenes} onBack={() => navigate("scenes")} onSceneSelect={(code) => navigate(code)} />;
   }
 
   if (view === "ssq") {
-    return <SsqDashboard scenes={scenes} onBack={() => setView("scenes")} />;
+    return <SsqDashboard scenes={scenes} onBack={() => navigate("scenes")} onSceneSelect={(code) => navigate(code)} />;
   }
 
   if (view !== "scenes") {
     const scene = scenes.find((item) => item.code.toLowerCase() === view);
-    return <ModulePlaceholder scene={scene} scenes={scenes} onBack={() => setView("scenes")} />;
+    return <ModulePlaceholder scene={scene} scenes={scenes} onBack={() => navigate("scenes")} />;
   }
 
-  return <SceneSelect scenes={scenes} onEnter={(code) => setView(code.toLowerCase())} />;
+  return <SceneSelect scenes={scenes} onEnter={(code) => navigate(code)} />;
 }
 
 createRoot(document.getElementById("root")).render(<App />);

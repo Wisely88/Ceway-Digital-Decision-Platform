@@ -44,7 +44,7 @@ from review import build_review, build_ssq_review, review_ssq_plan
 from scorer import score_back_numbers, score_front_numbers, score_ssq_back_numbers, score_ssq_front_numbers
 
 
-app = FastAPI(title="Ceway v1.5 Backtest API")
+app = FastAPI(title="Ceway v1.6 Decision Risk API")
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 app.add_middleware(
@@ -166,7 +166,7 @@ def build_dlt_payload(
             "subtitle": "Digital Decision Platform",
             "framework": "Powered by CBGO Framework",
             "baseline": "v1.2 MVP",
-            "version": "v1.5 Backtest Validation",
+            "version": "v1.6 Decision Risk",
         },
         "disclaimer": "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
         "history_count": len(history),
@@ -463,7 +463,7 @@ def build_ssq_payload(
             "subtitle": "Digital Decision Platform",
             "framework": "Powered by CBGO Framework",
             "baseline": "v1.2 MVP",
-            "version": "v1.5 Backtest Validation",
+            "version": "v1.6 Decision Risk",
         },
         "disclaimer": "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
         "history_count": len(history),

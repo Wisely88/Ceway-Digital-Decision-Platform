@@ -610,7 +610,16 @@ button:disabled {
 .topbar-actions {
   align-items: center;
   display: flex;
+  flex: 0 0 auto;
   gap: 10px;
+}
+
+.topbar-actions > * {
+  white-space: nowrap;
+}
+
+.topbar-actions .ghost-button {
+  min-width: 116px;
 }
 
 .ghost-button,
@@ -1190,6 +1199,14 @@ td {
   grid-template-columns: minmax(280px, 0.36fr) minmax(0, 0.64fr);
 }
 
+.betting-workspace.ai-workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ai-workspace .compact-fields {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
 .betting-controls,
 .manual-picker,
 .betting-result {
@@ -1556,6 +1573,12 @@ td {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.save-blocked-note {
+  color: #ff9d8f;
+  font-size: 13px;
+  margin: 8px 0 0;
 }
 
 .saved-summary {
@@ -1955,6 +1978,117 @@ td {
   align-self: start;
 }
 
+.risk-settings {
+  align-items: end;
+  background: rgba(7, 18, 32, 0.52);
+  border: 1px solid rgba(83, 129, 179, 0.18);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin-bottom: 14px;
+  padding: 14px;
+}
+
+.decision-brief {
+  background: rgba(7, 18, 32, 0.72);
+  border: 1px solid rgba(83, 129, 179, 0.26);
+  border-left: 4px solid #43d27d;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+}
+
+.decision-brief.risk-watch {
+  border-left-color: #f3b43f;
+}
+
+.decision-brief.risk-stop {
+  border-left-color: #ff6654;
+}
+
+.decision-brief-head,
+.decision-brief-head > div {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.decision-brief-head {
+  color: #43d27d;
+  justify-content: space-between;
+}
+
+.risk-watch .decision-brief-head {
+  color: #f3b43f;
+}
+
+.risk-stop .decision-brief-head {
+  color: #ff7666;
+}
+
+.decision-brief-head span {
+  color: #a9bdd2;
+  font-size: 12px;
+}
+
+.decision-brief-head strong {
+  color: currentColor;
+  font-size: 18px;
+}
+
+.decision-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.decision-metrics div {
+  background: rgba(8, 23, 40, 0.7);
+  border: 1px solid rgba(83, 129, 179, 0.16);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.decision-metrics span,
+.decision-conclusion p,
+.decision-conclusion li,
+.long-term-note p {
+  color: #a9bdd2;
+  font-size: 13px;
+}
+
+.decision-metrics strong,
+.decision-conclusion strong,
+.long-term-note strong {
+  color: #ffffff;
+}
+
+.decision-conclusion,
+.long-term-note {
+  border-top: 1px solid rgba(83, 129, 179, 0.16);
+  padding-top: 10px;
+}
+
+.decision-conclusion p,
+.long-term-note p {
+  line-height: 1.65;
+  margin: 5px 0 0;
+}
+
+.decision-conclusion ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.plan-card .decision-brief {
+  margin-top: 16px;
+}
+
 .capital-grid {
   display: grid;
   gap: 10px;
@@ -2202,6 +2336,8 @@ td {
   }
 
   .app-sidebar {
+    display: grid;
+    gap: 12px;
     padding: 14px;
   }
 
@@ -2218,6 +2354,23 @@ td {
     width: 36px;
   }
 
+  .side-nav {
+    display: flex;
+    gap: 6px;
+    grid-template-columns: none;
+    overflow-x: auto;
+    padding-bottom: 3px;
+    scroll-snap-type: x proximity;
+  }
+
+  .side-nav-item {
+    flex: 0 0 auto;
+    min-height: 42px;
+    padding: 8px 12px;
+    scroll-snap-align: start;
+    width: auto;
+  }
+
   .workspace-topbar {
     align-items: flex-start;
     flex-direction: column;
@@ -2229,8 +2382,14 @@ td {
     font-size: 22px;
   }
 
+  .workspace-topbar > div:first-child {
+    min-width: 0;
+    width: 100%;
+  }
+
   .workspace-topbar p {
     font-size: 13px;
+    overflow-wrap: anywhere;
   }
 
   .topbar-actions {
@@ -2241,6 +2400,20 @@ td {
 
   .topbar-actions .ghost-button {
     grid-column: 1 / -1;
+  }
+
+  .topbar-actions > *,
+  .topbar-actions .ghost-button,
+  .topbar-actions .upload-button {
+    min-width: 0;
+    white-space: normal;
+    width: 100%;
+  }
+
+  .topbar-actions .icon-button {
+    aspect-ratio: auto;
+    grid-column: 1 / -1;
+    min-height: 42px;
   }
 
   .control-panel {
@@ -2390,6 +2563,11 @@ td {
     grid-template-columns: 1fr;
   }
 
+  .risk-settings,
+  .decision-metrics {
+    grid-template-columns: 1fr;
+  }
+
   .capital-chart {
     overflow-x: auto;
   }
@@ -2434,7 +2612,7 @@ td {
 
 @media (max-width: 420px) {
   .topbar-actions {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 
   .review-summary {
