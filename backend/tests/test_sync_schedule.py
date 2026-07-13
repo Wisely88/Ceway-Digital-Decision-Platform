@@ -2,6 +2,11 @@ from datetime import datetime
 import unittest
 from zoneinfo import ZoneInfo
 
+from scripts.update_dlt_history import (
+    expected_draw_date as expected_dlt_draw_date,
+    merge_rows as merge_dlt_rows,
+    parse_78500_payload,
+)
 from scripts.update_ssq_history import (
     expected_draw_date,
     fill_latest_new_draw_date,
@@ -10,6 +15,25 @@ from scripts.update_ssq_history import (
 
 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
+
+
+class DltSyncScheduleTests(unittest.TestCase):
+    def test_parses_78500_post_payload_and_normalizes_issue(self):
+        rows = parse_78500_payload(
+            [["04,14,19,24,27", "06,07", "2026077"]]
+        )
+        self.assertEqual(rows[0]["issue"], "26077")
+        self.assertEqual(rows[0]["front"], [4, 14, 19, 24, 27])
+        self.assertEqual(rows[0]["back"], [6, 7])
+
+    def test_preserves_existing_date_when_78500_has_no_date(self):
+        current = [{"issue": "26077", "date": "2026-07-11", "front": [4, 14, 19, 24, 27], "back": [6, 7]}]
+        incoming = [{"issue": "26077", "date": "", "front": [4, 14, 19, 24, 27], "back": [6, 7]}]
+        self.assertEqual(merge_dlt_rows(current, incoming)[0]["date"], "2026-07-11")
+
+    def test_uses_previous_dlt_draw_day_for_after_midnight_retry(self):
+        now = datetime(2026, 7, 12, 0, 30, tzinfo=SHANGHAI_TZ)
+        self.assertEqual(expected_dlt_draw_date(now), "2026-07-11")
 
 
 class SsqSyncScheduleTests(unittest.TestCase):

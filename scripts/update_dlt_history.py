@@ -6,10 +6,12 @@ import csv
 import json
 import re
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -26,6 +28,8 @@ USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 )
 CSV_HEADER = ["issue", "date", "f1", "f2", "f3", "f4", "f5", "b1", "b2"]
+SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
+DLT_DRAW_WEEKDAYS = {0, 2, 5}
 
 
 def fetch_text(url: str, timeout: int = 12, encoding: str | None = None) -> str:
@@ -107,44 +111,70 @@ def normalize_sporttery_row(item: dict) -> dict:
 
 
 def fetch_78500_js() -> list[dict]:
-    text = fetch_text("https://img.78500.cn/78500/tools/dlt/dltdb.js", timeout=12, encoding="gb2312")
+    url = "https://www.78500.cn/tool/dltdb.html"
+    request = Request(
+        url,
+        data=b"",
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "application/json,text/javascript,*/*",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": url,
+        },
+    )
+    with urlopen(request, timeout=12) as response:
+        text = response.read().decode(response.headers.get_content_charset() or "gb2312", errors="replace")
+    return parse_78500_payload(json.loads(text))
+
+
+def normalize_78500_issue(issue: str) -> str:
+    value = str(issue).strip()
+    return value[2:] if len(value) == 7 and value.startswith("20") else value
+
+
+def parse_78500_payload(payload: list) -> list[dict]:
     rows = []
-    patterns = [
-        re.compile(
-            r"(?P<issue>\d{5,7})[^\d]{1,20}(?P<date>20\d{2}[-/]\d{1,2}[-/]\d{1,2})"
-            r".{0,120}?(?P<n1>\d{1,2})[^\d]+(?P<n2>\d{1,2})[^\d]+(?P<n3>\d{1,2})"
-            r"[^\d]+(?P<n4>\d{1,2})[^\d]+(?P<n5>\d{1,2})[^\d]+(?P<n6>\d{1,2})"
-            r"[^\d]+(?P<n7>\d{1,2})",
-            re.S,
-        ),
-        re.compile(
-            r"(?P<issue>\d{5,7}).{0,80}?(?P<n1>\d{2})\s+(?P<n2>\d{2})\s+(?P<n3>\d{2})"
-            r"\s+(?P<n4>\d{2})\s+(?P<n5>\d{2})\s*[+|,]\s*(?P<n6>\d{2})\s+(?P<n7>\d{2})",
-            re.S,
-        ),
-    ]
-    seen = set()
-    for pattern in patterns:
-        for match in pattern.finditer(text):
-            issue = match.group("issue")
-            if issue in seen:
-                continue
-            numbers = [int(match.group(f"n{index}")) for index in range(1, 8)]
-            front = numbers[:5]
-            back = numbers[5:7]
-            if is_valid_dlt_numbers(front, back):
-                rows.append(
-                    {
-                        "issue": issue,
-                        "date": match.groupdict().get("date", ""),
-                        "front": sorted(front),
-                        "back": sorted(back),
-                    }
-                )
-                seen.add(issue)
+    for item in payload:
+        if not isinstance(item, list) or len(item) < 3:
+            continue
+        front = [int(number) for number in str(item[0]).split(",")]
+        back = [int(number) for number in str(item[1]).split(",")]
+        issue = normalize_78500_issue(item[2])
+        if issue.isdigit() and is_valid_dlt_numbers(front, back):
+            rows.append({"issue": issue, "date": "", "front": sorted(front), "back": sorted(back)})
     if not rows:
-        raise ValueError("78500 数据文件可访问，但未识别到稳定的开奖数据结构")
-    return sorted(rows, key=lambda row: row["issue"])
+        raise ValueError("78500 大乐透接口未返回可用的开奖数据")
+    return sorted(dedupe_rows(rows), key=lambda row: row["issue"])
+
+
+def expected_draw_date(now: datetime | None = None) -> str:
+    local_now = now.astimezone(SHANGHAI_TZ) if now else datetime.now(SHANGHAI_TZ)
+    candidate = local_now.date()
+    if local_now.hour < 2:
+        candidate -= timedelta(days=1)
+    return candidate.isoformat() if candidate.weekday() in DLT_DRAW_WEEKDAYS else ""
+
+
+def fill_latest_new_draw_date(
+    incoming_rows: list[dict],
+    current_rows: list[dict],
+    now: datetime | None = None,
+) -> list[dict]:
+    draw_date = expected_draw_date(now)
+    if not draw_date:
+        return incoming_rows
+    current_issues = {row["issue"] for row in current_rows}
+    new_rows = [row for row in incoming_rows if row["issue"] not in current_issues]
+    if not new_rows:
+        return incoming_rows
+    latest_new_issue = max(row["issue"] for row in new_rows)
+    return [
+        {**row, "date": row.get("date") or draw_date}
+        if row["issue"] == latest_new_issue
+        else row
+        for row in incoming_rows
+    ]
 
 
 def is_valid_dlt_numbers(front: list[int], back: list[int]) -> bool:
@@ -185,9 +215,14 @@ def write_csv_file(path: Path, rows: list[dict]) -> None:
 
 
 def merge_rows(current_rows: list[dict], incoming_rows: list[dict]) -> list[dict]:
-    merged = {row["issue"]: row for row in current_rows}
+    current = {row["issue"]: row for row in current_rows}
+    merged = dict(current)
     for row in incoming_rows:
-        merged[row["issue"]] = row
+        previous = current.get(row["issue"])
+        merged[row["issue"]] = {
+            **row,
+            "date": previous.get("date", "") if previous and previous.get("date") else row.get("date", ""),
+        }
     return sorted(merged.values(), key=lambda row: row["issue"])
 
 
@@ -224,10 +259,11 @@ def main() -> int:
         else:
             incoming_rows = fetch_source(source, args.limit, args.all, args.max_pages)
 
+        current_rows = read_csv_file(args.export_csv) if args.export_csv.exists() else []
+        incoming_rows = fill_latest_new_draw_date(incoming_rows, current_rows)
         if args.mode == "replace":
             final_rows = incoming_rows
         else:
-            current_rows = read_csv_file(args.export_csv) if args.export_csv.exists() else []
             final_rows = merge_rows(current_rows, incoming_rows)
 
         csv_text = rows_to_csv(final_rows)
