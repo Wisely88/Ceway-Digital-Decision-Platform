@@ -325,7 +325,7 @@ def dlt_draws(
 
 @app.post("/data/dlt/sync")
 def sync_dlt_history(
-    source: str = Query(default="sporttery", pattern="^(sporttery|78500)$"),
+    source: str = Query(default="78500", pattern="^(sporttery|78500)$"),
     full: bool = Query(default=False),
 ) -> dict:
     command = [
@@ -646,7 +646,7 @@ async def import_ssq_history(
 
 @app.post("/data/ssq/sync")
 def sync_ssq_history(
-    source: str = Query(default="auto", pattern="^(auto|cwl|78500)$"),
+    source: str = Query(default="78500", pattern="^(auto|cwl|78500)$"),
     full: bool = Query(default=False),
 ) -> dict:
     command = [

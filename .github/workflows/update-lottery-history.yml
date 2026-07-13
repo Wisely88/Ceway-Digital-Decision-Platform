@@ -71,14 +71,14 @@ jobs:
         run: |
           case "$GAME" in
             dlt)
-              python scripts/update_dlt_history.py --source sporttery --mode append --limit 100
+              python scripts/update_dlt_history.py --source 78500 --mode append
               ;;
             ssq)
-              python scripts/update_ssq_history.py --source auto --mode append
+              python scripts/update_ssq_history.py --source 78500 --mode append
               ;;
             all)
-              python scripts/update_dlt_history.py --source sporttery --mode append --limit 100
-              python scripts/update_ssq_history.py --source auto --mode append
+              python scripts/update_dlt_history.py --source 78500 --mode append
+              python scripts/update_ssq_history.py --source 78500 --mode append
               ;;
             *)
               echo "不支持的更新范围：$GAME" >&2
