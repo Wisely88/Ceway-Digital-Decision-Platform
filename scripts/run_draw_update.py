@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import json
 import os
 import shutil
 import subprocess
@@ -33,11 +34,49 @@ AUTOMATION_PATH = ":".join(
         "/sbin",
     ]
 )
+STATUS_FILE = Path(
+    os.environ.get(
+        "CEWAY_STATUS_FILE",
+        Path.home() / "Library/Caches/Ceway-Automation/status/latest.json",
+    )
+).expanduser()
 
 
 def log(message: str) -> None:
     timestamp = datetime.now(SHANGHAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{timestamp}] {message}", flush=True)
+
+
+def write_run_status(status: str, game: str, message: str, status_file: Path | None = None) -> Path:
+    target = status_file or STATUS_FILE
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "status": status,
+        "game": game,
+        "message": message,
+        "updated_at": datetime.now(SHANGHAI_TZ).isoformat(),
+    }
+    temporary = target.with_suffix(target.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(target)
+    return target
+
+
+def send_failure_notification(game: str, message: str) -> None:
+    if sys.platform != "darwin" or not shutil.which("osascript"):
+        return
+    title = json.dumps(f"策维 {game.upper()} 数据更新失败", ensure_ascii=False)
+    body = json.dumps(message[:180], ensure_ascii=False)
+    try:
+        subprocess.run(
+            ["osascript", "-e", f"display notification {body} with title {title}"],
+            text=True,
+            capture_output=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
 
 
 def run(
@@ -193,12 +232,16 @@ def main() -> int:
         try:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            log("已有一个更新任务在运行，本次跳过")
+            message = "已有一个更新任务在运行，本次跳过"
+            log(message)
+            write_run_status("skipped", args.game, message)
             return 0
 
         game = scheduled_game() if args.game == "auto" else args.game
         if not game:
-            log("当前不属于大乐透或双色球开奖检查时段，本次跳过")
+            message = "当前不属于大乐透或双色球开奖检查时段，本次跳过"
+            log(message)
+            write_run_status("skipped", args.game, message)
             return 0
 
         try:
@@ -212,10 +255,15 @@ def main() -> int:
                 log("未发现新期号")
             build_pages()
             publish_pages()
-            log("自动更新任务完成")
+            message = "自动更新任务完成"
+            log(message)
+            write_run_status("ok", game, message)
             return 0
         except Exception as exc:
-            log(f"自动更新失败：{exc}")
+            message = f"自动更新失败：{exc}"
+            log(message)
+            write_run_status("failed", game, message)
+            send_failure_notification(game, message)
             return 1
 
 

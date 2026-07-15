@@ -15,6 +15,12 @@ body {
   overflow-x: hidden;
 }
 
+html,
+body,
+#root {
+  max-width: 100%;
+}
+
 button,
 input,
 select {
@@ -108,6 +114,12 @@ button:disabled {
   align-items: flex-start;
   display: flex;
   justify-content: space-between;
+  min-width: 0;
+}
+
+.scene-shell-title > div,
+.scene-tile {
+  min-width: 0;
 }
 
 .scene-shell-title h1 {
@@ -2519,6 +2531,11 @@ td {
   .scene-shell-title {
     display: grid;
     gap: 12px;
+  }
+
+  .scene-shell-title h1,
+  .scene-shell-title p {
+    overflow-wrap: anywhere;
   }
 
   .scene-grid {

@@ -74,6 +74,9 @@ npm run build:pages
 
 cd ..
 backend/.venv/bin/python -m unittest discover -s backend/tests -v
+
+# 先启动静态演示前端，再执行 390x844 的 DLT/SSQ 手机主流程验收
+backend/.venv/bin/python scripts/mobile_smoke.py
 ```
 
 当前数据快照：
@@ -92,6 +95,8 @@ macOS 定时任务按北京时间检查最新开奖：
 定时任务统一从 `78500.cn` 的大乐透和双色球数据库读取最新开奖。GitHub 云端 IP 会被该站拒绝，因此由本机 LaunchAgent 在 `~/Library/Caches/Ceway-Automation` 的专用工作副本中执行抓取，验证通过后自动提交 GitHub 并重新发布 Pages。
 
 任务只在发现新期号且数据校验通过时更新 CSV、提交主分支并重新发布 GitHub Pages。任一数据源失败、号码越界、期号重复或历史记录异常时，任务会失败并保留原数据。休市日没有新期号时不会产生提交。
+
+每次任务会把最终状态写入 `~/Library/Caches/Ceway-Automation/status/latest.json`。更新失败时同时发送 macOS 通知中心提醒，因此失败原因不再只存在于 LaunchAgent 日志中。
 
 电脑需要开机且已连网。关机期间错过检查时间时，下一个开奖日检查会通过期号去重自动补齐。
 

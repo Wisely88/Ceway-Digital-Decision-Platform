@@ -1,6 +1,8 @@
 from datetime import datetime
+import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from zoneinfo import ZoneInfo
 
@@ -13,7 +15,7 @@ from scripts.update_dlt_history import (
     merge_rows as merge_dlt_rows,
     parse_78500_payload,
 )
-from scripts.run_draw_update import scheduled_game
+from scripts.run_draw_update import scheduled_game, write_run_status
 from scripts.update_ssq_history import (
     expected_draw_date,
     fill_latest_new_draw_date,
@@ -55,6 +57,17 @@ class LocalAutomationScheduleTests(unittest.TestCase):
     def test_skips_when_previous_day_has_no_supported_draw(self):
         now = datetime(2026, 7, 18, 0, 30, tzinfo=SHANGHAI_TZ)
         self.assertIsNone(scheduled_game(now))
+
+    def test_persists_latest_automation_status_outside_logs(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target = Path(temp_dir) / "status" / "latest.json"
+            written = write_run_status("failed", "ssq", "测试失败通知", status_file=target)
+            payload = json.loads(written.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["game"], "ssq")
+        self.assertEqual(payload["message"], "测试失败通知")
+        self.assertIn("updated_at", payload)
 
 
 class SsqSyncScheduleTests(unittest.TestCase):
