@@ -58,3 +58,17 @@ test("拖码组合会排除已选胆码", () => {
   const tuo = selectScoredCombination(rows, 12, 5, 2, dan);
   assert.equal(tuo.some((number) => dan.includes(number)), false);
 });
+
+test("双色球1至5胆会独立轮换且红球拖码不重复", () => {
+  const rows = Array.from({ length: 33 }, (_, index) => ({ number: index + 1, total_score: 100 - index }));
+  for (let danCount = 1; danCount <= 5; danCount += 1) {
+    const signatures = Array.from({ length: 5 }, (_, index) => {
+      const variant = index + 1;
+      const dan = selectScoredCombination(rows, 33, danCount, variant);
+      const tuo = selectScoredCombination(rows, 33, Math.max(6 - danCount, 5), variant, dan);
+      assert.equal(tuo.some((number) => dan.includes(number)), false);
+      return dan.slice().sort((a, b) => a - b).join("-");
+    });
+    assert.equal(new Set(signatures).size, signatures.length);
+  }
+});
