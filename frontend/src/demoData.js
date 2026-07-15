@@ -566,11 +566,8 @@ function nextDemoDraw(issue) {
 
 function reviewDemoPlan(plan, draw) {
   const details = plan.mode === "dantuo"
-    ? [compareTicket(
-      [...(plan.front_dan || []), ...(plan.front_tuo || [])].slice(0, 5),
-      (plan.back || []).slice(0, 2),
-      draw,
-    )]
+    ? choose(plan.front_tuo || [], 5 - (plan.front_dan || []).length).flatMap((tuo) =>
+      choose(plan.back || [], 2).map((back) => compareTicket([...(plan.front_dan || []), ...tuo], back, draw)))
     : (plan.items || []).map((item, index) => ({ ticket: index + 1, ...compareTicket(item.front || [], item.back || [], draw) }));
   const best = details.reduce((current, item) => {
     if (!current) return item;
@@ -579,6 +576,12 @@ function reviewDemoPlan(plan, draw) {
     return itemScore > currentScore ? item : current;
   }, null);
   const hitTickets = details.filter((item) => item.prize_label !== "未命中固定奖级").length;
+  const prizeDistribution = details.reduce((distribution, item) => {
+    if (item.prize_label !== "未命中固定奖级") {
+      distribution[item.prize_label] = (distribution[item.prize_label] || 0) + 1;
+    }
+    return distribution;
+  }, {});
   return {
     actual: { issue: draw.issue, date: draw.date, front: draw.front, back: draw.back },
     mode: plan.mode,
@@ -588,6 +591,7 @@ function reviewDemoPlan(plan, draw) {
     details: details.slice(0, 20),
     hit_tickets: hitTickets,
     hit_rate: Math.round((hitTickets / Math.max(1, plan.tickets || details.length)) * 10000) / 100,
+    prize_distribution: prizeDistribution,
   };
 }
 
@@ -770,6 +774,12 @@ function reviewDemoSsqPlan(plan, draw) {
     return item.front_hits * 2 + item.back_hits > current.front_hits * 2 + current.back_hits ? item : current;
   }, null);
   const hitTickets = details.filter((item) => item.prize_label !== "未命中固定奖级").length;
+  const prizeDistribution = details.reduce((distribution, item) => {
+    if (item.prize_label !== "未命中固定奖级") {
+      distribution[item.prize_label] = (distribution[item.prize_label] || 0) + 1;
+    }
+    return distribution;
+  }, {});
   return {
     actual: { issue: draw.issue, date: draw.date, front: draw.front, back: draw.back },
     mode: plan.mode,
@@ -779,6 +789,7 @@ function reviewDemoSsqPlan(plan, draw) {
     details: details.slice(0, 20),
     hit_tickets: hitTickets,
     hit_rate: Math.round((hitTickets / Math.max(1, plan.tickets || details.length)) * 10000) / 100,
+    prize_distribution: prizeDistribution,
   };
 }
 

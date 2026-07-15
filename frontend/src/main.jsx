@@ -1492,6 +1492,9 @@ function ReviewPanel({ review, onRefresh }) {
                     推荐期号 {item.recommended_issue || item.latest_issue || "-"} · {planModeLabel(item.mode)} · {item.cost} 元 ·
                     命中票数 {item.hit_tickets}/{item.tickets} · 命中率 {item.hit_rate}%
                   </p>
+                  {Object.keys(item.prize_distribution || {}).length > 0 && (
+                    <p>奖级分布：{Object.entries(item.prize_distribution).map(([label, count]) => `${label} ${count} 注`).join("·")}</p>
+                  )}
                 </>
               );
             })()}

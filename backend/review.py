@@ -110,10 +110,50 @@ def best_dantuo_hit(plan: dict, draw: dict) -> dict:
     return best
 
 
+def review_dantuo(plan: dict, draw: dict) -> tuple[list[dict], dict]:
+    dan = plan.get("front_dan", [])
+    tuo = plan.get("front_tuo", [])
+    back_pool = plan.get("back", [])
+    need_tuo = max(0, 5 - len(dan))
+    rows = []
+
+    for front_combo in combinations(tuo, need_tuo):
+        front = sorted(dan + list(front_combo))
+        for back_combo in combinations(back_pool, 2):
+            back = sorted(back_combo)
+            front_hits, back_hits = hit_counts(front, back, draw)
+            rows.append(
+                {
+                    "ticket": len(rows) + 1,
+                    "front": front,
+                    "back": back,
+                    "front_hits": front_hits,
+                    "back_hits": back_hits,
+                    "hit_label": f"{front_hits}+{back_hits}",
+                    "prize_label": prize_label(front_hits, back_hits),
+                }
+            )
+
+    best = max(
+        rows,
+        key=lambda item: (item["front_hits"] + item["back_hits"], item["front_hits"], item["back_hits"]),
+        default={},
+    )
+    return rows, best
+
+
+def prize_distribution(rows: list[dict]) -> dict[str, int]:
+    distribution = {}
+    for row in rows:
+        label = row.get("prize_label")
+        if label and label != "未命中固定奖级":
+            distribution[label] = distribution.get(label, 0) + 1
+    return distribution
+
+
 def review_plan(plan: dict, draw: dict) -> dict:
     if plan.get("mode") == "dantuo":
-        best = best_dantuo_hit(plan, draw)
-        rows = [best] if best else []
+        rows, best = review_dantuo(plan, draw)
     else:
         rows, best = review_single(plan, draw)
 
@@ -134,6 +174,7 @@ def review_plan(plan: dict, draw: dict) -> dict:
         "details": rows[:20],
         "hit_tickets": len(hit_tickets),
         "hit_rate": round((len(hit_tickets) / max(1, plan.get("tickets", len(rows)))) * 100, 2),
+        "prize_distribution": prize_distribution(rows),
     }
 
 
@@ -207,7 +248,7 @@ def build_review(records: list[dict], history: list[dict], limit: int = 20) -> d
 # --- SSQ 双色球复盘函数 ---
 
 def ssq_prize_label(front_hits: int, back_hits: int) -> str:
-    """SSQ 奖级判定：6个红球+1个蓝球 = 9个奖级（一等奖到六等奖）"""
+    """SSQ 奖级判定：6 个红球与 1 个蓝球，共六个奖级。"""
     if front_hits == 6 and back_hits == 1:
         return "一等奖"
     if front_hits == 6:
@@ -273,10 +314,41 @@ def review_ssq_best_dantuo_hit(plan: dict, draw: dict) -> dict:
     return best
 
 
+def review_ssq_dantuo(plan: dict, draw: dict) -> tuple[list[dict], dict]:
+    dan = plan.get("front_dan", [])
+    tuo = plan.get("front_tuo", [])
+    back_pool = plan.get("back", [])
+    need_tuo = max(0, 6 - len(dan))
+    rows = []
+
+    for front_combo in combinations(tuo, need_tuo):
+        front = sorted(dan + list(front_combo))
+        for back_number in back_pool:
+            back = [back_number]
+            front_hits, back_hits = hit_counts(front, back, draw)
+            rows.append(
+                {
+                    "ticket": len(rows) + 1,
+                    "front": front,
+                    "back": back,
+                    "front_hits": front_hits,
+                    "back_hits": back_hits,
+                    "hit_label": f"{front_hits}+{back_hits}",
+                    "prize_label": ssq_prize_label(front_hits, back_hits),
+                }
+            )
+
+    best = max(
+        rows,
+        key=lambda item: (item["front_hits"] + item["back_hits"], item["front_hits"], item["back_hits"]),
+        default={},
+    )
+    return rows, best
+
+
 def review_ssq_plan(plan: dict, draw: dict) -> dict:
     if plan.get("mode") == "dantuo":
-        best = review_ssq_best_dantuo_hit(plan, draw)
-        rows = [best] if best else []
+        rows, best = review_ssq_dantuo(plan, draw)
     else:
         rows, best = review_ssq_single(plan, draw)
 
@@ -297,6 +369,7 @@ def review_ssq_plan(plan: dict, draw: dict) -> dict:
         "details": rows[:20],
         "hit_tickets": len(hit_tickets),
         "hit_rate": round((len(hit_tickets) / max(1, plan.get("tickets", len(rows)))) * 100, 2),
+        "prize_distribution": prize_distribution(rows),
     }
 
 

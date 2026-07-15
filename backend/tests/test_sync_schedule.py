@@ -1,6 +1,12 @@
 from datetime import datetime
+from pathlib import Path
+import sys
 import unittest
 from zoneinfo import ZoneInfo
+
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT_DIR))
 
 from scripts.update_dlt_history import (
     expected_draw_date as expected_dlt_draw_date,
