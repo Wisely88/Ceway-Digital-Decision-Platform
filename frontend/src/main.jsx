@@ -63,6 +63,7 @@ import {
 } from "./api";
 import { buildDecisionBrief, cumulativeSpending, recentSpending } from "./decision";
 import { evaluatePackage, packageCatalog, PACKAGE_SOURCES } from "./packageEvaluator";
+import { rotateItems, topScoreNumbers } from "./suggestionRotation";
 import "./styles.css";
 
 function Badge({ children, tone = "default" }) {
@@ -288,21 +289,6 @@ function combinationCount(total, pick) {
     result = (result * (total - safePick + index)) / index;
   }
   return Math.round(result);
-}
-
-function rotateItems(items, variant = 0) {
-  if (!items.length) return [];
-  const shift = variant % items.length;
-  return [...items.slice(shift), ...items.slice(0, shift)];
-}
-
-function topScoreNumbers(rows, max, variant = 0) {
-  const ranked = [...(rows || [])]
-    .sort((left, right) => (right.total_score || 0) - (left.total_score || 0))
-    .map((row) => Number(row.number))
-    .filter((number) => number >= 1 && number <= max);
-  const fallback = rangeNumbers(max);
-  return rotateItems([...new Set([...ranked, ...fallback])], variant);
 }
 
 function displayNumbers(numbers) {
@@ -1381,8 +1367,51 @@ function normalizeRecordPlan(record) {
   return record?.plan || record;
 }
 
+function SavedPlanDetails({ plan }) {
+  const [copied, setCopied] = useState(false);
+  const labels = plan.play_labels || planLabelsForScene(plan.scene || "DLT");
+  const text = plan.mode === "dantuo"
+    ? `${labels.dan}：${(plan.front_dan_display || displayNumbers(plan.front_dan || [])).join(" ")}\n${labels.tuo}：${(plan.front_tuo_display || displayNumbers(plan.front_tuo || [])).join(" ")}\n${labels.back}：${(plan.back_display || displayNumbers(plan.back || [])).join(" ")}`
+    : (plan.items || []).map((item, index) => `${index + 1}. ${labels.front} ${(item.front_display || displayNumbers(item.front || [])).join(" ")} + ${labels.back} ${(item.back_display || displayNumbers(item.back || [])).join(" ")}`).join("\n");
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      window.prompt("当前浏览器不允许自动复制，请长按复制：", text);
+    }
+  };
+
+  return (
+    <div className="saved-plan-details">
+      {plan.mode === "dantuo" ? (
+        <div className="saved-number-groups">
+          <div><span>{labels.dan}</span><strong>{(plan.front_dan_display || displayNumbers(plan.front_dan || [])).join(" ")}</strong></div>
+          <div><span>{labels.tuo}</span><strong>{(plan.front_tuo_display || displayNumbers(plan.front_tuo || [])).join(" ")}</strong></div>
+          <div><span>{labels.back}</span><strong>{(plan.back_display || displayNumbers(plan.back || [])).join(" ")}</strong></div>
+        </div>
+      ) : (
+        <div className="saved-ticket-list">
+          {(plan.items || []).map((item, index) => (
+            <p key={`${index}-${(item.front || []).join("-")}`}>
+              <b>{index + 1}</b> {labels.front} {(item.front_display || displayNumbers(item.front || [])).join(" ")} · {labels.back} {(item.back_display || displayNumbers(item.back || [])).join(" ")}
+            </p>
+          ))}
+        </div>
+      )}
+      <div className="saved-plan-footer">
+        <p>{plan.reason || plan.explanation?.[0] || "该方案保留生成时的号码与决策说明。"}</p>
+        <button className="ghost-button compact" onClick={copy} type="button"><Clipboard size={14} />{copied ? "已复制" : "复制号码"}</button>
+      </div>
+    </div>
+  );
+}
+
 function HistoryRecords({ records, onDelete, review }) {
   const [filter, setFilter] = useState("");
+  const [expandedId, setExpandedId] = useState(null);
   const statusByRecord = useMemo(() => reviewStatusMap(review), [review]);
   const visibleRecords = records
     .filter((record) => !filter || `${record.latest_issue || ""}${record.strategy || ""}`.includes(filter))
@@ -1408,8 +1437,9 @@ function HistoryRecords({ records, onDelete, review }) {
             const savedAt = record.saved_at ? new Date(record.saved_at).toLocaleString() : "-";
             const status = statusByRecord.get(record.id) || {};
             const statusText = record.review_status || status.label || "待复盘";
+            const recordKey = record.id || `${savedAt}-${plan.mode}-${plan.cost}`;
             return (
-              <article className="history-item" key={record.id || `${savedAt}-${plan.mode}-${plan.cost}`}>
+              <article className={`history-item ${expandedId === recordKey ? "expanded" : ""}`} key={recordKey}>
                 <div>
                   <strong>{STRATEGY_LABELS[record.strategy || plan.strategy] || "策略"} · {planModeLabel(plan.mode)}</strong>
                   <span>{savedAt} · 推荐期号 {plan.recommended_issue || record.latest_issue || "-"}</span>
@@ -1420,9 +1450,15 @@ function HistoryRecords({ records, onDelete, review }) {
                 </div>
                 <Badge>{statusText}</Badge>
                 <p>{status.nextStep || plan.reason || plan.explanation?.[0] || "该记录保留推荐方案和评分解释。"}</p>
-                {record.id && (
-                  <button className="ghost-button compact danger" onClick={() => onDelete(record.id)} type="button">删除记录</button>
-                )}
+                <div className="history-actions">
+                  <button className="ghost-button compact" onClick={() => setExpandedId(expandedId === recordKey ? null : recordKey)} type="button">
+                    {expandedId === recordKey ? "收起方案" : "查看方案"}
+                  </button>
+                  {record.id && (
+                    <button className="ghost-button compact danger" onClick={() => onDelete(record.id)} type="button">删除记录</button>
+                  )}
+                </div>
+                {expandedId === recordKey && <SavedPlanDetails plan={plan} />}
               </article>
             );
           })}
@@ -1796,7 +1832,14 @@ function BettingPlanPanel({
   const [manualDan, setManualDan] = useState([]);
   const [manualTuo, setManualTuo] = useState([]);
   const [message, setMessage] = useState("");
-  const [variant, setVariant] = useState(0);
+  const variantStorageKey = `ceway_${scene.toLowerCase()}_suggestion_variant`;
+  const [variant, setVariant] = useState(() => Number(sessionStorage.getItem(variantStorageKey) || 0));
+
+  const revealGenerated = () => {
+    window.requestAnimationFrame(() => {
+      document.getElementById("generated-plan-result")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   const toggleNumber = (list, setList, number, limit = Infinity) => {
     setMessage("");
@@ -1836,9 +1879,11 @@ function BettingPlanPanel({
         variant: nextVariant,
       });
       setVariant(nextVariant);
+      sessionStorage.setItem(variantStorageKey, String(nextVariant));
       const decisionBrief = buildDecisionBrief({ plan, budget, ...decisionContext });
-      onGenerated({ ...plan, decision_brief: decisionBrief });
-      setMessage(plan.cost <= Number(budget || 0) ? "规则建议方案已生成，可复制或保存。" : "方案已生成，但费用超过预算，请调整胆拖数量。");
+      onGenerated({ ...plan, generation_variant: nextVariant, decision_brief: decisionBrief });
+      setMessage(plan.cost <= Number(budget || 0) ? `第 ${nextVariant} 组规则建议已生成，再次点击会轮换候选号码。` : "方案已生成，但费用超过预算，请调整胆拖数量。");
+      revealGenerated();
     } catch (err) {
       setMessage(err.message);
     }
@@ -1861,6 +1906,7 @@ function BettingPlanPanel({
       const decisionBrief = buildDecisionBrief({ plan, budget, ...decisionContext });
       onGenerated({ ...plan, decision_brief: decisionBrief });
       setMessage("人工方案已生成点评，可保存后进入待开奖复盘。");
+      revealGenerated();
     } catch (err) {
       setMessage(err.message);
     }
@@ -1949,7 +1995,7 @@ function BettingPlanPanel({
               <div><span>预算状态</span><strong>{estimatedCost <= Number(budget || 0) ? "符合" : "超出"}</strong></div>
               <button className="primary-button strong" onClick={createAiPlan} type="button">
                 <Play size={16} />
-                生成系统建议
+                {generated?.source === "rule_suggestion" ? "再生成一组" : "生成系统建议"}
               </button>
             </div>
           ) : (
@@ -2020,9 +2066,9 @@ function BettingPlanPanel({
       </div>
 
       {generated && flow !== "package" && (
-        <div className="betting-result">
+        <div className="betting-result" id="generated-plan-result">
           <div className="section-kicker">
-            <span>{generated.source === "manual_selection" ? "人工方案点评" : "系统建议结果"}</span>
+            <span>{generated.source === "manual_selection" ? "人工方案点评" : `系统建议结果${generated.generation_variant ? ` · 第${generated.generation_variant}组` : ""}`}</span>
             <strong>{generated.cost} 元 · {generated.tickets} 注</strong>
           </div>
           <PlanCard plan={generated} onSave={onSave} />
