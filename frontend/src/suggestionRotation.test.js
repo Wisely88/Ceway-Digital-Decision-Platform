@@ -41,3 +41,20 @@ test("后区组合在候选组合用完前不重复", () => {
   ));
   assert.equal(new Set(signatures).size, signatures.length);
 });
+
+test("2胆和3胆都会随生成序号切换不同高分组合", () => {
+  const rows = Array.from({ length: 35 }, (_, index) => ({ number: index + 1, total_score: 100 - index }));
+  for (const danCount of [2, 3]) {
+    const signatures = Array.from({ length: 8 }, (_, index) => (
+      selectScoredCombination(rows, 35, danCount, index + 1).slice().sort((a, b) => a - b).join("-")
+    ));
+    assert.equal(new Set(signatures).size, signatures.length);
+  }
+});
+
+test("拖码组合会排除已选胆码", () => {
+  const rows = Array.from({ length: 12 }, (_, index) => ({ number: index + 1, total_score: 100 - index }));
+  const dan = selectScoredCombination(rows, 12, 2, 2);
+  const tuo = selectScoredCombination(rows, 12, 5, 2, dan);
+  assert.equal(tuo.some((number) => dan.includes(number)), false);
+});

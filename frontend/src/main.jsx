@@ -398,9 +398,10 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
   const safeDan = Math.max(1, Math.min(Number(danCount || 1), rules.frontPick - 1));
   const safeTuo = Math.max(rules.frontPick - safeDan, Number(tuoCount || rules.frontPick));
   const safeBack = Math.max(rules.backPick, Number(backCount || rules.backPick));
-  const selectedFront = selectScoredCombination(scoreRows, rules.frontMax, safeDan + safeTuo, variant);
-  const frontDan = selectedFront.slice(0, safeDan).sort((left, right) => left - right);
-  const frontTuo = selectedFront.slice(safeDan).sort((left, right) => left - right);
+  const frontDan = selectScoredCombination(scoreRows, rules.frontMax, safeDan, variant)
+    .sort((left, right) => left - right);
+  const frontTuo = selectScoredCombination(scoreRows, rules.frontMax, safeTuo, variant, frontDan)
+    .sort((left, right) => left - right);
   const back = selectScoredCombination(backRows, rules.backMax, safeBack, variant).sort((left, right) => left - right);
   const tickets = combinationCount(frontTuo.length, rules.frontPick - frontDan.length) * combinationCount(back.length, rules.backPick);
   const cost = tickets * 2;
