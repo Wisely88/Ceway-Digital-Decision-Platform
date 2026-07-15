@@ -126,6 +126,11 @@ export function getDltReview() {
   return request("/review/dlt");
 }
 
+export function getDltBehavior() {
+  if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoBehavior("DLT"));
+  return request("/behavior/dlt");
+}
+
 export function getDltBacktest({ budget = 20, strategy = "balanced", periods = 100, window = 100 } = {}) {
   if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoBacktest({ budget, strategy, periods, window }));
   const params = toQueryString({ budget, strategy, periods, window });
@@ -234,6 +239,11 @@ export function saveSsqRecord({ budget, strategy, latestIssue, plan }) {
 export function getSsqReview() {
   if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoSsqReview());
   return request("/review/ssq");
+}
+
+export function getSsqBehavior() {
+  if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoBehavior("SSQ"));
+  return request("/behavior/ssq");
 }
 
 export function getSsqBacktest({ budget = 20, strategy = "balanced", periods = 100, window = 100 } = {}) {

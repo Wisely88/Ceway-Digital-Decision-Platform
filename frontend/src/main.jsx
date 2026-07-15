@@ -28,6 +28,7 @@ import {
 import {
   deleteDltRecord,
   deleteSsqRecord,
+  getDltBehavior,
   getDltBacktest,
   getDltDashboard,
   getDltDataStatus,
@@ -36,6 +37,7 @@ import {
   getDltReview,
   getScenes,
   getSsqBacktest,
+  getSsqBehavior,
   getSsqDashboard,
   getSsqDataStatus,
   getSsqDraws,
@@ -150,8 +152,8 @@ const PRODUCT_STATUS = [
   },
   {
     label: "当前版本",
-    value: "V1.8 验证闭环版",
-    detail: "多方案比较、实际奖金、跨设备同步与按需加载",
+    value: "V1.9 行为风控版",
+    detail: "智能行为分析、官方参与热度与主动风险提醒",
     tone: "green",
   },
   {
@@ -198,6 +200,11 @@ const ROADMAP_ITEMS = [
     version: "V1.8",
     title: "验证闭环版",
     description: "多方案比较、号码明细、实际奖金与 ROI、同步码、数据来源和前端按需加载。",
+  },
+  {
+    version: "V1.9",
+    title: "行为风控版",
+    description: "分析投入频次、金额变化、连续加码和官方市场参与度，输出可执行风险建议。",
   },
 ];
 
@@ -554,6 +561,7 @@ const MODULE_NAV_ITEMS = [
   { key: "overview", label: "系统总览", icon: Home },
   { key: "data", label: "投注方案", icon: FileStack },
   { key: "review", label: "推荐复盘", icon: GitCompare },
+  { key: "behavior", label: "行为分析", icon: Gauge },
   { key: "backtest", label: "历史回测", icon: Activity },
   { key: "trends", label: "走势分析", icon: TrendingUp },
   { key: "score", label: "号码评分", icon: Table2 },
@@ -672,7 +680,7 @@ function SceneSelect({ scenes, onEnter }) {
           <div>
             <Badge tone="live">场景选择页（所有版本通用）</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
-            <p>Digital Decision Platform · Powered by CBGO Framework。当前版本为 v1.8 验证闭环版，DLT 与 SSQ 共用完整决策闭环。</p>
+            <p>Digital Decision Platform · Powered by CBGO Framework。当前版本为 v1.9 行为风控版，DLT 与 SSQ 共用完整决策闭环。</p>
           </div>
         </div>
 
@@ -706,7 +714,7 @@ function SceneSelect({ scenes, onEnter }) {
 
       <section className="baseline-panel">
         <div>
-          <Badge tone="live">v1.8 验证闭环版</Badge>
+          <Badge tone="live">v1.9 行为风控版</Badge>
           <h2>当前交付范围</h2>
           <p>选号只是入口；本版补齐方案比较、实际奖金复盘、跨设备同步和数据可追溯性。</p>
         </div>
@@ -723,7 +731,7 @@ function SceneSelect({ scenes, onEnter }) {
           <article>
             <h3>本版不开发</h3>
             <ul>
-              <li>AI、论坛、舆情、外部数据 API</li>
+              <li>开奖号码预测、论坛爬虫、无法核验的舆情数据</li>
               <li>任何中奖率或收益率承诺</li>
               <li>用历史命中结果预测下一期</li>
               <li>诱导追投、翻倍或亏损后加码</li>
@@ -1609,6 +1617,71 @@ function ReviewPanel({ review, onRefresh }) {
   );
 }
 
+function BehaviorPanel({ behavior, onRefresh }) {
+  if (!behavior) {
+    return (
+      <section className="panel wide behavior-panel" id="module-behavior">
+        <div className="panel-title"><div><h2>行为分析</h2><p>等待历史方案与复盘数据</p></div></div>
+        <p className="empty-text">保存至少一份方案后，系统会分析投入频次、金额变化和加码行为。</p>
+      </section>
+    );
+  }
+  const metrics = behavior.metrics || {};
+  const market = behavior.market || {};
+  const maxSales = Math.max(1, ...(market.series || []).map((item) => Number(item.sales || 0)));
+  return (
+    <section className="panel wide behavior-panel" id="module-behavior">
+      <div className="panel-title">
+        <div>
+          <h2>智能行为分析</h2>
+          <p>{behavior.engine} · 只解释历史行为，不用于预测开奖</p>
+        </div>
+        <button className="ghost-button compact" onClick={onRefresh} type="button"><RefreshCw size={14} />刷新分析</button>
+      </div>
+      <div className="behavior-lead">
+        <div className={`behavior-risk risk-${behavior.risk_level === "高" ? "high" : behavior.risk_level === "中" ? "medium" : "low"}`}>
+          <span>行为风险</span>
+          <strong>{behavior.risk_level}</strong>
+          <b>{behavior.risk_score} / 100</b>
+        </div>
+        <div>
+          <h3>本期建议</h3>
+          <p>{behavior.action}</p>
+          <div className="behavior-signals">{(behavior.signals || []).map((signal) => <span key={signal}>{signal}</span>)}</div>
+        </div>
+      </div>
+      <div className="behavior-metrics">
+        <div><span>保存方案</span><strong>{metrics.record_count || 0}</strong></div>
+        <div><span>近30日投入</span><strong>{metrics.recent_cost || 0} 元</strong></div>
+        <div><span>平均单次</span><strong>{metrics.average_cost || 0} 元</strong></div>
+        <div><span>最大单次</span><strong>{metrics.maximum_cost || 0} 元</strong></div>
+        <div><span>胆拖占比</span><strong>{metrics.dantuo_ratio || 0}%</strong></div>
+        <div><span>连续加码</span><strong>{metrics.escalation_count || 0} 次</strong></div>
+        <div><span>已复盘</span><strong>{metrics.reviewed_count || 0}</strong></div>
+        <div><span>历史 ROI</span><strong>{metrics.historical_roi === null || metrics.historical_roi === undefined ? "待完整" : `${metrics.historical_roi}%`}</strong></div>
+      </div>
+      <div className="market-pulse">
+        <div className="market-copy">
+          <Badge tone={market.available ? "live" : "default"}>{market.label || "市场参与数据"}</Badge>
+          <h3>市场参与度</h3>
+          {market.available ? (
+            <p>最新第 {market.latest_issue} 期销售额 {(Number(market.latest_sales || 0) / 100000000).toFixed(2)} 亿元，近5期较前5期 {market.change_percent >= 0 ? "+" : ""}{market.change_percent}%。</p>
+          ) : <p>{market.message}</p>}
+          <span>来源：{market.source || "暂无"}</span>
+        </div>
+        {market.available && (
+          <div className="market-bars" aria-label="近20期官方销售额趋势">
+            {(market.series || []).map((item) => (
+              <i key={item.issue} style={{ height: `${Math.max(8, Number(item.sales || 0) / maxSales * 100)}%` }} title={`${item.issue}：${item.sales}`} />
+            ))}
+          </div>
+        )}
+      </div>
+      <p className="behavior-disclaimer"><ShieldAlert size={14} />{behavior.disclaimer} {market.message}</p>
+    </section>
+  );
+}
+
 function BacktestPanel({ backtest, onRefresh, strategy, onStrategyChange }) {
   if (!backtest) return null;
   const summary = backtest.summary || {};
@@ -2178,6 +2251,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
   const [generated, setGenerated] = useState(null);
   const [savedPlans, setSavedPlans] = useState([]);
   const [review, setReview] = useState(null);
+  const [behavior, setBehavior] = useState(null);
   const [backtest, setBacktest] = useState(null);
   const [dataStorage, setDataStorage] = useState(null);
   const [draws, setDraws] = useState([]);
@@ -2229,6 +2303,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
         items: [],
         disclaimer: "复盘数据暂不可用，已跳过异常记录。",
       }));
+    getDltBehavior().then(setBehavior).catch(() => setBehavior(null));
     getDltBacktest({ budget, strategy, periods: 100, window: windowSize })
       .then(setBacktest)
       .catch(() => setBacktest(null));
@@ -2256,6 +2331,14 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
         items: [],
         disclaimer: `复盘数据暂不可用：${err.message}`,
       });
+    }
+  };
+
+  const refreshBehavior = async () => {
+    try {
+      setBehavior(await getDltBehavior());
+    } catch (err) {
+      setError(`行为分析暂不可用：${err.message}`);
     }
   };
 
@@ -2291,6 +2374,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
       await deleteDltRecord(id);
       setSavedPlans((items) => items.filter((record) => record.id !== id));
       await refreshReview();
+      await refreshBehavior();
       setNotice("历史推荐记录已删除。");
     } catch (err) {
       setError(err.message);
@@ -2320,6 +2404,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
       });
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
       await refreshReview();
+      await refreshBehavior();
       changeModule("history");
       setNotice("方案已保存到后端历史记录。");
     } catch (err) {
@@ -2327,6 +2412,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
       localStorage.setItem("cbgo_saved_plans", JSON.stringify(nextPlans));
       setSavedPlans(nextPlans);
       await refreshReview();
+      await refreshBehavior();
       changeModule("history");
       setNotice(`后端保存失败，方案已保存到本地浏览器。${err?.message ? `原因：${err.message}` : ""}`);
     }
@@ -2351,6 +2437,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
       const refreshed = await getDltRecords();
       setSavedPlans(refreshed);
       await refreshReview();
+      await refreshBehavior();
     }
     return saved.length;
   };
@@ -2458,6 +2545,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
           )}
 
           {activeModule === "review" && <ReviewPanel review={review} onRefresh={refreshReview} />}
+          {activeModule === "behavior" && <BehaviorPanel behavior={behavior} onRefresh={refreshBehavior} />}
           {activeModule === "backtest" && <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} strategy={strategy} onStrategyChange={setStrategy} />}
           {activeModule === "trends" && (
             <TrendPanel
@@ -2516,6 +2604,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
   const [activeModule, setActiveModule] = useState(initialModuleFromUrl);
   const [dashboard, setDashboard] = useState(null);
   const [generated, setGenerated] = useState(null);
+  const [behavior, setBehavior] = useState(null);
   const [savedPlans, setSavedPlans] = useState([]);
   const [review, setReview] = useState(null);
   const [backtest, setBacktest] = useState(null);
@@ -2569,6 +2658,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
         items: [],
         disclaimer: "SSQ 复盘数据暂不可用。",
       }));
+    getSsqBehavior().then(setBehavior).catch(() => setBehavior(null));
     getSsqBacktest({ budget, strategy, periods: 100, window: windowSize })
       .then(setBacktest)
       .catch(() => setBacktest(null));
@@ -2596,6 +2686,14 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
         items: [],
         disclaimer: `SSQ 复盘数据暂不可用：${err.message}`,
       });
+    }
+  };
+
+  const refreshBehavior = async () => {
+    try {
+      setBehavior(await getSsqBehavior());
+    } catch (err) {
+      setError(`双色球行为分析暂不可用：${err.message}`);
     }
   };
 
@@ -2640,12 +2738,15 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
       const result = await saveSsqRecord({ budget, strategy, latestIssue, plan });
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
       await refreshReview();
+      await refreshBehavior();
       changeModule("history");
       setNotice("双色球方案已保存。");
     } catch (err) {
       const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
       localStorage.setItem("cbgo_ssq_plans", JSON.stringify(nextPlans));
       setSavedPlans(nextPlans);
+      await refreshReview();
+      await refreshBehavior();
       changeModule("history");
       setNotice(`后端保存失败，双色球方案已保存到本地浏览器。${err?.message ? `原因：${err.message}` : ""}`);
     }
@@ -2670,6 +2771,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
       const refreshed = await getSsqRecords();
       setSavedPlans(refreshed);
       await refreshReview();
+      await refreshBehavior();
     }
     return saved.length;
   };
@@ -2679,6 +2781,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
       await deleteSsqRecord(id);
       setSavedPlans((items) => items.filter((record) => record.id !== id));
       await refreshReview();
+      await refreshBehavior();
       setNotice("双色球历史推荐记录已删除。");
     } catch (err) {
       setError(err.message);
@@ -2805,6 +2908,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
           )}
 
           {activeModule === "review" && <ReviewPanel review={review} onRefresh={refreshReview} />}
+          {activeModule === "behavior" && <BehaviorPanel behavior={behavior} onRefresh={refreshBehavior} />}
           {activeModule === "backtest" && <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} strategy={strategy} onStrategyChange={setStrategy} />}
           {activeModule === "trends" && (
             <TrendPanel

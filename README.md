@@ -1,9 +1,9 @@
-# 策维（Ceway）数字决策平台 v1.8
+# 策维（Ceway）数字决策平台 v1.9
 
 Digital Decision Platform  
 Powered by CBGO Framework
 
-当前版本为“验证闭环版”，已支持大乐透 DLT 与双色球 SSQ。
+当前版本为“行为风控版”，已支持大乐透 DLT 与双色球 SSQ。
 
 产品主线：选号只是入口，决策解释和风险控制才是核心。系统会说明本期实际支出、组合覆盖、投注倍率、资金暴露、近 30 日投入、连续加码迹象和历史回测表现。
 
@@ -43,6 +43,7 @@ ceway/
 - [v1.6 决策风控说明](docs/ceway_v1_6_decision_risk.md)
 - [v1.7 套餐评估说明](docs/ceway_v1_7_package_evaluation.md)
 - [v1.8 验证闭环说明](docs/ceway_v1_8_validation_loop.md)
+- [v1.9 行为风控说明](docs/ceway_v1_9_behavior_risk.md)
 - [Backlog](docs/backlog.md)
 - [数据导入说明](docs/data_import.md)
 
@@ -82,13 +83,13 @@ backend/.venv/bin/python scripts/mobile_smoke.py
 
 当前数据快照：
 
-- 大乐透：2896 期，最新 `26078`（2026-07-13）。
+- 大乐透：2897 期，最新 `26079`（2026-07-15）。
 - 双色球：3477 期，最新 `2026080`（2026-07-14）。
 - 两份数据均通过当前期号范围连续性检查。
 
 每期实际奖金快照：
 
-- 大乐透：2896 期。
+- 大乐透：2897 期。
 - 双色球：2038 期。
 - 复盘页只在奖级金额数据完整时显示净收益与 ROI；不完整时明确标记待补，避免用估算值冒充实际奖金。
 

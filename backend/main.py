@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from backtest import build_dlt_backtest, build_ssq_backtest
+from behavior import build_behavior_profile
 from capital import capital_state
 from db import (
     data_status,
@@ -45,7 +46,7 @@ from prizes import load_prize_snapshot
 from scorer import score_back_numbers, score_front_numbers, score_ssq_back_numbers, score_ssq_front_numbers
 
 
-app = FastAPI(title="Ceway v1.8 Validation Loop API")
+app = FastAPI(title="Ceway v1.9 Behavior Risk API")
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 app.add_middleware(
@@ -167,7 +168,7 @@ def build_dlt_payload(
             "subtitle": "Digital Decision Platform",
             "framework": "Powered by CBGO Framework",
             "baseline": "v1.2 MVP",
-            "version": "v1.8 Validation Loop",
+            "version": "v1.9 Behavior Risk",
         },
         "disclaimer": "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
         "history_count": len(history),
@@ -292,6 +293,14 @@ def review_dlt(limit: int = Query(default=20, ge=1, le=100)) -> dict:
             "items": [],
             "disclaimer": f"复盘数据暂不可用，已跳过异常记录。原因：{exc}",
         }
+
+
+@app.get("/behavior/dlt")
+def behavior_dlt() -> dict:
+    records = load_dlt_records()
+    snapshot = load_prize_snapshot("DLT")
+    review = build_review(records, load_dlt_history(), limit=100, prize_snapshot=snapshot)
+    return build_behavior_profile(records, review, snapshot)
 
 
 @app.get("/backtest/dlt")
@@ -465,7 +474,7 @@ def build_ssq_payload(
             "subtitle": "Digital Decision Platform",
             "framework": "Powered by CBGO Framework",
             "baseline": "v1.2 MVP",
-            "version": "v1.8 Validation Loop",
+            "version": "v1.9 Behavior Risk",
         },
         "disclaimer": "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
         "history_count": len(history),
@@ -577,6 +586,14 @@ def review_ssq(limit: int = Query(default=20, ge=1, le=100)) -> dict:
             "items": [],
             "disclaimer": f"SSQ复盘数据暂不可用，已跳过异常记录。原因：{exc}",
         }
+
+
+@app.get("/behavior/ssq")
+def behavior_ssq() -> dict:
+    records = load_ssq_records()
+    snapshot = load_prize_snapshot("SSQ")
+    review = build_ssq_review(records, load_ssq_history(), limit=100, prize_snapshot=snapshot)
+    return build_behavior_profile(records, review, snapshot)
 
 
 @app.get("/backtest/ssq")

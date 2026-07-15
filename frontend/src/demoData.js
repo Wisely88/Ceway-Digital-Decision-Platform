@@ -2,6 +2,7 @@ import dltHistoryCsv from "../../backend/data/dlt_history.csv?raw";
 import ssqHistoryCsv from "../../backend/data/ssq_history.csv?raw";
 import dltPrizeUrl from "../../backend/data/dlt_prizes.json?url";
 import ssqPrizeUrl from "../../backend/data/ssq_prizes.json?url";
+import { buildBehaviorProfile } from "./behavior";
 
 const prizeCache = new Map();
 
@@ -13,6 +14,12 @@ async function loadPrizeIssues(url) {
     }).then((payload) => payload.issues || {}));
   }
   return prizeCache.get(url);
+}
+
+async function loadPrizeSnapshot(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`奖金快照加载失败：${response.status}`);
+  return response.json();
 }
 
 function prizeFinancials(distribution, issueData, cost) {
@@ -518,7 +525,7 @@ export function getDemoDashboard({ budget = 20, lastPrize = 0, strategy = "balan
   });
   return Promise.resolve({
     scene: "DLT",
-    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.7 Package Evaluation" },
+    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.9 Behavior Risk" },
     disclaimer: "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
     history_count: HISTORY.length,
     latest_issue: latest.issue,
@@ -581,7 +588,7 @@ export function getDemoSsqDashboard({ budget = 20, lastPrize = 0, strategy = "ba
   });
   return Promise.resolve({
     scene: "SSQ",
-    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.7 Package Evaluation" },
+    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.9 Behavior Risk" },
     disclaimer: "策维不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
     history_count: SSQ_HISTORY.length,
     latest_issue: latest.issue,
@@ -614,6 +621,14 @@ export function getDemoRecords() {
 
 export function getDemoSsqRecords() {
   return Promise.resolve(JSON.parse(localStorage.getItem("ceway_demo_ssq_records") || "[]"));
+}
+
+export async function getDemoBehavior(scene) {
+  const isSsq = String(scene).toUpperCase() === "SSQ";
+  const records = isSsq ? await getDemoSsqRecords() : await getDemoRecords();
+  const review = isSsq ? await getDemoSsqReview() : await getDemoReview();
+  const snapshot = await loadPrizeSnapshot(isSsq ? ssqPrizeUrl : dltPrizeUrl);
+  return buildBehaviorProfile(records, review, snapshot);
 }
 
 export function saveDemoRecord({ budget, strategy, latestIssue, plan }) {
