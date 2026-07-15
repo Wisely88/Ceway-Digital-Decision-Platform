@@ -62,6 +62,7 @@ import {
   syncSsqHistory,
 } from "./api";
 import { buildDecisionBrief, cumulativeSpending, recentSpending } from "./decision";
+import { evaluatePackage, packageCatalog, PACKAGE_SOURCES } from "./packageEvaluator";
 import "./styles.css";
 
 function Badge({ children, tone = "default" }) {
@@ -149,8 +150,8 @@ const PRODUCT_STATUS = [
   },
   {
     label: "当前版本",
-    value: "V1.6 决策风控版",
-    detail: "决策解释、风险控制与复盘闭环",
+    value: "V1.7 套餐评估版",
+    detail: "决策风控、复盘闭环与活动套餐成本评估",
     tone: "green",
   },
   {
@@ -187,6 +188,11 @@ const ROADMAP_ITEMS = [
     version: "V1.6",
     title: "决策风控版",
     description: "支出解释、覆盖与倍率、资金暴露、周期上限、连续加码提醒和长期表现说明。",
+  },
+  {
+    version: "V1.7",
+    title: "套餐评估版",
+    description: "按地区和活动有效性，评估套餐实付、票面展开注数、赠票覆盖与预算占用。",
   },
 ];
 
@@ -652,7 +658,7 @@ function SceneSelect({ scenes, onEnter }) {
     <main className="scene-page">
       <header className="version-strip">
         {PRODUCT_STATUS.map((item) => (
-          <div className={`version-pill ${item.tone}`} key={item.version}>
+          <div className={`version-pill ${item.tone}`} key={item.label}>
             <span>{item.label}</span>
             <strong>{item.value}</strong>
             <em>{item.detail}</em>
@@ -665,7 +671,7 @@ function SceneSelect({ scenes, onEnter }) {
           <div>
             <Badge tone="live">场景选择页（所有版本通用）</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
-            <p>Digital Decision Platform · Powered by CBGO Framework。当前版本为 v1.6 决策风控版，DLT 与 SSQ 共用完整决策闭环。</p>
+            <p>Digital Decision Platform · Powered by CBGO Framework。当前版本为 v1.7 套餐评估版，DLT 与 SSQ 共用完整决策闭环。</p>
           </div>
         </div>
 
@@ -699,9 +705,9 @@ function SceneSelect({ scenes, onEnter }) {
 
       <section className="baseline-panel">
         <div>
-          <Badge tone="live">v1.6 决策风控版</Badge>
+          <Badge tone="live">v1.7 套餐评估版</Badge>
           <h2>当前交付范围</h2>
-          <p>选号只是入口；本版重点解释支出、覆盖、倍率、资金暴露、长期回测和连续加码风险。</p>
+          <p>选号只是入口；本版在决策风控闭环上，增加地区活动与套餐票实际成本评估。</p>
         </div>
         <div className="baseline-grid">
           <article>
@@ -1685,6 +1691,87 @@ function NumberPicker({ title, max, selected, onToggle, tone = "front", helper }
   );
 }
 
+function PackageEvaluator({ scene, budget, onBudgetChange }) {
+  const [multiplier, setMultiplier] = useState(1);
+  const [giftConfirmed, setGiftConfirmed] = useState(false);
+  const source = PACKAGE_SOURCES[scene];
+  const rows = useMemo(
+    () => packageCatalog(scene).map((item) => evaluatePackage(item, { multiplier, giftConfirmed, budget })),
+    [scene, multiplier, giftConfirmed, budget],
+  );
+  const isSsq = scene === "SSQ";
+
+  return (
+    <div className="package-evaluator">
+      <div className="package-context">
+        <div>
+          <span>当前口径</span>
+          <strong>{source.label}</strong>
+          <p>{source.region}。{source.activity}</p>
+        </div>
+        <a href={source.sourceUrl} rel="noreferrer" target="_blank">查看官方规则</a>
+      </div>
+
+      <div className="package-controls">
+        <label>
+          本期总预算
+          <input min="2" step="2" type="number" value={budget} onChange={(event) => onBudgetChange(Number(event.target.value))} />
+        </label>
+        <label>
+          套餐倍数
+          <input min="1" max="20" step="1" type="number" value={multiplier} onChange={(event) => setMultiplier(Math.max(1, Number(event.target.value) || 1))} />
+        </label>
+        {isSsq && (
+          <label className="package-confirm">
+            <input checked={giftConfirmed} onChange={(event) => setGiftConfirmed(event.target.checked)} type="checkbox" />
+            <span>当地终端已明确显示赠票成功</span>
+          </label>
+        )}
+      </div>
+
+      {isSsq && !giftConfirmed && (
+        <p className="form-warning">活动有地区和资金限制，未确认前不把赠票计入覆盖与单注成本。</p>
+      )}
+
+      <div className="package-table-wrap">
+        <table className="package-table">
+          <thead>
+            <tr>
+              <th>套餐</th>
+              <th>结构</th>
+              <th>实付</th>
+              <th>基础注数</th>
+              <th>赠票</th>
+              <th>票面展开</th>
+              <th>单注实付</th>
+              <th>预算</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.amount}>
+                <td><strong>{row.amount}元</strong>{row.multiplier > 1 && <span>×{row.multiplier}</span>}</td>
+                <td><span>{row.structure}</span>{row.giftTickets > 0 && <small>赠 {row.giftStructure}{row.blueDistinct ? "·蓝球扩展" : ""}</small>}</td>
+                <td>{row.paid}元</td>
+                <td>{row.baseTickets}注</td>
+                <td>{row.giftAmount > 0 ? `${row.giftAmount}元 / ${row.giftTickets}注` : "未计入"}</td>
+                <td>{row.faceAmount}元 / {row.totalTickets}注</td>
+                <td>{row.unitPaidCost}元</td>
+                <td><Badge tone={row.withinBudget ? "live" : "default"}>{row.withinBudget ? "预算内" : "超出"}</Badge></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="package-notes">
+        <p>“票面展开注数”按单式与复式组合公式计算，不代表不重复号码数，也不表示中奖概率被额外改变。</p>
+        <p>套餐评估只比较固定预算内的实付与覆盖；倍投会同比增加支出，系统不因赠票建议追加预算。</p>
+      </div>
+    </div>
+  );
+}
+
 function BettingPlanPanel({
   scene,
   dashboard,
@@ -1811,10 +1898,14 @@ function BettingPlanPanel({
           <Table2 size={16} />
           人工选号点评
         </button>
+        <button className={flow === "package" ? "active" : ""} onClick={() => setFlow("package")} type="button">
+          <WalletCards size={16} />
+          套餐评估
+        </button>
       </div>
 
-      <div className={`betting-workspace ${flow === "ai" ? "ai-workspace" : "manual-workspace"}`}>
-        <div className="betting-controls">
+      <div className={`betting-workspace ${flow}-workspace`}>
+        {flow !== "package" && <div className="betting-controls">
           <div className="field-grid compact-fields">
             <label>
               本期预算
@@ -1874,7 +1965,7 @@ function BettingPlanPanel({
             </div>
           )}
           {message && <p className={message.includes("超过") || message.includes("需要") || message.includes("不足") ? "form-warning" : "form-success"}>{message}</p>}
-        </div>
+        </div>}
 
         {flow === "manual" && (
           <div className="manual-picker">
@@ -1923,9 +2014,12 @@ function BettingPlanPanel({
             )}
           </div>
         )}
+        {flow === "package" && (
+          <PackageEvaluator scene={scene} budget={budget} onBudgetChange={onBudgetChange} />
+        )}
       </div>
 
-      {generated && (
+      {generated && flow !== "package" && (
         <div className="betting-result">
           <div className="section-kicker">
             <span>{generated.source === "manual_selection" ? "人工方案点评" : "系统建议结果"}</span>

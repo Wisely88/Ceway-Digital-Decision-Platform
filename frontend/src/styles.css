@@ -329,7 +329,7 @@ button:disabled {
 .roadmap-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .roadmap-card {
@@ -1170,7 +1170,7 @@ td {
   border: 1px solid rgba(83, 129, 179, 0.18);
   border-radius: 8px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   overflow: hidden;
 }
 
@@ -1200,6 +1200,10 @@ td {
 }
 
 .betting-workspace.ai-workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.betting-workspace.package-workspace {
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -1283,6 +1287,105 @@ td {
 .manual-picker {
   display: grid;
   gap: 14px;
+}
+
+.package-evaluator {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.package-context {
+  align-items: center;
+  background: rgba(7, 18, 32, 0.5);
+  border: 1px solid rgba(83, 129, 179, 0.16);
+  border-radius: 8px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 14px;
+}
+
+.package-context div {
+  display: grid;
+  gap: 5px;
+}
+
+.package-context span,
+.package-table small {
+  color: #8fb0cf;
+  font-size: 12px;
+}
+
+.package-context strong {
+  color: #ffffff;
+}
+
+.package-context p,
+.package-notes p {
+  color: #a9bdd2;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.package-context a {
+  color: #78b7ff;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.package-controls {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(150px, 0.25fr) minmax(150px, 0.25fr) minmax(260px, 0.5fr);
+}
+
+.package-confirm {
+  align-items: center;
+  background: rgba(8, 23, 40, 0.56);
+  border: 1px solid rgba(83, 129, 179, 0.16);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  min-height: 42px;
+  padding: 8px 12px;
+}
+
+.package-confirm input {
+  height: 18px;
+  margin: 0;
+  width: 18px;
+}
+
+.package-table-wrap {
+  border: 1px solid rgba(83, 129, 179, 0.16);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.package-table {
+  min-width: 920px;
+}
+
+.package-table td:first-child {
+  white-space: nowrap;
+}
+
+.package-table td:first-child span,
+.package-table td:nth-child(2) span,
+.package-table td:nth-child(2) small {
+  display: block;
+}
+
+.package-notes {
+  border-left: 3px solid #e6a83c;
+  display: grid;
+  gap: 5px;
+  padding-left: 12px;
 }
 
 .number-picker {
@@ -2299,6 +2402,14 @@ td {
     grid-template-columns: 1fr;
   }
 
+  .package-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .package-confirm {
+    grid-column: 1 / -1;
+  }
+
   .primary-chart {
     grid-row: auto;
   }
@@ -2456,8 +2567,18 @@ td {
 
   .workflow-tabs,
   .compact-fields,
-  .betting-estimate {
+  .betting-estimate,
+  .package-controls {
     grid-template-columns: 1fr;
+  }
+
+  .package-confirm {
+    grid-column: auto;
+  }
+
+  .package-context {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .picker-grid {
