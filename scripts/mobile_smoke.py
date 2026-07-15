@@ -122,6 +122,9 @@ async def run_scene_flow(client: CdpClient, scene_name: str) -> dict:
     await click_text(client, "行为分析", ".side-nav-item")
     await wait_for_text(client, "智能行为分析")
     await assert_no_document_overflow(client, f"{scene_name}行为分析页")
+    await click_text(client, "云端同步", ".side-nav-item")
+    await wait_for_text(client, "输入同步密码")
+    await assert_no_document_overflow(client, f"{scene_name}云同步页")
     result = await client.evaluate(
         "({title: document.querySelector('.workspace-topbar h1')?.textContent.trim(), width: innerWidth})"
     )

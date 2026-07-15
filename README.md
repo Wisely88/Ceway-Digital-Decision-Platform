@@ -1,9 +1,9 @@
-# 策维（Ceway）数字决策平台 v1.9
+# 策维（Ceway）数字决策平台 v1.10
 
 Digital Decision Platform  
 Powered by CBGO Framework
 
-当前版本为“行为风控版”，已支持大乐透 DLT 与双色球 SSQ。
+当前版本为“单用户云同步版”，已支持大乐透 DLT 与双色球 SSQ，并提供不开放注册的自用设备同步。
 
 产品主线：选号只是入口，决策解释和风险控制才是核心。系统会说明本期实际支出、组合覆盖、投注倍率、资金暴露、近 30 日投入、连续加码迹象和历史回测表现。
 
@@ -44,6 +44,7 @@ ceway/
 - [v1.7 套餐评估说明](docs/ceway_v1_7_package_evaluation.md)
 - [v1.8 验证闭环说明](docs/ceway_v1_8_validation_loop.md)
 - [v1.9 行为风控说明](docs/ceway_v1_9_behavior_risk.md)
+- [v1.10 单用户云同步说明](docs/ceway_v1_10_cloud_sync.md)
 - [Backlog](docs/backlog.md)
 - [数据导入说明](docs/data_import.md)
 
@@ -66,6 +67,15 @@ npm run dev
 ```
 
 前端默认读取 `http://localhost:8000`。
+
+## 单用户云同步
+
+云同步不提供公开注册。首次启用时，在 Supabase 控制台完成两步初始化：
+
+1. 在 SQL Editor 执行 [`supabase/setup.sql`](supabase/setup.sql)。
+2. 在 Authentication > Users 新建并确认内部用户 `ceway-sync@ceway.local`，设置仅自己知道的同步密码。
+
+之后在 DLT 或 SSQ 左侧进入“云端同步”，所有自用设备输入同一个同步密码即可。公开发布密钥可以存在前端；数据访问由表级 RLS 限制。不要把 Supabase secret key 或 service role key放入仓库。
 
 ## 验证
 

@@ -2690,6 +2690,119 @@ td {
   padding: 12px 14px;
 }
 
+.cloud-sync-panel {
+  max-width: 920px;
+}
+
+.cloud-status {
+  align-items: center;
+  background: rgba(100, 116, 139, 0.14);
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 999px;
+  color: #b9c8d9;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 7px;
+  padding: 7px 11px;
+}
+
+.cloud-status.connected {
+  background: rgba(20, 129, 86, 0.17);
+  border-color: rgba(55, 223, 120, 0.32);
+  color: #8cecad;
+}
+
+.cloud-connect,
+.cloud-connected {
+  background: rgba(5, 17, 31, 0.48);
+  border: 1px solid rgba(83, 129, 179, 0.2);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.cloud-connect {
+  align-items: end;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 0.8fr) auto;
+}
+
+.cloud-connect h3,
+.cloud-connect p,
+.cloud-security strong,
+.cloud-security span {
+  margin: 0;
+}
+
+.cloud-connect p,
+.cloud-security span,
+.cloud-last-sync,
+.cloud-sync-panel .panel-title p {
+  color: #91a8c0;
+  font-size: 13px;
+}
+
+.cloud-connect input {
+  background: #07182a;
+  border: 1px solid rgba(83, 129, 179, 0.35);
+  border-radius: 8px;
+  color: #e8f2ff;
+  min-height: 42px;
+  min-width: 0;
+  padding: 9px 12px;
+  width: 100%;
+}
+
+.cloud-connected {
+  align-items: center;
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+}
+
+.cloud-security {
+  align-items: center;
+  color: #66d996;
+  display: flex;
+  gap: 11px;
+}
+
+.cloud-security div {
+  display: grid;
+  gap: 3px;
+}
+
+.cloud-security strong {
+  color: #e8f2ff;
+}
+
+.cloud-toggle {
+  align-items: center;
+  color: #c9d8e8;
+  display: inline-flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.cloud-toggle input {
+  accent-color: #1680ff;
+  height: 17px;
+  width: 17px;
+}
+
+.cloud-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.cloud-message {
+  color: #bcd2e8;
+  margin: 14px 0 0;
+}
+
+.cloud-last-sync {
+  margin: 5px 0 0;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -2697,6 +2810,16 @@ td {
 }
 
 @media (max-width: 980px) {
+  .cloud-connect,
+  .cloud-connected {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .cloud-actions > button {
+    flex: 1;
+  }
+
   .behavior-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

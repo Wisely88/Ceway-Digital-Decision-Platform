@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   BarChart3,
   CircleCheck,
+  Cloud,
   Clipboard,
   Coins,
   Database,
@@ -56,12 +57,15 @@ import { buildDecisionBrief, cumulativeSpending, recentSpending } from "./decisi
 import { evaluatePackage, packageCatalog, PACKAGE_SOURCES } from "./packageEvaluator";
 import { selectScoredCombination } from "./suggestionRotation";
 import { decodeSyncBundle, encodeSyncBundle } from "./syncCodec";
+import { mirrorCloudRecord, notifyCloudDataChanged, removeCloudRecord } from "./cloudSync";
 import "./styles.css";
 
 const BUILD_TIME = typeof __CEWAY_BUILD_TIME__ === "string" ? __CEWAY_BUILD_TIME__ : "";
 const TrendBarChartView = lazy(() => import("./Charts").then((module) => ({ default: module.TrendBarChart })));
 const TrendLineChartView = lazy(() => import("./Charts").then((module) => ({ default: module.TrendLineChart })));
 const CapitalSpendChartView = lazy(() => import("./Charts").then((module) => ({ default: module.CapitalSpendChart })));
+const CloudSyncPanelView = lazy(() => import("./CloudSyncPanel"));
+const CloudSyncAgentView = lazy(() => import("./CloudSyncPanel").then((module) => ({ default: module.CloudSyncAgent })));
 
 function ChartFallback({ height = 250 }) {
   return <div className="chart-loading" style={{ minHeight: height }}>正在加载图表...</div>;
@@ -152,8 +156,8 @@ const PRODUCT_STATUS = [
   },
   {
     label: "当前版本",
-    value: "V1.9 行为风控版",
-    detail: "智能行为分析、官方参与热度与主动风险提醒",
+    value: "V1.10 单用户云同步版",
+    detail: "固定内部账号、密码连接与 DLT/SSQ 方案同步",
     tone: "green",
   },
   {
@@ -205,6 +209,11 @@ const ROADMAP_ITEMS = [
     version: "V1.9",
     title: "行为风控版",
     description: "分析投入频次、金额变化、连续加码和官方市场参与度，输出可执行风险建议。",
+  },
+  {
+    version: "V1.10",
+    title: "单用户云同步版",
+    description: "不开放注册，仅使用同步密码连接自用设备，合并 DLT/SSQ 历史方案。",
   },
 ];
 
@@ -567,6 +576,7 @@ const MODULE_NAV_ITEMS = [
   { key: "score", label: "号码评分", icon: Table2 },
   { key: "capital", label: "风险控制", icon: Coins },
   { key: "history", label: "历史记录", icon: History },
+  { key: "cloud", label: "云端同步", icon: Cloud },
 ];
 
 const MODULE_TITLES = MODULE_NAV_ITEMS.reduce((items, item) => ({
@@ -680,7 +690,7 @@ function SceneSelect({ scenes, onEnter }) {
           <div>
             <Badge tone="live">场景选择页（所有版本通用）</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
-            <p>Digital Decision Platform · Powered by CBGO Framework。当前版本为 v1.9 行为风控版，DLT 与 SSQ 共用完整决策闭环。</p>
+            <p>Digital Decision Platform · Powered by CBGO Framework。当前版本为 v1.10 单用户云同步版，DLT 与 SSQ 共用完整决策闭环。</p>
           </div>
         </div>
 
@@ -714,7 +724,7 @@ function SceneSelect({ scenes, onEnter }) {
 
       <section className="baseline-panel">
         <div>
-          <Badge tone="live">v1.9 行为风控版</Badge>
+          <Badge tone="live">v1.10 单用户云同步版</Badge>
           <h2>当前交付范围</h2>
           <p>选号只是入口；本版补齐方案比较、实际奖金复盘、跨设备同步和数据可追溯性。</p>
         </div>
@@ -2372,6 +2382,8 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
     setError("");
     try {
       await deleteDltRecord(id);
+      removeCloudRecord("DLT", id);
+      notifyCloudDataChanged();
       setSavedPlans((items) => items.filter((record) => record.id !== id));
       await refreshReview();
       await refreshBehavior();
@@ -2402,6 +2414,8 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
         latestIssue: dashboard.latest_issue,
         plan,
       });
+      mirrorCloudRecord("DLT", result.record);
+      notifyCloudDataChanged();
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
       await refreshReview();
       await refreshBehavior();
@@ -2410,6 +2424,8 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
     } catch (err) {
       const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
       localStorage.setItem("cbgo_saved_plans", JSON.stringify(nextPlans));
+      mirrorCloudRecord("DLT", localRecord);
+      notifyCloudDataChanged();
       setSavedPlans(nextPlans);
       await refreshReview();
       await refreshBehavior();
@@ -2434,6 +2450,8 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
       plan: normalizeRecordPlan(record),
     })));
     if (saved.length) {
+      saved.forEach((result) => mirrorCloudRecord("DLT", result.record));
+      notifyCloudDataChanged();
       const refreshed = await getDltRecords();
       setSavedPlans(refreshed);
       await refreshReview();
@@ -2581,6 +2599,11 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
             />
           )}
           {activeModule === "history" && <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} scene="DLT" onImport={importSyncedRecords} />}
+          {activeModule === "cloud" && (
+            <Suspense fallback={<div className="panel chart-loading">正在加载云同步...</div>}>
+              <CloudSyncPanelView scene="DLT" onApply={importSyncedRecords} />
+            </Suspense>
+          )}
         </section>
 
         <footer className="disclaimer footer-note">
@@ -2736,6 +2759,8 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
     };
     try {
       const result = await saveSsqRecord({ budget, strategy, latestIssue, plan });
+      mirrorCloudRecord("SSQ", result.record);
+      notifyCloudDataChanged();
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
       await refreshReview();
       await refreshBehavior();
@@ -2744,6 +2769,8 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
     } catch (err) {
       const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
       localStorage.setItem("cbgo_ssq_plans", JSON.stringify(nextPlans));
+      mirrorCloudRecord("SSQ", localRecord);
+      notifyCloudDataChanged();
       setSavedPlans(nextPlans);
       await refreshReview();
       await refreshBehavior();
@@ -2768,6 +2795,8 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
       plan: normalizeRecordPlan(record),
     })));
     if (saved.length) {
+      saved.forEach((result) => mirrorCloudRecord("SSQ", result.record));
+      notifyCloudDataChanged();
       const refreshed = await getSsqRecords();
       setSavedPlans(refreshed);
       await refreshReview();
@@ -2779,6 +2808,8 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
   const deleteRecord = async (id) => {
     try {
       await deleteSsqRecord(id);
+      removeCloudRecord("SSQ", id);
+      notifyCloudDataChanged();
       setSavedPlans((items) => items.filter((record) => record.id !== id));
       await refreshReview();
       await refreshBehavior();
@@ -2944,6 +2975,11 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
             />
           )}
           {activeModule === "history" && <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} scene="SSQ" onImport={importSyncedRecords} />}
+          {activeModule === "cloud" && (
+            <Suspense fallback={<div className="panel chart-loading">正在加载云同步...</div>}>
+              <CloudSyncPanelView scene="SSQ" onApply={importSyncedRecords} />
+            </Suspense>
+          )}
         </section>
 
         <footer className="disclaimer footer-note">
@@ -3005,4 +3041,13 @@ function App() {
   return <SceneSelect scenes={scenes} onEnter={(code) => navigate(code)} />;
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+function Root() {
+  return (
+    <>
+      <Suspense fallback={null}><CloudSyncAgentView /></Suspense>
+      <App />
+    </>
+  );
+}
+
+createRoot(document.getElementById("root")).render(<Root />);
