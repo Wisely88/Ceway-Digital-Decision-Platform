@@ -63,7 +63,7 @@ import {
 } from "./api";
 import { buildDecisionBrief, cumulativeSpending, recentSpending } from "./decision";
 import { evaluatePackage, packageCatalog, PACKAGE_SOURCES } from "./packageEvaluator";
-import { rotateItems, topScoreNumbers } from "./suggestionRotation";
+import { selectScoredCombination } from "./suggestionRotation";
 import "./styles.css";
 
 function Badge({ children, tone = "default" }) {
@@ -326,12 +326,11 @@ function sceneRules(scene) {
     : { scene: "DLT", playName: "大乐透", frontMax: 35, backMax: 12, frontPick: 5, backPick: 2 };
 }
 
-function buildSingleItems({ rules, frontPool, backPool, count }) {
+function buildSingleItems({ rules, frontRows, backRows, count, variant }) {
   const items = [];
   for (let index = 0; index < count; index += 1) {
-    const front = frontPool.slice(index, index + rules.frontPick);
-    const back = backPool.slice(index, index + rules.backPick);
-    if (front.length < rules.frontPick || back.length < rules.backPick) break;
+    const front = selectScoredCombination(frontRows, rules.frontMax, rules.frontPick, variant + index);
+    const back = selectScoredCombination(backRows, rules.backMax, rules.backPick, variant + index);
     items.push({
       front: [...front].sort((left, right) => left - right),
       back: [...back].sort((left, right) => left - right),
@@ -361,17 +360,15 @@ function aiCommentaryForPlan(plan, labels) {
 function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, ticketCount, danCount, tuoCount, backCount, latestIssue, recommendedIssue, variant }) {
   const rules = sceneRules(scene);
   const labels = planLabelsForScene(scene);
-  const frontPool = topScoreNumbers(scoreRows, rules.frontMax, variant);
   const backRows = backScoreRows?.length
     ? backScoreRows
     : rangeNumbers(rules.backMax).map((number) => ({ number, total_score: 0 }));
-  const backPool = topScoreNumbers(backRows, rules.backMax, variant * 2 + 1);
   const backScoreMap = new Map(backRows.map((row) => [Number(row.number), row]));
 
   if (mode === "single") {
     const affordable = Math.max(1, Math.floor(Number(budget || 0) / 2));
     const count = Math.max(1, Math.min(Number(ticketCount || 1), affordable));
-    const items = buildSingleItems({ rules, frontPool, backPool, count });
+    const items = buildSingleItems({ rules, frontRows: scoreRows, backRows, count, variant });
     return {
       scene,
       play_name: rules.playName,
@@ -401,9 +398,10 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
   const safeDan = Math.max(1, Math.min(Number(danCount || 1), rules.frontPick - 1));
   const safeTuo = Math.max(rules.frontPick - safeDan, Number(tuoCount || rules.frontPick));
   const safeBack = Math.max(rules.backPick, Number(backCount || rules.backPick));
-  const frontDan = frontPool.slice(0, safeDan).sort((left, right) => left - right);
-  const frontTuo = frontPool.slice(safeDan, safeDan + safeTuo).sort((left, right) => left - right);
-  const back = backPool.slice(0, safeBack).sort((left, right) => left - right);
+  const selectedFront = selectScoredCombination(scoreRows, rules.frontMax, safeDan + safeTuo, variant);
+  const frontDan = selectedFront.slice(0, safeDan).sort((left, right) => left - right);
+  const frontTuo = selectedFront.slice(safeDan).sort((left, right) => left - right);
+  const back = selectScoredCombination(backRows, rules.backMax, safeBack, variant).sort((left, right) => left - right);
   const tickets = combinationCount(frontTuo.length, rules.frontPick - frontDan.length) * combinationCount(back.length, rules.backPick);
   const cost = tickets * 2;
   return {
