@@ -1,5 +1,53 @@
 import dltHistoryCsv from "../../backend/data/dlt_history.csv?raw";
 import ssqHistoryCsv from "../../backend/data/ssq_history.csv?raw";
+import dltPrizeUrl from "../../backend/data/dlt_prizes.json?url";
+import ssqPrizeUrl from "../../backend/data/ssq_prizes.json?url";
+
+const prizeCache = new Map();
+
+async function loadPrizeIssues(url) {
+  if (!prizeCache.has(url)) {
+    prizeCache.set(url, fetch(url).then((response) => {
+      if (!response.ok) throw new Error(`奖金快照加载失败：${response.status}`);
+      return response.json();
+    }).then((payload) => payload.issues || {}));
+  }
+  return prizeCache.get(url);
+}
+
+function prizeFinancials(distribution, issueData, cost) {
+  const prizes = issueData?.prizes || {};
+  let prizeAmount = 0;
+  const missing = [];
+  Object.entries(distribution || {}).forEach(([label, count]) => {
+    if (typeof prizes[label] !== "number") missing.push(label);
+    else prizeAmount += prizes[label] * count;
+  });
+  const complete = missing.length === 0;
+  const netProfit = complete ? prizeAmount - Number(cost || 0) : null;
+  return {
+    prize_amount: prizeAmount,
+    prize_amount_complete: complete,
+    missing_prize_labels: missing,
+    net_profit: netProfit,
+    roi: complete && cost ? Math.round((netProfit / cost) * 10000) / 100 : null,
+    prize_source: issueData?.source || "",
+  };
+}
+
+function reviewFinancialSummary(items) {
+  const reviewed = items.filter((item) => item.status === "reviewed");
+  const totalCost = reviewed.reduce((sum, item) => sum + Number(item.cost || 0), 0);
+  const totalPrize = reviewed.reduce((sum, item) => sum + Number(item.prize_amount || 0), 0);
+  const complete = reviewed.every((item) => item.prize_amount_complete);
+  const netProfit = complete ? totalPrize - totalCost : null;
+  return {
+    total_prize: totalPrize,
+    net_profit: netProfit,
+    roi: complete && totalCost ? Math.round((netProfit / totalCost) * 10000) / 100 : null,
+    roi_complete: complete,
+  };
+}
 
 const PARSED_DLT_HISTORY = dltHistoryCsv
   .trim()
@@ -64,6 +112,12 @@ function buildTrends(window = 100, history = HISTORY) {
     const seenAt = lastSeen.get(number);
     return { number, missing: seenAt === undefined ? history.length : history.length - seenAt - 1 };
   });
+  const lastSeenRows = Array.from({ length: 35 }, (_, index) => {
+    const number = index + 1;
+    const seenAt = lastSeen.get(number);
+    const row = seenAt === undefined ? null : history[seenAt];
+    return { number, issue: row?.issue || null, date: row?.date || null };
+  });
   const backOmissions = Array.from({ length: 12 }, (_, index) => {
     const number = index + 1;
     const seenAt = backLastSeen.get(number);
@@ -85,6 +139,7 @@ function buildTrends(window = 100, history = HISTORY) {
     hot_front: Array.from(frontCounts, ([number, count]) => ({ number, count })).sort((a, b) => b.count - a.count || a.number - b.number),
     hot_back: Array.from(backCounts, ([number, count]) => ({ number, count })).sort((a, b) => b.count - a.count || a.number - b.number),
     omissions,
+    last_seen: lastSeenRows,
     back_omissions: backOmissions,
     odd_even: Array.from(oddEven, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
     big_small: Array.from(bigSmall, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
@@ -100,6 +155,7 @@ function buildTrends(window = 100, history = HISTORY) {
 function scoreFront(trends) {
   const heatByNumber = new Map(trends.hot_front.map((item) => [item.number, item.count]));
   const missingByNumber = new Map(trends.omissions.map((item) => [item.number, item.missing]));
+  const lastSeenByNumber = new Map((trends.last_seen || []).map((item) => [item.number, item]));
   const maxHeat = Math.max(...heatByNumber.values());
   const maxMissing = Math.max(...missingByNumber.values());
   return Array.from({ length: 35 }, (_, index) => {
@@ -112,6 +168,8 @@ function scoreFront(trends) {
       number,
       heat_count: heatByNumber.get(number) || 0,
       missing_periods: missingByNumber.get(number) || 0,
+      last_seen_issue: lastSeenByNumber.get(number)?.issue || null,
+      last_seen_date: lastSeenByNumber.get(number)?.date || null,
       heat_score: heat,
       missing_score: missing,
       balance_score: balanced,
@@ -169,6 +227,12 @@ function buildSsqTrends(window = 100, history = SSQ_HISTORY) {
     const seenAt = lastSeen.get(number);
     return { number, missing: seenAt === undefined ? history.length : history.length - seenAt - 1 };
   });
+  const lastSeenRows = Array.from({ length: 33 }, (_, index) => {
+    const number = index + 1;
+    const seenAt = lastSeen.get(number);
+    const row = seenAt === undefined ? null : history[seenAt];
+    return { number, issue: row?.issue || null, date: row?.date || null };
+  });
   const backOmissions = Array.from({ length: 16 }, (_, index) => {
     const number = index + 1;
     const seenAt = backLastSeen.get(number);
@@ -188,6 +252,7 @@ function buildSsqTrends(window = 100, history = SSQ_HISTORY) {
     hot_front: Array.from(frontCounts, ([number, count]) => ({ number, count })).sort((a, b) => b.count - a.count || a.number - b.number),
     hot_back: Array.from(backCounts, ([number, count]) => ({ number, count })).sort((a, b) => b.count - a.count || a.number - b.number),
     omissions,
+    last_seen: lastSeenRows,
     back_omissions: backOmissions,
     odd_even: Array.from(oddEven, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
     big_small: Array.from(bigSmall, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
@@ -203,6 +268,7 @@ function buildSsqTrends(window = 100, history = SSQ_HISTORY) {
 function scoreSsqFront(trends) {
   const heatByNumber = new Map(trends.hot_front.map((item) => [item.number, item.count]));
   const missingByNumber = new Map(trends.omissions.map((item) => [item.number, item.missing]));
+  const lastSeenByNumber = new Map((trends.last_seen || []).map((item) => [item.number, item]));
   const maxHeat = Math.max(...heatByNumber.values());
   const maxMissing = Math.max(...missingByNumber.values());
   return Array.from({ length: 33 }, (_, index) => {
@@ -215,6 +281,8 @@ function scoreSsqFront(trends) {
       number,
       heat_count: heatByNumber.get(number) || 0,
       missing_periods: missingByNumber.get(number) || 0,
+      last_seen_issue: lastSeenByNumber.get(number)?.issue || null,
+      last_seen_date: lastSeenByNumber.get(number)?.date || null,
       heat_score: heat,
       missing_score: missing,
       balance_score: balanced,
@@ -578,9 +646,18 @@ export function saveDemoSsqRecord({ budget, strategy, latestIssue, plan }) {
   return Promise.resolve({ status: "ok", record, count: next.length });
 }
 
-function prizeLabel(frontHits, backHits) {
+function prizeLabel(frontHits, backHits, issue) {
+  const newRules = Number(issue || 0) >= 26014;
   if (frontHits === 5 && backHits === 2) return "一等奖";
   if (frontHits === 5 && backHits === 1) return "二等奖";
+  if (newRules) {
+    if (frontHits === 5 || (frontHits === 4 && backHits === 2)) return "三等奖";
+    if (frontHits === 4 && backHits === 1) return "四等奖";
+    if (frontHits === 4 || (frontHits === 3 && backHits === 2)) return "五等奖";
+    if ((frontHits === 3 && backHits === 1) || (frontHits === 2 && backHits === 2)) return "六等奖";
+    if ((frontHits === 3 && backHits === 0) || (frontHits === 2 && backHits === 1) || (frontHits <= 1 && backHits === 2)) return "七等奖";
+    return "未命中固定奖级";
+  }
   if (frontHits === 5) return "三等奖";
   if (frontHits === 4 && backHits === 2) return "四等奖";
   if (frontHits === 4 && backHits === 1) return "五等奖";
@@ -600,7 +677,7 @@ function compareTicket(front, back, draw) {
     front_hits: frontHits,
     back_hits: backHits,
     hit_label: `${frontHits}+${backHits}`,
-    prize_label: prizeLabel(frontHits, backHits),
+    prize_label: prizeLabel(frontHits, backHits, draw.issue),
   };
 }
 
@@ -610,7 +687,7 @@ function nextDemoDraw(issue) {
   return index >= 0 && index + 1 < HISTORY.length ? HISTORY[index + 1] : null;
 }
 
-function reviewDemoPlan(plan, draw) {
+function reviewDemoPlan(plan, draw, prizeIssues = {}) {
   const details = plan.mode === "dantuo"
     ? choose(plan.front_tuo || [], 5 - (plan.front_dan || []).length).flatMap((tuo) =>
       choose(plan.back || [], 2).map((back) => compareTicket([...(plan.front_dan || []), ...tuo], back, draw)))
@@ -628,7 +705,7 @@ function reviewDemoPlan(plan, draw) {
     }
     return distribution;
   }, {});
-  return {
+  const result = {
     actual: { issue: draw.issue, date: draw.date, front: draw.front, back: draw.back },
     mode: plan.mode,
     cost: plan.cost || 0,
@@ -639,9 +716,11 @@ function reviewDemoPlan(plan, draw) {
     hit_rate: Math.round((hitTickets / Math.max(1, plan.tickets || details.length)) * 10000) / 100,
     prize_distribution: prizeDistribution,
   };
+  return { ...result, ...prizeFinancials(prizeDistribution, prizeIssues[draw.issue], result.cost) };
 }
 
-export function getDemoReview() {
+export async function getDemoReview() {
+  const prizeIssues = await loadPrizeIssues(dltPrizeUrl);
   const records = JSON.parse(localStorage.getItem("ceway_demo_records") || "[]");
   const fallback = records.length > 0 ? records : [
     {
@@ -671,13 +750,13 @@ export function getDemoReview() {
       strategy: record.strategy,
       budget: record.budget,
       status: "reviewed",
-      ...reviewDemoPlan(record.plan, draw),
+      ...reviewDemoPlan(record.plan, draw, prizeIssues),
     };
   });
   const reviewed = items.filter((item) => item.status === "reviewed");
   const hitRecords = reviewed.filter((item) => item.hit_tickets > 0);
   const bestItem = reviewed[0];
-  return Promise.resolve({
+  return {
     summary: {
       records: items.length,
       reviewed: reviewed.length,
@@ -687,10 +766,11 @@ export function getDemoReview() {
       record_hit_rate: Math.round((hitRecords.length / Math.max(1, reviewed.length)) * 10000) / 100,
       best_hit: bestItem?.best?.hit_label || "-",
       best_prize_label: bestItem?.best?.prize_label || "-",
+      ...reviewFinancialSummary(items),
     },
     items,
     disclaimer: "复盘只统计历史推荐与实际开奖号码的匹配结果，不代表未来命中概率或收益能力。",
-  });
+  };
 }
 
 export function getDemoBacktest({ budget = 20, strategy = "balanced", periods = 12, window = 30 } = {}) {
@@ -810,7 +890,7 @@ function compareSsqTicket(front, back, draw) {
   };
 }
 
-function reviewDemoSsqPlan(plan, draw) {
+function reviewDemoSsqPlan(plan, draw, prizeIssues = {}) {
   const details = plan.mode === "dantuo"
     ? choose(plan.front_tuo || [], 6 - (plan.front_dan || []).length).flatMap((tuo) =>
       (plan.back || []).map((back) => compareSsqTicket([...(plan.front_dan || []), ...tuo], [back], draw)))
@@ -826,7 +906,7 @@ function reviewDemoSsqPlan(plan, draw) {
     }
     return distribution;
   }, {});
-  return {
+  const result = {
     actual: { issue: draw.issue, date: draw.date, front: draw.front, back: draw.back },
     mode: plan.mode,
     cost: plan.cost || 0,
@@ -837,6 +917,7 @@ function reviewDemoSsqPlan(plan, draw) {
     hit_rate: Math.round((hitTickets / Math.max(1, plan.tickets || details.length)) * 10000) / 100,
     prize_distribution: prizeDistribution,
   };
+  return { ...result, ...prizeFinancials(prizeDistribution, prizeIssues[draw.issue], result.cost) };
 }
 
 function nextDemoSsqDraw(issue) {
@@ -845,7 +926,8 @@ function nextDemoSsqDraw(issue) {
   return index >= 0 && index + 1 < SSQ_HISTORY.length ? SSQ_HISTORY[index + 1] : null;
 }
 
-export function getDemoSsqReview() {
+export async function getDemoSsqReview() {
+  const prizeIssues = await loadPrizeIssues(ssqPrizeUrl);
   const records = JSON.parse(localStorage.getItem("ceway_demo_ssq_records") || "[]");
   const items = records.map((record) => {
     const draw = nextDemoSsqDraw(record.latest_issue);
@@ -868,7 +950,7 @@ export function getDemoSsqReview() {
       budget: record.budget,
       status: "reviewed",
       status_label: "已复盘",
-      ...reviewDemoSsqPlan(record.plan, draw),
+      ...reviewDemoSsqPlan(record.plan, draw, prizeIssues),
     };
   });
   const reviewed = items.filter((item) => item.status === "reviewed");
@@ -877,7 +959,7 @@ export function getDemoSsqReview() {
     if (!current) return item;
     return (item.best?.front_hits || 0) > (current.best?.front_hits || 0) ? item : current;
   }, null);
-  return Promise.resolve({
+  return {
     summary: {
       records: items.length,
       reviewed: reviewed.length,
@@ -887,10 +969,11 @@ export function getDemoSsqReview() {
       record_hit_rate: Math.round((hitRecords.length / Math.max(1, reviewed.length)) * 10000) / 100,
       best_hit: best?.best?.hit_label || "-",
       best_prize_label: best?.best?.prize_label || "-",
+      ...reviewFinancialSummary(items),
     },
     items,
     disclaimer: "复盘只统计保存方案与实际开奖号码的历史匹配，不代表未来收益。",
-  });
+  };
 }
 
 export function getDemoSsqBacktest({ budget = 20, strategy = "balanced", periods = 12, window = 30 } = {}) {

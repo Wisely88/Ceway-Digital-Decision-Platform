@@ -16,6 +16,7 @@ from scripts.update_dlt_history import (
     parse_78500_payload,
 )
 from scripts.run_draw_update import scheduled_game, write_run_status
+from scripts.update_prize_data import normalize_dlt_prize, normalize_ssq_prize
 from scripts.update_ssq_history import (
     expected_draw_date,
     fill_latest_new_draw_date,
@@ -103,6 +104,37 @@ class SsqSyncScheduleTests(unittest.TestCase):
         rows = fill_latest_new_draw_date(incoming, current, now)
         self.assertEqual(rows[-1]["date"], "2026-07-14")
         self.assertEqual(rows[0]["date"], "")
+
+
+class PrizeSyncTests(unittest.TestCase):
+    def test_normalizes_dlt_actual_prize_amounts(self):
+        issue, row = normalize_dlt_prize(
+            {
+                "lotteryDrawNum": "26078",
+                "lotteryDrawTime": "2026-07-13",
+                "prizeLevelList": [
+                    {"prizeLevel": "一等奖", "stakeAmountFormat": "8216073"},
+                    {"prizeLevel": "一等奖(追加)", "stakeAmountFormat": "6572858"},
+                    {"prizeLevel": "七等奖", "stakeAmountFormat": "5"},
+                ],
+            }
+        )
+        self.assertEqual(issue, "26078")
+        self.assertEqual(row["prizes"], {"一等奖": 8216073, "七等奖": 5})
+
+    def test_normalizes_ssq_actual_prize_amounts(self):
+        issue, row = normalize_ssq_prize(
+            {
+                "code": "2026080",
+                "date": "2026-07-14(二)",
+                "prizegrades": [
+                    {"type": 1, "typemoney": "7579965"},
+                    {"type": 6, "typemoney": "5"},
+                ],
+            }
+        )
+        self.assertEqual(issue, "2026080")
+        self.assertEqual(row["prizes"], {"一等奖": 7579965, "六等奖": 5})
 
 
 if __name__ == "__main__":

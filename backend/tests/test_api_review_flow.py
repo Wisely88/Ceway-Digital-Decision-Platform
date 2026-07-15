@@ -103,8 +103,11 @@ class ApiReviewFlowTests(unittest.TestCase):
         self.assertEqual(reviewed["items"][0]["status"], "reviewed")
         self.assertEqual(reviewed["items"][0]["actual"]["issue"], "26002")
         self.assertEqual(reviewed["items"][0]["best"]["prize_label"], "一等奖")
-        with sqlite3.connect(db.DB_PATH) as connection:
+        connection = sqlite3.connect(db.DB_PATH)
+        try:
             self.assertEqual(connection.execute("select count(*) from dlt_review_results").fetchone()[0], 1)
+        finally:
+            connection.close()
 
     def test_ssq_save_draw_and_review_flow(self) -> None:
         db.replace_ssq_draws(
@@ -137,8 +140,11 @@ class ApiReviewFlowTests(unittest.TestCase):
         self.assertEqual(reviewed["items"][0]["status"], "reviewed")
         self.assertEqual(reviewed["items"][0]["actual"]["issue"], "2026002")
         self.assertEqual(reviewed["items"][0]["best"]["prize_label"], "一等奖")
-        with sqlite3.connect(db.DB_PATH) as connection:
+        connection = sqlite3.connect(db.DB_PATH)
+        try:
             self.assertEqual(connection.execute("select count(*) from ssq_review_results").fetchone()[0], 1)
+        finally:
+            connection.close()
 
 
 if __name__ == "__main__":

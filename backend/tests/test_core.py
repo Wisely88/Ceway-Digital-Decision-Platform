@@ -12,6 +12,7 @@ from capital import capital_state  # noqa: E402
 from engine import calculate_trends, calculate_ssq_trends  # noqa: E402
 from generator import generate_plans, generate_ssq_plans  # noqa: E402
 from review import prize_label, review_plan, review_ssq_plan, ssq_prize_label  # noqa: E402
+from prizes import prize_financials  # noqa: E402
 from scorer import score_back_numbers, score_ssq_back_numbers  # noqa: E402
 
 
@@ -128,6 +129,32 @@ class ReviewTests(unittest.TestCase):
         for hits, expected in cases.items():
             with self.subTest(hits=hits):
                 self.assertEqual(ssq_prize_label(*hits), expected)
+
+    def test_dlt_uses_seven_prize_levels_from_issue_26014(self) -> None:
+        cases = {
+            (5, 0): "三等奖",
+            (4, 2): "三等奖",
+            (4, 1): "四等奖",
+            (4, 0): "五等奖",
+            (3, 2): "五等奖",
+            (3, 1): "六等奖",
+            (2, 2): "六等奖",
+            (0, 2): "七等奖",
+        }
+        for hits, expected in cases.items():
+            with self.subTest(hits=hits):
+                self.assertEqual(prize_label(*hits, issue="26014"), expected)
+
+    def test_actual_prize_amount_produces_net_profit_and_roi(self) -> None:
+        result = prize_financials(
+            {"五等奖": 2, "七等奖": 1},
+            {"prizes": {"五等奖": 150, "七等奖": 5}, "source": "官方接口"},
+            20,
+        )
+        self.assertEqual(result["prize_amount"], 305)
+        self.assertEqual(result["net_profit"], 285)
+        self.assertEqual(result["roi"], 1425.0)
+        self.assertTrue(result["prize_amount_complete"])
 
     def test_dlt_dantuo_counts_every_expanded_winning_ticket(self) -> None:
         plan = {

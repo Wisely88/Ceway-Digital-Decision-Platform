@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity,
@@ -25,17 +25,6 @@ import {
   TrendingUp,
   WalletCards,
 } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import {
   deleteDltRecord,
   deleteSsqRecord,
@@ -64,7 +53,17 @@ import {
 import { buildDecisionBrief, cumulativeSpending, recentSpending } from "./decision";
 import { evaluatePackage, packageCatalog, PACKAGE_SOURCES } from "./packageEvaluator";
 import { selectScoredCombination } from "./suggestionRotation";
+import { decodeSyncBundle, encodeSyncBundle } from "./syncCodec";
 import "./styles.css";
+
+const BUILD_TIME = typeof __CEWAY_BUILD_TIME__ === "string" ? __CEWAY_BUILD_TIME__ : "";
+const TrendBarChartView = lazy(() => import("./Charts").then((module) => ({ default: module.TrendBarChart })));
+const TrendLineChartView = lazy(() => import("./Charts").then((module) => ({ default: module.TrendLineChart })));
+const CapitalSpendChartView = lazy(() => import("./Charts").then((module) => ({ default: module.CapitalSpendChart })));
+
+function ChartFallback({ height = 250 }) {
+  return <div className="chart-loading" style={{ minHeight: height }}>正在加载图表...</div>;
+}
 
 function Badge({ children, tone = "default" }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;
@@ -151,8 +150,8 @@ const PRODUCT_STATUS = [
   },
   {
     label: "当前版本",
-    value: "V1.7 套餐评估版",
-    detail: "决策风控、复盘闭环与活动套餐成本评估",
+    value: "V1.8 验证闭环版",
+    detail: "多方案比较、实际奖金、跨设备同步与按需加载",
     tone: "green",
   },
   {
@@ -194,6 +193,11 @@ const ROADMAP_ITEMS = [
     version: "V1.7",
     title: "套餐评估版",
     description: "按地区和活动有效性，评估套餐实付、票面展开注数、赠票覆盖与预算占用。",
+  },
+  {
+    version: "V1.8",
+    title: "验证闭环版",
+    description: "多方案比较、号码明细、实际奖金与 ROI、同步码、数据来源和前端按需加载。",
   },
 ];
 
@@ -293,6 +297,12 @@ function combinationCount(total, pick) {
 
 function displayNumbers(numbers) {
   return [...numbers].sort((left, right) => left - right).map(formatNumber);
+}
+
+function planFrontNumbers(plan) {
+  if (!plan) return [];
+  if (plan.mode === "dantuo") return [...(plan.front_dan || []), ...(plan.front_tuo || [])];
+  return [...new Set((plan.items || []).flatMap((item) => item.front || []))];
 }
 
 function planLabelsForScene(scene) {
@@ -662,7 +672,7 @@ function SceneSelect({ scenes, onEnter }) {
           <div>
             <Badge tone="live">场景选择页（所有版本通用）</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
-            <p>Digital Decision Platform · Powered by CBGO Framework。当前版本为 v1.7 套餐评估版，DLT 与 SSQ 共用完整决策闭环。</p>
+            <p>Digital Decision Platform · Powered by CBGO Framework。当前版本为 v1.8 验证闭环版，DLT 与 SSQ 共用完整决策闭环。</p>
           </div>
         </div>
 
@@ -696,9 +706,9 @@ function SceneSelect({ scenes, onEnter }) {
 
       <section className="baseline-panel">
         <div>
-          <Badge tone="live">v1.7 套餐评估版</Badge>
+          <Badge tone="live">v1.8 验证闭环版</Badge>
           <h2>当前交付范围</h2>
-          <p>选号只是入口；本版在决策风控闭环上，增加地区活动与套餐票实际成本评估。</p>
+          <p>选号只是入口；本版补齐方案比较、实际奖金复盘、跨设备同步和数据可追溯性。</p>
         </div>
         <div className="baseline-grid">
           <article>
@@ -783,21 +793,6 @@ function ModulePlaceholder({ scene, scenes, onBack }) {
   );
 }
 
-function TrendTooltip({ active, payload, scoreMap }) {
-  if (!active || !payload?.length) return null;
-  const row = payload[0].payload;
-  const score = scoreMap.get(row.number);
-  return (
-    <div className="chart-tooltip">
-      <strong>{String(row.number).padStart(2, "0")}</strong>
-      <span>出现次数：{row.count}</span>
-      <span>当前遗漏：{row.missing} 期</span>
-      {score && <span>综合评分：{score.total_score}</span>}
-      {score && <span>排名：{score.rank}</span>}
-    </div>
-  );
-}
-
 function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
   const [activeTab, setActiveTab] = useState("hot");
   const missingByNumber = new Map(dashboard.trends.omissions.map((item) => [item.number, item.missing]));
@@ -860,16 +855,9 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
         <div className="trend-layout">
           <div className="chart-box primary-chart">
             <h3>冷热号分布（近{dashboard.trends.window}期）</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={hotFront}>
-                <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
-                <XAxis dataKey="number" tickFormatter={(value) => `${value}`} />
-                <YAxis allowDecimals={false} />
-                <Tooltip content={<TrendTooltip scoreMap={scoreMap} />} />
-                <Bar dataKey="missing" fill="#ef4d3c" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="count" fill="#1768d7" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<ChartFallback />}>
+              <TrendBarChartView data={hotFront} mode="hot" scoreRows={scoreRows} />
+            </Suspense>
           </div>
 
           <div className="trend-stats">
@@ -884,15 +872,9 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
 
           <div className="chart-box sum-chart">
             <h3>和值走势</h3>
-            <ResponsiveContainer width="100%" height={170}>
-              <LineChart data={sumValues}>
-                <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
-                <XAxis dataKey="issue" hide />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="value" stroke="#53a3ff" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<ChartFallback height={170} />}>
+              <TrendLineChartView data={sumValues} compact />
+            </Suspense>
           </div>
         </div>
       )}
@@ -901,15 +883,9 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
         <div className="trend-layout single">
           <div className="chart-box primary-chart">
             <h3>遗漏分布（前区35码）</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={missingRows}>
-                <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
-                <XAxis dataKey="number" tickFormatter={(value) => `${value}`} />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="missing" fill="#ef4d3c" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<ChartFallback height={300} />}>
+              <TrendBarChartView data={missingRows} mode="missing" />
+            </Suspense>
           </div>
           <div className="trend-list">
             {missingRows.slice(0, 10).map((item) => (
@@ -926,15 +902,9 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
         <div className="trend-layout single">
           <div className="chart-box primary-chart">
             <h3>{activeTab === "odd" ? "奇偶比历史分布" : "大小比历史分布"}</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={activeTab === "odd" ? dashboard.trends.odd_even : dashboard.trends.big_small}>
-                <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
-                <XAxis dataKey="ratio" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#31d86b" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<ChartFallback height={300} />}>
+              <TrendBarChartView data={activeTab === "odd" ? dashboard.trends.odd_even : dashboard.trends.big_small} mode="ratio" />
+            </Suspense>
           </div>
           <div className="trend-list">
             {(activeTab === "odd" ? dashboard.trends.odd_even : dashboard.trends.big_small).map((item) => (
@@ -951,15 +921,9 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
         <div className="trend-layout single">
           <div className="chart-box primary-chart">
             <h3>和值走势与区间</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={sumRangeRows}>
-                <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
-                <XAxis dataKey="issue" hide />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="value" stroke="#53a3ff" strokeWidth={2} dot />
-              </LineChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<ChartFallback height={300} />}>
+              <TrendLineChartView data={sumRangeRows} showDots />
+            </Suspense>
           </div>
           <div className="trend-list">
             {sumRangeRows.slice(-10).reverse().map((item) => (
@@ -1002,9 +966,11 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
   );
 }
 
-function ScoreTable({ rows }) {
+function ScoreTable({ rows, selectedNumbers = [] }) {
   const [sortKey, setSortKey] = useState("total_score");
   const [showAll, setShowAll] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
+  const selectedSet = useMemo(() => new Set(selectedNumbers.map(Number)), [selectedNumbers]);
   const sortedRows = useMemo(() => (
     [...rows].sort((left, right) => {
       const delta = (right[sortKey] || 0) - (left[sortKey] || 0);
@@ -1047,9 +1013,14 @@ function ScoreTable({ rows }) {
           </thead>
           <tbody>
             {visibleRows.map((row, index) => (
-              <tr key={row.number}>
-                <td>{index + 1}</td>
-                <td><strong>{String(row.number).padStart(2, "0")}</strong></td>
+              <tr className={selectedRow?.number === row.number ? "selected" : ""} key={row.number}>
+                <td>{row.rank || index + 1}</td>
+                <td>
+                  <button className="score-number-button" onClick={() => setSelectedRow(row)} type="button">
+                    {String(row.number).padStart(2, "0")}
+                  </button>
+                  {selectedSet.has(Number(row.number)) && <Badge tone="live">已入选</Badge>}
+                </td>
                 <td>{row.heat_score}</td>
                 <td>{row.missing_score}</td>
                 <td>{row.balance_score}</td>
@@ -1060,6 +1031,24 @@ function ScoreTable({ rows }) {
           </tbody>
         </table>
       </div>
+      {selectedRow && (
+        <aside className="number-detail" aria-label={`号码${formatNumber(selectedRow.number)}详情`}>
+          <div>
+            <span>号码详情</span>
+            <strong>{formatNumber(selectedRow.number)}</strong>
+          </div>
+          <dl>
+            <div><dt>近期开奖出现</dt><dd>{selectedRow.heat_count ?? "-"} 次</dd></div>
+            <div><dt>当前遗漏</dt><dd>{selectedRow.missing_periods ?? "-"} 期</dd></div>
+            <div><dt>最近出现期号</dt><dd>{selectedRow.last_seen_issue || "暂无"}</dd></div>
+            <div><dt>最近出现日期</dt><dd>{selectedRow.last_seen_date || "暂无"}</dd></div>
+            <div><dt>综合评分</dt><dd>{selectedRow.total_score}</dd></div>
+            <div><dt>本期方案</dt><dd>{selectedSet.has(Number(selectedRow.number)) ? "已入选" : "未入选"}</dd></div>
+          </dl>
+          <p>{selectedRow.explanation}</p>
+          <button className="ghost-button compact" onClick={() => setSelectedRow(null)} type="button">关闭详情</button>
+        </aside>
+      )}
     </section>
   );
 }
@@ -1190,15 +1179,9 @@ function CapitalPanel({
       <div className="capital-chart">
         <h3>累计投入（来自已保存方案）</h3>
         {curve.length > 0 ? (
-          <ResponsiveContainer width="100%" height={190}>
-            <LineChart data={curve}>
-              <CartesianGrid stroke="rgba(134, 166, 194, 0.16)" vertical={false} />
-              <XAxis dataKey="issue" />
-              <YAxis />
-              <Tooltip formatter={(value, name, item) => [`${value} 元（本期 ${item.payload.cost} 元）`, "累计投入"]} />
-              <Line type="monotone" dataKey="value" stroke="#4ca6ff" strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
+          <Suspense fallback={<ChartFallback height={190} />}>
+            <CapitalSpendChartView data={curve} />
+          </Suspense>
         ) : <p className="empty-text">保存投注方案后，这里才会显示真实累计投入；系统不再展示示例资金曲线。</p>}
       </div>
       <div className="state-machine">
@@ -1219,6 +1202,11 @@ function DataStatusPanel({ dataStatus, onImport }) {
   const quality = dataStatus.quality;
   const isPublishedSnapshot = dataStatus.source === "published_snapshot"
     || dataStatus.storage === "published_snapshot";
+  const lastSync = dataStatus.last_sync || {};
+  const syncTime = lastSync.synced_at || dataStatus.synced_at || dataStatus.snapshot_updated_at || BUILD_TIME;
+  const sourceName = dataStatus.source_name
+    || lastSync.source
+    || (isPublishedSnapshot ? "78500.cn + 官方开奖快照" : dataStatus.source_label || "本地 SQLite 数据库");
 
   return (
     <section className={`data-status-panel ${dataStatus.is_sample ? "sample" : ""}`}>
@@ -1231,6 +1219,8 @@ function DataStatusPanel({ dataStatus, onImport }) {
       <dl>
         <div><dt>最新期号</dt><dd>{dataStatus.latest_issue || "-"}</dd></div>
         <div><dt>开奖日期</dt><dd>{dataStatus.latest_date || "-"}</dd></div>
+        <div><dt>数据来源</dt><dd>{sourceName}</dd></div>
+        <div><dt>快照同步</dt><dd>{syncTime ? new Date(syncTime).toLocaleString("zh-CN", { hour12: false }) : "-"}</dd></div>
         {quality && <div><dt>完整性</dt><dd>{quality.label}</dd></div>}
         <div><dt>数据文件</dt><dd>{dataStatus.path}</dd></div>
       </dl>
@@ -1292,7 +1282,7 @@ function PlanCard({ plan, onSave }) {
     <article className="plan-card">
       <div className="plan-head">
         <Badge tone={plan.mode === "dantuo" ? "live" : "default"}>
-          {STRATEGY_LABELS[plan.strategy] || "策略"} · {planModeLabel(plan.mode)}
+          {plan.option_label || STRATEGY_LABELS[plan.strategy] || "策略"} · {planModeLabel(plan.mode)}
         </Badge>
         <strong>{plan.cost} 元 · {plan.tickets} 注</strong>
       </div>
@@ -1415,7 +1405,63 @@ function SavedPlanDetails({ plan }) {
   );
 }
 
-function HistoryRecords({ records, onDelete, review }) {
+function RecordSync({ scene, records, onImport }) {
+  const [syncCode, setSyncCode] = useState("");
+  const [importCode, setImportCode] = useState("");
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const generate = async () => {
+    const code = encodeSyncBundle(scene, records);
+    setSyncCode(code);
+    setStatus(`已生成 ${records.length} 条记录的同步码。`);
+    try {
+      await navigator.clipboard.writeText(code);
+      setStatus(`已复制 ${records.length} 条记录的同步码。`);
+    } catch {
+      // The visible text area remains available for manual copying.
+    }
+  };
+
+  const importRecords = async () => {
+    setBusy(true);
+    setStatus("");
+    try {
+      const bundle = decodeSyncBundle(importCode, scene);
+      const count = await onImport(bundle.records);
+      setStatus(`同步完成，新增 ${count} 条记录。`);
+      setImportCode("");
+    } catch (error) {
+      setStatus(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="record-sync">
+      <div className="record-sync-heading">
+        <div>
+          <strong>跨设备同步</strong>
+          <span>同步码包含方案数据，不上传第三方；在另一台设备进入同一场景后导入。</span>
+        </div>
+        <button className="ghost-button compact" disabled={records.length === 0} onClick={generate} type="button">
+          <Clipboard size={14} />生成同步码
+        </button>
+      </div>
+      {syncCode && <textarea aria-label="导出的同步码" readOnly rows="3" value={syncCode} onFocus={(event) => event.target.select()} />}
+      <div className="record-sync-import">
+        <textarea aria-label="需要导入的同步码" rows="3" value={importCode} onChange={(event) => setImportCode(event.target.value)} placeholder="粘贴另一台设备生成的同步码" />
+        <button className="primary-button" disabled={busy || !importCode.trim()} onClick={importRecords} type="button">
+          {busy ? "正在导入..." : "导入同步码"}
+        </button>
+      </div>
+      {status && <p className="record-sync-status">{status}</p>}
+    </div>
+  );
+}
+
+function HistoryRecords({ records, onDelete, review, scene, onImport }) {
   const [filter, setFilter] = useState("");
   const [expandedId, setExpandedId] = useState(null);
   const statusByRecord = useMemo(() => reviewStatusMap(review), [review]);
@@ -1434,6 +1480,7 @@ function HistoryRecords({ records, onDelete, review }) {
       <div className="inline-tools">
         <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="搜索期号或策略" />
       </div>
+      <RecordSync scene={scene} records={records} onImport={onImport} />
       {visibleRecords.length === 0 ? (
         <p className="empty-text">暂无保存记录。进入“投注方案”生成系统建议或人工选号点评后，点击“保存方案”。</p>
       ) : (
@@ -1493,6 +1540,9 @@ function ReviewPanel({ review, onRefresh }) {
         <div><span>命中记录率</span><strong>{summary.record_hit_rate || 0}%</strong></div>
         <div><span>最佳命中</span><strong>{summary.best_hit || "-"}</strong></div>
         <div><span>最佳奖级</span><strong>{summary.best_prize_label || "-"}</strong></div>
+        <div><span>实际奖金</span><strong>{summary.roi_complete ? `${summary.total_prize || 0} 元` : "部分待补"}</strong></div>
+        <div><span>净收益</span><strong>{summary.roi_complete ? `${summary.net_profit || 0} 元` : "待奖金完整"}</strong></div>
+        <div><span>实际 ROI</span><strong>{summary.roi_complete && summary.roi !== null ? `${summary.roi}%` : "待奖金完整"}</strong></div>
       </div>
       <div className="review-list">
         {(review.items || []).slice(0, 6).map((item) => (
@@ -1543,6 +1593,11 @@ function ReviewPanel({ review, onRefresh }) {
                   {Object.keys(item.prize_distribution || {}).length > 0 && (
                     <p>奖级分布：{Object.entries(item.prize_distribution).map(([label, count]) => `${label} ${count} 注`).join("·")}</p>
                   )}
+                  <p>
+                    实际奖金 {item.prize_amount_complete ? `${item.prize_amount || 0} 元` : "奖金数据待补齐"}
+                    {item.prize_amount_complete && ` · 净收益 ${item.net_profit || 0} 元 · ROI ${item.roi ?? 0}%`}
+                  </p>
+                  {item.prize_source && <p>奖金来源：{item.prize_source}</p>}
                 </>
               );
             })()}
@@ -1872,25 +1927,40 @@ function BettingPlanPanel({
   const createAiPlan = () => {
     try {
       const nextVariant = variant + 1;
-      const plan = buildAiBettingPlan({
-        scene,
-        scoreRows,
-        backScoreRows,
-        budget,
-        mode,
-        ticketCount,
-        danCount,
-        tuoCount,
-        backCount,
-        latestIssue: dashboard.latest_issue,
-        recommendedIssue: dashboard.recommended_issue,
-        variant: nextVariant,
+      const optionSpecs = [
+        { optionLabel: "主推方案", optionMode: mode, offset: 0 },
+        { optionLabel: "备选方案 A", optionMode: mode, offset: 1 },
+        { optionLabel: "备选方案 B", optionMode: mode, offset: 2 },
+        { optionLabel: "单式兜底", optionMode: "single", offset: 3 },
+      ];
+      const comparisonPlans = optionSpecs.map(({ optionLabel, optionMode, offset }) => {
+        const plan = buildAiBettingPlan({
+          scene,
+          scoreRows,
+          backScoreRows,
+          budget,
+          mode: optionMode,
+          ticketCount: optionMode === "single" ? Math.max(1, Math.min(3, Math.floor(Number(budget || 0) / 2))) : ticketCount,
+          danCount,
+          tuoCount,
+          backCount,
+          latestIssue: dashboard.latest_issue,
+          recommendedIssue: dashboard.recommended_issue,
+          variant: nextVariant + offset,
+        });
+        return {
+          ...plan,
+          option_label: optionLabel,
+          generation_variant: nextVariant + offset,
+          decision_brief: buildDecisionBrief({ plan, budget, ...decisionContext }),
+        };
       });
-      setVariant(nextVariant);
-      sessionStorage.setItem(variantStorageKey, String(nextVariant));
-      const decisionBrief = buildDecisionBrief({ plan, budget, ...decisionContext });
-      onGenerated({ ...plan, generation_variant: nextVariant, decision_brief: decisionBrief });
-      setMessage(plan.cost <= Number(budget || 0) ? `第 ${nextVariant} 组规则建议已生成，再次点击会轮换候选号码。` : "方案已生成，但费用超过预算，请调整胆拖数量。");
+      const plan = comparisonPlans[0];
+      const followingVariant = nextVariant + optionSpecs.length;
+      setVariant(followingVariant);
+      sessionStorage.setItem(variantStorageKey, String(followingVariant));
+      onGenerated({ ...plan, comparison_plans: comparisonPlans });
+      setMessage(plan.cost <= Number(budget || 0) ? `第 ${nextVariant} 批建议已生成，可比较主推、备选和单式兜底。` : "方案已生成，但费用超过预算，请调整胆拖数量。");
       revealGenerated();
     } catch (err) {
       setMessage(err.message);
@@ -2076,10 +2146,18 @@ function BettingPlanPanel({
       {generated && flow !== "package" && (
         <div className="betting-result" id="generated-plan-result">
           <div className="section-kicker">
-            <span>{generated.source === "manual_selection" ? "人工方案点评" : `系统建议结果${generated.generation_variant ? ` · 第${generated.generation_variant}组` : ""}`}</span>
-            <strong>{generated.cost} 元 · {generated.tickets} 注</strong>
+            <span>{generated.source === "manual_selection" ? "人工方案点评" : "系统方案比较"}</span>
+            <strong>{generated.source === "manual_selection" ? `${generated.cost} 元 · ${generated.tickets} 注` : "4 个方案独立保存"}</strong>
           </div>
-          <PlanCard plan={generated} onSave={onSave} />
+          <div className={generated.comparison_plans?.length ? "plan-comparison-grid" : ""}>
+            {(generated.comparison_plans || [generated]).map((plan) => (
+              <PlanCard
+                key={`${plan.option_label || "manual"}-${plan.generation_variant || 0}`}
+                plan={plan}
+                onSave={onSave}
+              />
+            ))}
+          </div>
         </div>
       )}
     </section>
@@ -2254,6 +2332,29 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
     }
   };
 
+  const importSyncedRecords = async (records) => {
+    const signatures = new Set(savedPlans.map((record) => JSON.stringify(normalizeRecordPlan(record))));
+    const incoming = records.filter((record) => {
+      const plan = normalizeRecordPlan(record);
+      const signature = JSON.stringify(plan);
+      if (!plan?.mode || signatures.has(signature)) return false;
+      signatures.add(signature);
+      return true;
+    });
+    const saved = await Promise.all(incoming.map((record) => saveDltRecord({
+      budget: Number(record.budget || record.plan?.cost || 0),
+      strategy: record.strategy || record.plan?.strategy || "balanced",
+      latestIssue: record.latest_issue || record.plan?.recommended_issue || dashboard.latest_issue,
+      plan: normalizeRecordPlan(record),
+    })));
+    if (saved.length) {
+      const refreshed = await getDltRecords();
+      setSavedPlans(refreshed);
+      await refreshReview();
+    }
+    return saved.length;
+  };
+
   const importHistory = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -2369,7 +2470,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
               }}
             />
           )}
-          {activeModule === "score" && <ScoreTable rows={dashboard.score_table} />}
+          {activeModule === "score" && <ScoreTable rows={dashboard.score_table} selectedNumbers={planFrontNumbers(generated)} />}
           {activeModule === "capital" && (
             <CapitalPanel
               capital={dashboard.capital_state}
@@ -2391,7 +2492,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
               onApply={loadDashboard}
             />
           )}
-          {activeModule === "history" && <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} />}
+          {activeModule === "history" && <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} scene="DLT" onImport={importSyncedRecords} />}
         </section>
 
         <footer className="disclaimer footer-note">
@@ -2550,6 +2651,29 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
     }
   };
 
+  const importSyncedRecords = async (records) => {
+    const signatures = new Set(savedPlans.map((record) => JSON.stringify(normalizeRecordPlan(record))));
+    const incoming = records.filter((record) => {
+      const plan = normalizeRecordPlan(record);
+      const signature = JSON.stringify(plan);
+      if (!plan?.mode || signatures.has(signature)) return false;
+      signatures.add(signature);
+      return true;
+    });
+    const saved = await Promise.all(incoming.map((record) => saveSsqRecord({
+      budget: Number(record.budget || record.plan?.cost || 0),
+      strategy: record.strategy || record.plan?.strategy || "balanced",
+      latestIssue: record.latest_issue || record.plan?.recommended_issue || dashboard.latest_issue,
+      plan: normalizeRecordPlan(record),
+    })));
+    if (saved.length) {
+      const refreshed = await getSsqRecords();
+      setSavedPlans(refreshed);
+      await refreshReview();
+    }
+    return saved.length;
+  };
+
   const deleteRecord = async (id) => {
     try {
       await deleteSsqRecord(id);
@@ -2693,7 +2817,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
               }}
             />
           )}
-          {activeModule === "score" && <ScoreTable rows={scoreRows} />}
+          {activeModule === "score" && <ScoreTable rows={scoreRows} selectedNumbers={planFrontNumbers(generated)} />}
           {activeModule === "capital" && (
             <CapitalPanel
               capital={dashboard.capital}
@@ -2715,7 +2839,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
               onApply={loadDashboard}
             />
           )}
-          {activeModule === "history" && <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} />}
+          {activeModule === "history" && <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} scene="SSQ" onImport={importSyncedRecords} />}
         </section>
 
         <footer className="disclaimer footer-note">

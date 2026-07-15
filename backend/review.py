@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from itertools import combinations
 
+from prizes import prize_financials, review_financial_summary
+
 
 DLT_LABELS = {
     "front": "前区",
@@ -18,11 +20,29 @@ SSQ_LABELS = {
 }
 
 
-def prize_label(front_hits: int, back_hits: int) -> str:
+def prize_label(front_hits: int, back_hits: int, issue: str | None = None) -> str:
+    new_rules = bool(issue and issue.isdigit() and int(issue) >= 26014)
     if front_hits == 5 and back_hits == 2:
         return "一等奖"
     if front_hits == 5 and back_hits == 1:
         return "二等奖"
+    if new_rules:
+        if front_hits == 5 or (front_hits == 4 and back_hits == 2):
+            return "三等奖"
+        if front_hits == 4 and back_hits == 1:
+            return "四等奖"
+        if front_hits == 4 or (front_hits == 3 and back_hits == 2):
+            return "五等奖"
+        if (front_hits == 3 and back_hits == 1) or (front_hits == 2 and back_hits == 2):
+            return "六等奖"
+        if (
+            (front_hits == 3 and back_hits == 0)
+            or (front_hits == 2 and back_hits == 1)
+            or (front_hits == 1 and back_hits == 2)
+            or (front_hits == 0 and back_hits == 2)
+        ):
+            return "七等奖"
+        return "未命中固定奖级"
     if front_hits == 5:
         return "三等奖"
     if front_hits == 4 and back_hits == 2:
@@ -72,7 +92,7 @@ def review_single(plan: dict, draw: dict) -> tuple[list[dict], dict]:
                 "front_hits": front_hits,
                 "back_hits": back_hits,
                 "hit_label": f"{front_hits}+{back_hits}",
-                "prize_label": prize_label(front_hits, back_hits),
+                "prize_label": prize_label(front_hits, back_hits, draw.get("issue")),
             }
         )
     best = max(rows, key=lambda item: (item["front_hits"] + item["back_hits"], item["front_hits"], item["back_hits"]), default=None)
@@ -98,7 +118,7 @@ def best_dantuo_hit(plan: dict, draw: dict) -> dict:
                 "front_hits": front_hits,
                 "back_hits": back_hits,
                 "hit_label": f"{front_hits}+{back_hits}",
-                "prize_label": prize_label(front_hits, back_hits),
+                "prize_label": prize_label(front_hits, back_hits, draw.get("issue")),
             }
             if not best or (front_hits + back_hits, front_hits, back_hits) > (
                 best["front_hits"] + best["back_hits"],
@@ -130,7 +150,7 @@ def review_dantuo(plan: dict, draw: dict) -> tuple[list[dict], dict]:
                     "front_hits": front_hits,
                     "back_hits": back_hits,
                     "hit_label": f"{front_hits}+{back_hits}",
-                    "prize_label": prize_label(front_hits, back_hits),
+                    "prize_label": prize_label(front_hits, back_hits, draw.get("issue")),
                 }
             )
 
@@ -178,7 +198,7 @@ def review_plan(plan: dict, draw: dict) -> dict:
     }
 
 
-def build_review(records: list[dict], history: list[dict], limit: int = 20) -> dict:
+def build_review(records: list[dict], history: list[dict], limit: int = 20, prize_snapshot: dict | None = None) -> dict:
     items = []
     for record in records[:limit]:
         draw = next_draw(history, record.get("latest_issue"))
@@ -201,6 +221,13 @@ def build_review(records: list[dict], history: list[dict], limit: int = 20) -> d
             continue
 
         result = review_plan(record.get("plan", {}), draw)
+        result.update(
+            prize_financials(
+                result.get("prize_distribution", {}),
+                (prize_snapshot or {}).get("issues", {}).get(draw["issue"]),
+                result.get("cost", 0),
+            )
+        )
         items.append(
             {
                 "record_id": record.get("id"),
@@ -229,6 +256,7 @@ def build_review(records: list[dict], history: list[dict], limit: int = 20) -> d
         default=None,
     )
 
+    financials = review_financial_summary(items)
     return {
         "summary": {
             "records": len(items),
@@ -239,6 +267,7 @@ def build_review(records: list[dict], history: list[dict], limit: int = 20) -> d
             "record_hit_rate": round((len(hit_items) / max(1, len(reviewed))) * 100, 2),
             "best_hit": best_item.get("best", {}).get("hit_label") if best_item else "-",
             "best_prize_label": best_item.get("best", {}).get("prize_label") if best_item else "-",
+            **financials,
         },
         "items": items,
         "disclaimer": "复盘只统计历史推荐与实际开奖号码的匹配结果，不代表未来命中概率或收益能力。",
@@ -373,7 +402,7 @@ def review_ssq_plan(plan: dict, draw: dict) -> dict:
     }
 
 
-def build_ssq_review(records: list[dict], history: list[dict], limit: int = 20) -> dict:
+def build_ssq_review(records: list[dict], history: list[dict], limit: int = 20, prize_snapshot: dict | None = None) -> dict:
     items = []
     for record in records[:limit]:
         draw = next_draw(history, record.get("latest_issue"))
@@ -396,6 +425,13 @@ def build_ssq_review(records: list[dict], history: list[dict], limit: int = 20) 
             continue
 
         result = review_ssq_plan(record.get("plan", {}), draw)
+        result.update(
+            prize_financials(
+                result.get("prize_distribution", {}),
+                (prize_snapshot or {}).get("issues", {}).get(draw["issue"]),
+                result.get("cost", 0),
+            )
+        )
         items.append(
             {
                 "record_id": record.get("id"),
@@ -424,6 +460,7 @@ def build_ssq_review(records: list[dict], history: list[dict], limit: int = 20) 
         default=None,
     )
 
+    financials = review_financial_summary(items)
     return {
         "summary": {
             "records": len(items),
@@ -434,6 +471,7 @@ def build_ssq_review(records: list[dict], history: list[dict], limit: int = 20) 
             "record_hit_rate": round((len(hit_items) / max(1, len(reviewed))) * 100, 2),
             "best_hit": best_item.get("best", {}).get("hit_label") if best_item else "-",
             "best_prize_label": best_item.get("best", {}).get("prize_label") if best_item else "-",
+            **financials,
         },
         "items": items,
         "disclaimer": "复盘只统计历史推荐与实际开奖号码的匹配结果，不代表未来命中概率或收益能力。",

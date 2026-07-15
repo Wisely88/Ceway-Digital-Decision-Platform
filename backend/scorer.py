@@ -17,6 +17,7 @@ def balance_score(number: int) -> float:
 def score_front_numbers(trends: dict) -> list[dict]:
     heat_by_number = {item["number"]: item["count"] for item in trends["hot_front"]}
     missing_by_number = {item["number"]: item["missing"] for item in trends["omissions"]}
+    last_seen_by_number = {item["number"]: item for item in trends.get("last_seen", [])}
     max_heat = max(heat_by_number.values() or [0])
     max_missing = max(missing_by_number.values() or [0])
     rows = []
@@ -35,6 +36,8 @@ def score_front_numbers(trends: dict) -> list[dict]:
                 "number": number,
                 "heat_count": heat_by_number.get(number, 0),
                 "missing_periods": missing_by_number.get(number, 0),
+                "last_seen_issue": last_seen_by_number.get(number, {}).get("issue"),
+                "last_seen_date": last_seen_by_number.get(number, {}).get("date"),
                 "heat_score": heat,
                 "missing_score": missing,
                 "balance_score": balanced,
@@ -104,6 +107,7 @@ def ssq_balance_score(number: int) -> float:
 def score_ssq_front_numbers(trends: dict) -> list[dict]:
     heat_by_number = {item["number"]: item["count"] for item in trends["hot_front"]}
     missing_by_number = {item["number"]: item["missing"] for item in trends["omissions"]}
+    last_seen_by_number = {item["number"]: item for item in trends.get("last_seen", [])}
     max_heat = max(heat_by_number.values() or [0])
     max_missing = max(missing_by_number.values() or [0])
     rows = []
@@ -122,6 +126,8 @@ def score_ssq_front_numbers(trends: dict) -> list[dict]:
                 "number": number,
                 "heat_count": heat_by_number.get(number, 0),
                 "missing_periods": missing_by_number.get(number, 0),
+                "last_seen_issue": last_seen_by_number.get(number, {}).get("issue"),
+                "last_seen_date": last_seen_by_number.get(number, {}).get("date"),
                 "heat_score": heat,
                 "missing_score": missing,
                 "balance_score": balanced,

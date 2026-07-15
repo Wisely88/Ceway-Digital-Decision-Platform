@@ -140,11 +140,14 @@ def calculate_trends(history: list[dict], window: int = 100) -> dict:
     back_counts = Counter(back_flat)
 
     omissions = {}
+    last_seen = {}
     for number in front_numbers:
         omissions[number] = len(history)
+        last_seen[number] = {"issue": None, "date": None}
         for index, row in enumerate(reversed(history)):
             if number in row["front"]:
                 omissions[number] = index
+                last_seen[number] = {"issue": row["issue"], "date": row["date"]}
                 break
 
     back_omissions = {}
@@ -180,6 +183,7 @@ def calculate_trends(history: list[dict], window: int = 100) -> dict:
         "hot_front": hot_front,
         "hot_back": hot_back,
         "omissions": [{"number": number, "missing": omissions[number]} for number in front_numbers],
+        "last_seen": [{"number": number, **last_seen[number]} for number in front_numbers],
         "back_omissions": [{"number": number, "missing": back_omissions[number]} for number in back_numbers],
         "odd_even": [{"ratio": key, "count": odd_even[key]} for key in sorted(odd_even)],
         "big_small": [{"ratio": key, "count": big_small[key]} for key in sorted(big_small)],
@@ -284,11 +288,14 @@ def calculate_ssq_trends(history: list[dict], window: int = 100) -> dict:
     back_counts = Counter(back_flat)
 
     omissions = {}
+    last_seen = {}
     for number in front_numbers:
         omissions[number] = len(history)
+        last_seen[number] = {"issue": None, "date": None}
         for index, row in enumerate(reversed(history)):
             if number in row["front"]:
                 omissions[number] = index
+                last_seen[number] = {"issue": row["issue"], "date": row["date"]}
                 break
 
     back_omissions = {}
@@ -324,6 +331,7 @@ def calculate_ssq_trends(history: list[dict], window: int = 100) -> dict:
         "hot_front": hot_front,
         "hot_back": hot_back,
         "omissions": [{"number": number, "missing": omissions[number]} for number in front_numbers],
+        "last_seen": [{"number": number, **last_seen[number]} for number in front_numbers],
         "back_omissions": [{"number": number, "missing": back_omissions[number]} for number in back_numbers],
         "odd_even": [{"ratio": key, "count": odd_even[key]} for key in sorted(odd_even)],
         "big_small": [{"ratio": key, "count": big_small[key]} for key in sorted(big_small)],

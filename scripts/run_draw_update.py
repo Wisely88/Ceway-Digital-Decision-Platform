@@ -19,6 +19,8 @@ FRONTEND_DIR = ROOT_DIR / "frontend"
 DATA_FILES = [
     Path("backend/data/dlt_history.csv"),
     Path("backend/data/ssq_history.csv"),
+    Path("backend/data/dlt_prizes.json"),
+    Path("backend/data/ssq_prizes.json"),
 ]
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 DLT_DRAW_WEEKDAYS = {0, 2, 5}
@@ -156,6 +158,7 @@ def update_history(game: str) -> None:
         log(f"从 78500.cn 更新 {selected.upper()} 历史数据")
         run(commands[selected], timeout=30)
     run([sys.executable, "scripts/validate_lottery_history.py"], timeout=30)
+    run([sys.executable, "scripts/update_prize_data.py", "--game", game], timeout=60)
 
 
 def data_changed() -> bool:

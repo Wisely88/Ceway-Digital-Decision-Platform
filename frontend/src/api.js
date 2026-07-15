@@ -1,28 +1,7 @@
-import {
-  getDemoDashboard,
-  getDemoDltStatus,
-  getDemoPlan,
-  getDemoRecords,
-  getDemoReview,
-  getDemoBacktest,
-  getDemoScenes,
-  getDemoDraws,
-  getDemoSsqBacktest,
-  getDemoSsqDashboard,
-  getDemoSsqDraws,
-  getDemoSsqPlan,
-  getDemoSsqRecords,
-  getDemoSsqReview,
-  getDemoSsqStatus,
-  saveDemoRecord,
-  saveDemoSsqRecord,
-  searchDemoDltDraws,
-  searchDemoSsqDraws,
-} from "./demoData";
-
 const RAW_API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === "true"
   || window.location.hostname.endsWith("github.io");
+const loadDemo = () => import("./demoData");
 
 function getApiBase() {
   if (/^https?:\/\//i.test(RAW_API_BASE)) {
@@ -67,7 +46,7 @@ async function request(path, options = {}) {
 }
 
 export function getScenes() {
-  if (STATIC_DEMO) return getDemoScenes();
+  if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoScenes());
   return request("/scenes");
 }
 
@@ -81,7 +60,7 @@ export function getDltDashboard({
   levelUnits,
 }) {
   if (STATIC_DEMO) {
-    return getDemoDashboard({ budget, lastPrize, strategy, window, principal, balance, levelUnits });
+    return loadDemo().then((module) => module.getDemoDashboard({ budget, lastPrize, strategy, window, principal, balance, levelUnits }));
   }
   const params = toQueryString({
     budget,
@@ -97,7 +76,7 @@ export function getDltDashboard({
 
 export function generateDltPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits, variant = 0 }) {
   if (STATIC_DEMO) {
-    return getDemoPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits });
+    return loadDemo().then((module) => module.getDemoPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits }));
   }
   return request("/plan/dlt", {
     method: "POST",
@@ -115,7 +94,7 @@ export function generateDltPlan({ budget, strategy, lastPrize, window, principal
 }
 
 export function getDltRecords() {
-  if (STATIC_DEMO) return getDemoRecords();
+  if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoRecords());
   return request("/records/dlt");
 }
 
@@ -130,7 +109,7 @@ export function deleteDltRecord(id) {
 }
 
 export function saveDltRecord({ budget, strategy, latestIssue, plan }) {
-  if (STATIC_DEMO) return saveDemoRecord({ budget, strategy, latestIssue, plan });
+  if (STATIC_DEMO) return loadDemo().then((module) => module.saveDemoRecord({ budget, strategy, latestIssue, plan }));
   return request("/records/dlt", {
     method: "POST",
     body: JSON.stringify({
@@ -143,31 +122,31 @@ export function saveDltRecord({ budget, strategy, latestIssue, plan }) {
 }
 
 export function getDltReview() {
-  if (STATIC_DEMO) return getDemoReview();
+  if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoReview());
   return request("/review/dlt");
 }
 
 export function getDltBacktest({ budget = 20, strategy = "balanced", periods = 100, window = 100 } = {}) {
-  if (STATIC_DEMO) return getDemoBacktest({ budget, strategy, periods, window });
+  if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoBacktest({ budget, strategy, periods, window }));
   const params = toQueryString({ budget, strategy, periods, window });
   return request(`/backtest/dlt?${params}`);
 }
 
 export function getDltDataStatus() {
-  if (STATIC_DEMO) return getDemoDltStatus();
+  if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoDltStatus());
   return request("/data/dlt/status");
 }
 
 export function getDltDraws({ limit = 10 } = {}) {
   if (STATIC_DEMO) {
-    return getDemoDraws(limit).then((items) => ({ items, total: items.length, limit, offset: 0, issue: "" }));
+    return loadDemo().then((module) => module.getDemoDraws(limit)).then((items) => ({ items, total: items.length, limit, offset: 0, issue: "" }));
   }
   return request(`/data/dlt/draws?${toQueryString({ limit })}`);
 }
 
 export function searchDltDraws({ limit = 12, offset = 0, issue = "" } = {}) {
   if (STATIC_DEMO) {
-    return searchDemoDltDraws({ limit, offset, issue });
+    return loadDemo().then((module) => module.searchDemoDltDraws({ limit, offset, issue }));
   }
   const params = toQueryString({ limit, offset, issue });
   return request(`/data/dlt/draws?${params}`);
@@ -191,7 +170,7 @@ export function getSsqDashboard({
   levelUnits,
 }) {
   if (STATIC_DEMO) {
-    return getDemoSsqDashboard({ budget, lastPrize, strategy, window, principal, balance, levelUnits });
+    return loadDemo().then((module) => module.getDemoSsqDashboard({ budget, lastPrize, strategy, window, principal, balance, levelUnits }));
   }
   const params = toQueryString({
     budget,
@@ -207,7 +186,7 @@ export function getSsqDashboard({
 
 export function generateSsqPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits, variant = 0 }) {
   if (STATIC_DEMO) {
-    return getDemoSsqPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits });
+    return loadDemo().then((module) => module.getDemoSsqPlan({ budget, strategy, lastPrize, window, principal, balance, levelUnits }));
   }
   return request("/plan/ssq", {
     method: "POST",
@@ -225,7 +204,7 @@ export function generateSsqPlan({ budget, strategy, lastPrize, window, principal
 }
 
 export function getSsqRecords() {
-  if (STATIC_DEMO) return getDemoSsqRecords();
+  if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoSsqRecords());
   return request("/records/ssq");
 }
 
@@ -240,7 +219,7 @@ export function deleteSsqRecord(id) {
 }
 
 export function saveSsqRecord({ budget, strategy, latestIssue, plan }) {
-  if (STATIC_DEMO) return saveDemoSsqRecord({ budget, strategy, latestIssue, plan });
+  if (STATIC_DEMO) return loadDemo().then((module) => module.saveDemoSsqRecord({ budget, strategy, latestIssue, plan }));
   return request("/records/ssq", {
     method: "POST",
     body: JSON.stringify({
@@ -253,29 +232,29 @@ export function saveSsqRecord({ budget, strategy, latestIssue, plan }) {
 }
 
 export function getSsqReview() {
-  if (STATIC_DEMO) return getDemoSsqReview();
+  if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoSsqReview());
   return request("/review/ssq");
 }
 
 export function getSsqBacktest({ budget = 20, strategy = "balanced", periods = 100, window = 100 } = {}) {
-  if (STATIC_DEMO) return getDemoSsqBacktest({ budget, strategy, periods, window });
+  if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoSsqBacktest({ budget, strategy, periods, window }));
   const params = toQueryString({ budget, strategy, periods, window });
   return request(`/backtest/ssq?${params}`);
 }
 
 export function getSsqDataStatus() {
-  if (STATIC_DEMO) return getDemoSsqStatus();
+  if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoSsqStatus());
   return request("/data/ssq/status");
 }
 
 export function getSsqDraws({ limit = 10 } = {}) {
-  if (STATIC_DEMO) return getDemoSsqDraws(limit).then((items) => ({ items, total: items.length, limit, offset: 0, issue: "" }));
+  if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoSsqDraws(limit)).then((items) => ({ items, total: items.length, limit, offset: 0, issue: "" }));
   return request(`/data/ssq/draws?${toQueryString({ limit })}`);
 }
 
 export function searchSsqDraws({ limit = 12, offset = 0, issue = "" } = {}) {
   if (STATIC_DEMO) {
-    return searchDemoSsqDraws({ limit, offset, issue });
+    return loadDemo().then((module) => module.searchDemoSsqDraws({ limit, offset, issue }));
   }
   const params = toQueryString({ limit, offset, issue });
   return request(`/data/ssq/draws?${params}`);

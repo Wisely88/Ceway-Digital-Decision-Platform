@@ -7,16 +7,15 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "build:pages": "VITE_STATIC_DEMO=true vite build --base /Ceway-Digital-Decision-Platform/",
-    "preview": "vite preview",
+    "preview": "vite preview --base /Ceway-Digital-Decision-Platform/",
     "test": "node --test src/*.test.js"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.7",
+    "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "lucide-react": "^0.468.0",
-    "recharts": "^2.15.0"
-  },
-  "devDependencies": {}
+    "recharts": "^3.9.2",
+    "vite": "^6.0.7"
+  }
 }
