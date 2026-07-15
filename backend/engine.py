@@ -147,6 +147,14 @@ def calculate_trends(history: list[dict], window: int = 100) -> dict:
                 omissions[number] = index
                 break
 
+    back_omissions = {}
+    for number in back_numbers:
+        back_omissions[number] = len(history)
+        for index, row in enumerate(reversed(history)):
+            if number in row["back"]:
+                back_omissions[number] = index
+                break
+
     odd_even = Counter()
     big_small = Counter()
     sum_values = []
@@ -172,6 +180,7 @@ def calculate_trends(history: list[dict], window: int = 100) -> dict:
         "hot_front": hot_front,
         "hot_back": hot_back,
         "omissions": [{"number": number, "missing": omissions[number]} for number in front_numbers],
+        "back_omissions": [{"number": number, "missing": back_omissions[number]} for number in back_numbers],
         "odd_even": [{"ratio": key, "count": odd_even[key]} for key in sorted(odd_even)],
         "big_small": [{"ratio": key, "count": big_small[key]} for key in sorted(big_small)],
         "sum_values": [
@@ -282,6 +291,14 @@ def calculate_ssq_trends(history: list[dict], window: int = 100) -> dict:
                 omissions[number] = index
                 break
 
+    back_omissions = {}
+    for number in back_numbers:
+        back_omissions[number] = len(history)
+        for index, row in enumerate(reversed(history)):
+            if number in row["back"]:
+                back_omissions[number] = index
+                break
+
     odd_even = Counter()
     big_small = Counter()
     sum_values = []
@@ -307,6 +324,7 @@ def calculate_ssq_trends(history: list[dict], window: int = 100) -> dict:
         "hot_front": hot_front,
         "hot_back": hot_back,
         "omissions": [{"number": number, "missing": omissions[number]} for number in front_numbers],
+        "back_omissions": [{"number": number, "missing": back_omissions[number]} for number in back_numbers],
         "odd_even": [{"ratio": key, "count": odd_even[key]} for key in sorted(odd_even)],
         "big_small": [{"ratio": key, "count": big_small[key]} for key in sorted(big_small)],
         "sum_values": [

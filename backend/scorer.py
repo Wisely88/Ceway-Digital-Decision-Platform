@@ -49,14 +49,49 @@ def score_front_numbers(trends: dict) -> list[dict]:
     return rows
 
 
-def score_back_numbers(trends: dict) -> list[dict]:
+def back_balance_score(number: int, heat_by_number: dict[int, int], max_number: int) -> float:
+    odd_total = sum(count for candidate, count in heat_by_number.items() if candidate % 2 == 1)
+    even_total = sum(count for candidate, count in heat_by_number.items() if candidate % 2 == 0)
+    midpoint = max_number // 2
+    small_total = sum(count for candidate, count in heat_by_number.items() if candidate <= midpoint)
+    large_total = sum(count for candidate, count in heat_by_number.items() if candidate > midpoint)
+    parity_score = 100 if (number % 2 == 1 and odd_total <= even_total) or (number % 2 == 0 and even_total <= odd_total) else 85
+    size_score = 100 if (number <= midpoint and small_total <= large_total) or (number > midpoint and large_total <= small_total) else 85
+    return round((parity_score + size_score) / 2, 2)
+
+
+def build_back_scores(trends: dict, max_number: int) -> list[dict]:
     heat_by_number = {item["number"]: item["count"] for item in trends["hot_back"]}
+    missing_by_number = {item["number"]: item["missing"] for item in trends.get("back_omissions", [])}
     max_heat = max(heat_by_number.values() or [0])
+    max_missing = max(missing_by_number.values() or [0])
     rows = []
-    for number in range(1, 13):
+    for number in range(1, max_number + 1):
         heat = normalize(heat_by_number.get(number, 0), max_heat)
-        rows.append({"number": number, "score": heat})
-    return sorted(rows, key=lambda item: (-item["score"], item["number"]))
+        missing = normalize(missing_by_number.get(number, 0), max_missing)
+        balanced = back_balance_score(number, heat_by_number, max_number)
+        total = round(heat * 0.4 + missing * 0.3 + balanced * 0.3, 2)
+        rows.append(
+            {
+                "number": number,
+                "heat_count": heat_by_number.get(number, 0),
+                "missing_periods": missing_by_number.get(number, 0),
+                "heat_score": heat,
+                "missing_score": missing,
+                "balance_score": balanced,
+                "total_score": total,
+                "score": total,
+                "explanation": f"热度{heat}分、遗漏{missing}分、历史结构平衡{balanced}分；综合评分 {total}。",
+            }
+        )
+    rows.sort(key=lambda item: (-item["total_score"], item["number"]))
+    for index, row in enumerate(rows, start=1):
+        row["rank"] = index
+    return rows
+
+
+def score_back_numbers(trends: dict) -> list[dict]:
+    return build_back_scores(trends, 12)
 
 
 def ssq_balance_score(number: int) -> float:
@@ -102,10 +137,4 @@ def score_ssq_front_numbers(trends: dict) -> list[dict]:
 
 
 def score_ssq_back_numbers(trends: dict) -> list[dict]:
-    heat_by_number = {item["number"]: item["count"] for item in trends["hot_back"]}
-    max_heat = max(heat_by_number.values() or [0])
-    rows = []
-    for number in range(1, 17):
-        heat = normalize(heat_by_number.get(number, 0), max_heat)
-        rows.append({"number": number, "score": heat})
-    return sorted(rows, key=lambda item: (-item["score"], item["number"]))
+    return build_back_scores(trends, 16)

@@ -191,6 +191,7 @@ def build_dlt_payload(
         "capital_state": capital,
         "trends": trends,
         "score_table": score_table,
+        "back_scoreboard": back_scores,
         "plans": plans,
     }
 

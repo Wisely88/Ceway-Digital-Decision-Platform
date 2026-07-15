@@ -57,9 +57,16 @@ function buildTrends(window = 100, history = HISTORY) {
   const backCounts = countValues(recent.flatMap((row) => row.back), 1, 12);
   const lastSeen = new Map();
   history.forEach((row, index) => row.front.forEach((number) => lastSeen.set(number, index)));
+  const backLastSeen = new Map();
+  history.forEach((row, index) => row.back.forEach((number) => backLastSeen.set(number, index)));
   const omissions = Array.from({ length: 35 }, (_, index) => {
     const number = index + 1;
     const seenAt = lastSeen.get(number);
+    return { number, missing: seenAt === undefined ? history.length : history.length - seenAt - 1 };
+  });
+  const backOmissions = Array.from({ length: 12 }, (_, index) => {
+    const number = index + 1;
+    const seenAt = backLastSeen.get(number);
     return { number, missing: seenAt === undefined ? history.length : history.length - seenAt - 1 };
   });
   const oddEven = new Map();
@@ -78,6 +85,7 @@ function buildTrends(window = 100, history = HISTORY) {
     hot_front: Array.from(frontCounts, ([number, count]) => ({ number, count })).sort((a, b) => b.count - a.count || a.number - b.number),
     hot_back: Array.from(backCounts, ([number, count]) => ({ number, count })).sort((a, b) => b.count - a.count || a.number - b.number),
     omissions,
+    back_omissions: backOmissions,
     odd_even: Array.from(oddEven, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
     big_small: Array.from(bigSmall, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
     sum_values: recent.slice(-30).map((row) => ({ issue: row.issue, value: row.front.reduce((sum, number) => sum + number, 0) })),
@@ -115,8 +123,37 @@ function scoreFront(trends) {
 }
 
 function scoreBack(trends) {
-  const maxHeat = Math.max(...trends.hot_back.map((item) => item.count));
-  return trends.hot_back.map((item) => ({ number: item.number, score: normalize(item.count, maxHeat) }));
+  const heatByNumber = new Map(trends.hot_back.map((item) => [item.number, item.count]));
+  const missingByNumber = new Map((trends.back_omissions || []).map((item) => [item.number, item.missing]));
+  const maxHeat = Math.max(...heatByNumber.values());
+  const maxMissing = Math.max(...missingByNumber.values(), 0);
+  const maxNumber = Math.max(...heatByNumber.keys());
+  const midpoint = Math.floor(maxNumber / 2);
+  const oddTotal = [...heatByNumber].filter(([number]) => number % 2 === 1).reduce((sum, [, count]) => sum + count, 0);
+  const evenTotal = [...heatByNumber].filter(([number]) => number % 2 === 0).reduce((sum, [, count]) => sum + count, 0);
+  const smallTotal = [...heatByNumber].filter(([number]) => number <= midpoint).reduce((sum, [, count]) => sum + count, 0);
+  const largeTotal = [...heatByNumber].filter(([number]) => number > midpoint).reduce((sum, [, count]) => sum + count, 0);
+
+  return [...heatByNumber.keys()].map((number) => {
+    const heat = normalize(heatByNumber.get(number) || 0, maxHeat);
+    const missing = normalize(missingByNumber.get(number) || 0, maxMissing);
+    const parityScore = (number % 2 === 1 ? oddTotal <= evenTotal : evenTotal <= oddTotal) ? 100 : 85;
+    const sizeScore = (number <= midpoint ? smallTotal <= largeTotal : largeTotal <= smallTotal) ? 100 : 85;
+    const balanced = (parityScore + sizeScore) / 2;
+    const total = Math.round((heat * 0.4 + missing * 0.3 + balanced * 0.3) * 100) / 100;
+    return {
+      number,
+      heat_count: heatByNumber.get(number) || 0,
+      missing_periods: missingByNumber.get(number) || 0,
+      heat_score: heat,
+      missing_score: missing,
+      balance_score: balanced,
+      total_score: total,
+      score: total,
+      explanation: `热度${heat}分、遗漏${missing}分、历史结构平衡${balanced}分；综合评分 ${total}。`,
+    };
+  }).sort((left, right) => right.total_score - left.total_score || left.number - right.number)
+    .map((row, index) => ({ ...row, rank: index + 1 }));
 }
 
 function buildSsqTrends(window = 100, history = SSQ_HISTORY) {
@@ -125,9 +162,16 @@ function buildSsqTrends(window = 100, history = SSQ_HISTORY) {
   const backCounts = countValues(recent.flatMap((row) => row.back), 1, 16);
   const lastSeen = new Map();
   history.forEach((row, index) => row.front.forEach((number) => lastSeen.set(number, index)));
+  const backLastSeen = new Map();
+  history.forEach((row, index) => row.back.forEach((number) => backLastSeen.set(number, index)));
   const omissions = Array.from({ length: 33 }, (_, index) => {
     const number = index + 1;
     const seenAt = lastSeen.get(number);
+    return { number, missing: seenAt === undefined ? history.length : history.length - seenAt - 1 };
+  });
+  const backOmissions = Array.from({ length: 16 }, (_, index) => {
+    const number = index + 1;
+    const seenAt = backLastSeen.get(number);
     return { number, missing: seenAt === undefined ? history.length : history.length - seenAt - 1 };
   });
   const oddEven = new Map();
@@ -144,6 +188,7 @@ function buildSsqTrends(window = 100, history = SSQ_HISTORY) {
     hot_front: Array.from(frontCounts, ([number, count]) => ({ number, count })).sort((a, b) => b.count - a.count || a.number - b.number),
     hot_back: Array.from(backCounts, ([number, count]) => ({ number, count })).sort((a, b) => b.count - a.count || a.number - b.number),
     omissions,
+    back_omissions: backOmissions,
     odd_even: Array.from(oddEven, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
     big_small: Array.from(bigSmall, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
     sum_values: recent.slice(-30).map((row) => ({ issue: row.issue, value: row.front.reduce((sum, number) => sum + number, 0) })),
@@ -427,6 +472,7 @@ export function getDemoDashboard({ budget = 20, lastPrize = 0, strategy = "balan
     capital_state: buildCapital(lastPrize, Number(principal), balance, levelUnits),
     trends,
     score_table: scoreTable,
+    back_scoreboard: backScores,
     plans,
   });
 }

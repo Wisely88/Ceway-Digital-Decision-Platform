@@ -9,8 +9,10 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
 
 from capital import capital_state  # noqa: E402
+from engine import calculate_trends, calculate_ssq_trends  # noqa: E402
 from generator import generate_plans, generate_ssq_plans  # noqa: E402
 from review import prize_label, review_plan, review_ssq_plan, ssq_prize_label  # noqa: E402
+from scorer import score_back_numbers, score_ssq_back_numbers  # noqa: E402
 
 
 def score_rows(max_number: int) -> list[dict]:
@@ -45,6 +47,34 @@ class GeneratorTests(unittest.TestCase):
         first_numbers = first.get("front_dan", first.get("items", [{}])[0].get("front"))
         second_numbers = second.get("front_dan", second.get("items", [{}])[0].get("front"))
         self.assertNotEqual(first_numbers, second_numbers)
+
+
+class BackScoreTests(unittest.TestCase):
+    def test_dlt_back_scores_include_heat_missing_and_balance_formula(self) -> None:
+        history = [
+            {"issue": "26001", "date": "2026-01-01", "front": [1, 2, 3, 4, 5], "back": [1, 2]},
+            {"issue": "26002", "date": "2026-01-03", "front": [6, 7, 8, 9, 10], "back": [2, 3]},
+            {"issue": "26003", "date": "2026-01-05", "front": [11, 12, 13, 14, 15], "back": [3, 4]},
+        ]
+        trends = calculate_trends(history, window=3)
+        rows = score_back_numbers(trends)
+
+        self.assertEqual(len(trends["back_omissions"]), 12)
+        self.assertEqual(len(rows), 12)
+        self.assertTrue(all("heat_score" in row and "missing_score" in row and "balance_score" in row for row in rows))
+        self.assertEqual(rows, sorted(rows, key=lambda row: (-row["total_score"], row["number"])))
+
+    def test_ssq_blue_scores_use_the_same_explainable_formula(self) -> None:
+        history = [
+            {"issue": "2026001", "date": "2026-01-01", "front": [1, 2, 3, 4, 5, 6], "back": [1]},
+            {"issue": "2026002", "date": "2026-01-03", "front": [7, 8, 9, 10, 11, 12], "back": [2]},
+        ]
+        trends = calculate_ssq_trends(history, window=2)
+        rows = score_ssq_back_numbers(trends)
+
+        self.assertEqual(len(trends["back_omissions"]), 16)
+        self.assertEqual(len(rows), 16)
+        self.assertTrue(all(row["total_score"] == row["score"] for row in rows))
 
 
 class CapitalTests(unittest.TestCase):

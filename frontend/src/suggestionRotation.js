@@ -10,6 +10,24 @@ export function topScoreNumbers(rows, max, variant = 0) {
     .map((row) => Number(row.number))
     .filter((number) => number >= 1 && number <= max);
   const fallback = Array.from({ length: max }, (_, index) => index + 1);
-  return rotateItems([...new Set([...ranked, ...fallback])], variant);
-}
+  const completeRanked = [...new Set([...ranked, ...fallback])];
+  if (!variant || completeRanked.length < 3) return completeRanked;
 
+  const bandSize = Math.min(completeRanked.length, Math.max(8, Math.ceil(completeRanked.length * 0.4)));
+  const candidateBand = completeRanked.slice(0, bandSize);
+  const start = (Number(variant) * 2) % bandSize;
+  const strideOptions = [3, 5, 7, 11];
+  const stride = strideOptions[Math.abs(Number(variant) - 1) % strideOptions.length];
+  const varied = [];
+  for (let offset = 0; offset < bandSize; offset += 1) {
+    const candidate = candidateBand[(start + offset * stride) % bandSize];
+    if (!varied.includes(candidate)) varied.push(candidate);
+  }
+  candidateBand.forEach((number) => {
+    if (!varied.includes(number)) varied.push(number);
+  });
+  completeRanked.forEach((number) => {
+    if (!varied.includes(number)) varied.push(number);
+  });
+  return varied;
+}

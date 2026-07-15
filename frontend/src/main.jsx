@@ -358,11 +358,15 @@ function aiCommentaryForPlan(plan, labels) {
   ];
 }
 
-function buildAiBettingPlan({ scene, scoreRows, budget, mode, ticketCount, danCount, tuoCount, backCount, latestIssue, recommendedIssue, variant }) {
+function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, ticketCount, danCount, tuoCount, backCount, latestIssue, recommendedIssue, variant }) {
   const rules = sceneRules(scene);
   const labels = planLabelsForScene(scene);
   const frontPool = topScoreNumbers(scoreRows, rules.frontMax, variant);
-  const backPool = rotateItems(rangeNumbers(rules.backMax), variant);
+  const backRows = backScoreRows?.length
+    ? backScoreRows
+    : rangeNumbers(rules.backMax).map((number) => ({ number, total_score: 0 }));
+  const backPool = topScoreNumbers(backRows, rules.backMax, variant * 2 + 1);
+  const backScoreMap = new Map(backRows.map((row) => [Number(row.number), row]));
 
   if (mode === "single") {
     const affordable = Math.max(1, Math.floor(Number(budget || 0) / 2));
@@ -383,6 +387,7 @@ function buildAiBettingPlan({ scene, scoreRows, budget, mode, ticketCount, danCo
       items,
       reason: `按用户设置生成 ${items.length} 注单式，费用 ${items.length * 2} 元。`,
       explanation: aiCommentaryForPlan({ mode: "single" }, labels),
+      score_basis: `${labels.front}和${labels.back}均先按热度0.4 + 遗漏0.3 + 历史结构平衡0.3评分，再从高分候选带生成变体。`,
       budget_analysis: {
         budget: Number(budget || 0),
         cost: items.length * 2,
@@ -421,6 +426,7 @@ function buildAiBettingPlan({ scene, scoreRows, budget, mode, ticketCount, danCo
     tickets,
     reason: `按用户指定的 ${frontDan.length} 胆 ${frontTuo.length} 拖生成，费用 ${cost} 元。`,
     explanation: aiCommentaryForPlan({ mode: "dantuo" }, labels),
+    score_basis: `${labels.front}和${labels.back}均先按热度0.4 + 遗漏0.3 + 历史结构平衡0.3评分；${labels.back}${back.map((number) => `${formatNumber(number)}(${backScoreMap.get(number)?.total_score ?? backScoreMap.get(number)?.score ?? 0}分)`).join("、")}。`,
     budget_analysis: {
       budget: Number(budget || 0),
       cost,
@@ -1315,6 +1321,7 @@ function PlanCard({ plan, onSave }) {
       )}
       <p className="plan-rule">{labels.rule}</p>
       {plan.reason && <p className="plan-reason">{plan.reason}</p>}
+      {plan.score_basis && <p className="plan-score-basis">{plan.score_basis}</p>}
       {plan.mode === "dantuo" ? (
         <div className="number-groups">
           <div>
@@ -1812,6 +1819,7 @@ function BettingPlanPanel({
   scene,
   dashboard,
   scoreRows,
+  backScoreRows,
   budget,
   onBudgetChange,
   onSave,
@@ -1868,6 +1876,7 @@ function BettingPlanPanel({
       const plan = buildAiBettingPlan({
         scene,
         scoreRows,
+        backScoreRows,
         budget,
         mode,
         ticketCount,
@@ -2338,6 +2347,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
               scene="DLT"
               dashboard={dashboard}
               scoreRows={dashboard.score_table}
+              backScoreRows={dashboard.back_scoreboard}
               budget={budget}
               onBudgetChange={setBudget}
               generated={generated}
@@ -2661,6 +2671,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
               scene="SSQ"
               dashboard={dashboard}
               scoreRows={scoreRows}
+              backScoreRows={dashboard.back_scoreboard}
               budget={budget}
               onBudgetChange={setBudget}
               generated={generated}

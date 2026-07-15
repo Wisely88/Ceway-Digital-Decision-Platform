@@ -1501,6 +1501,16 @@ td {
   padding: 9px 10px;
 }
 
+.plan-score-basis {
+  background: rgba(16, 70, 114, 0.28);
+  border-left: 3px solid #53a3ff;
+  color: #bcd8f3;
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 10px 0;
+  padding: 9px 11px;
+}
+
 .plan-issue {
   background: rgba(10, 29, 49, 0.72);
   border: 1px solid rgba(83, 129, 179, 0.22);
