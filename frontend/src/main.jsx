@@ -601,31 +601,51 @@ function buildPackagePlan({ scene, packageRow, latestIssue, recommendedIssue }) 
   const rules = sceneRules(scene);
   const labels = planLabelsForScene(scene);
   const items = [];
-  for (let repeat = 0; repeat < packageRow.multiplier; repeat += 1) {
-    (packageRow.components || []).forEach((component) => {
-      if (component.mode === "single") {
-        for (let index = 0; index < component.count; index += 1) {
-          const front = randomSample(rules.frontMax, rules.frontPick);
-          const back = randomSample(rules.backMax, rules.backPick, scene === "DLT" ? front : []);
-          items.push({ front, back, front_display: displayNumbers(front), back_display: displayNumbers(back), explanation: ["套餐单式随机票。"] });
-        }
-      } else {
-        const frontPool = randomSample(rules.frontMax, component.front);
-        const backPool = randomSample(rules.backMax, component.back, scene === "DLT" ? frontPool : []);
-        items.push(...expandCompoundItems(frontPool, backPool, rules));
+  const packageEntries = [];
+  const addComponent = (component, repeat, componentIndex, isGift = false) => {
+    if (component.mode === "single") {
+      const singleItems = [];
+      for (let index = 0; index < component.count; index += 1) {
+        const front = randomSample(rules.frontMax, rules.frontPick);
+        const back = randomSample(rules.backMax, rules.backPick, scene === "DLT" ? front : []);
+        const item = { front, back, front_display: displayNumbers(front), back_display: displayNumbers(back), explanation: [isGift ? "活动赠票单式。" : "套餐单式随机票。"] };
+        singleItems.push(item);
+        items.push(item);
       }
+      packageEntries.push({ mode: "single", repeat: repeat + 1, component_index: componentIndex + 1, is_gift: isGift, tickets: singleItems.length, items: singleItems });
+      return;
+    }
+    const frontPool = randomSample(rules.frontMax, component.front);
+    const backPool = randomSample(rules.backMax, component.back, scene === "DLT" ? frontPool : []);
+    const expandedItems = expandCompoundItems(frontPool, backPool, rules);
+    items.push(...expandedItems);
+    packageEntries.push({
+      mode: "compound",
+      repeat: repeat + 1,
+      component_index: componentIndex + 1,
+      is_gift: isGift,
+      tickets: expandedItems.length,
+      front_pool: frontPool,
+      back_pool: backPool,
+      front_pool_display: displayNumbers(frontPool),
+      back_pool_display: displayNumbers(backPool),
     });
+  };
+  for (let repeat = 0; repeat < packageRow.multiplier; repeat += 1) {
+    (packageRow.components || []).forEach((component, componentIndex) => addComponent(component, repeat, componentIndex));
   }
-  for (let index = 0; index < packageRow.giftTickets; index += 1) {
-    const front = randomSample(rules.frontMax, rules.frontPick);
-    const back = randomSample(rules.backMax, rules.backPick, scene === "DLT" ? front : []);
-    items.push({ front, back, front_display: displayNumbers(front), back_display: displayNumbers(back), explanation: ["活动赠票模拟号码。"] });
+  if (packageRow.giftTickets > 0 && packageRow.giftComponent) {
+    for (let repeat = 0; repeat < packageRow.multiplier; repeat += 1) {
+      addComponent(packageRow.giftComponent, repeat, 0, true);
+    }
   }
   return {
     scene, play_name: rules.playName, play_labels: labels, mode: "package", source: "package_simulation", strategy: "package_simulation",
     based_on_issue: latestIssue, recommended_issue: recommendedIssue,
     recommendation_label: `第 ${recommendedIssue || "下一"} 期 ${packageRow.amount} 元套餐模拟。`,
-    package_amount: packageRow.amount, package_structure: packageRow.structure, cost: packageRow.paid, tickets: items.length, items,
+    package_amount: packageRow.amount, package_structure: packageRow.structure, package_multiplier: packageRow.multiplier,
+    gift_structure: packageRow.giftTickets > 0 ? packageRow.giftStructure : "", package_entries: packageEntries,
+    cost: packageRow.paid, tickets: items.length, items,
     reason: `${packageRow.structure}，随机模拟 ${items.length} 注；${packageRow.giftAmount ? `包含已确认赠票 ${packageRow.giftTickets} 注。` : "未计入赠票。"}`,
   };
 }
@@ -1460,6 +1480,82 @@ function DataStatusPanel({ dataStatus, onImport }) {
   );
 }
 
+function packagePlanText(plan, labels) {
+  const lines = [`${plan.play_name || "套餐"} ${plan.package_amount || plan.cost} 元套餐`, `结构：${plan.package_structure || "-"}`];
+  (plan.package_entries || []).forEach((entry) => {
+    const prefix = entry.is_gift ? `赠票第 ${entry.repeat} 份` : `第 ${entry.repeat} 份·组成 ${entry.component_index}`;
+    if (entry.mode === "compound") {
+      lines.push(`${prefix} 复式（展开 ${entry.tickets} 注）`);
+      lines.push(`${labels.front}池：${(entry.front_pool_display || displayNumbers(entry.front_pool || [])).join(" ")}`);
+      lines.push(`${labels.back}池：${(entry.back_pool_display || displayNumbers(entry.back_pool || [])).join(" ")}`);
+    } else {
+      lines.push(`${prefix} 单式 ${entry.tickets} 注`);
+      (entry.items || []).forEach((item, index) => lines.push(`${index + 1}. ${labels.front} ${(item.front_display || displayNumbers(item.front || [])).join(" ")} + ${labels.back} ${(item.back_display || displayNumbers(item.back || [])).join(" ")}`));
+    }
+  });
+  if (!(plan.package_entries || []).length) {
+    (plan.items || []).forEach((item, index) => lines.push(`${index + 1}. ${labels.front} ${(item.front_display || displayNumbers(item.front || [])).join(" ")} + ${labels.back} ${(item.back_display || displayNumbers(item.back || [])).join(" ")}`));
+  }
+  lines.push(`合计 ${plan.tickets || 0} 注，实付 ${plan.cost || 0} 元`);
+  return lines.join("\n");
+}
+
+function PackageEntry({ entry, labels }) {
+  const title = entry.is_gift
+    ? `活动赠票·第 ${entry.repeat} 份`
+    : `套餐第 ${entry.repeat} 份·组成 ${entry.component_index}`;
+  return (
+    <div className={`package-plan-entry ${entry.is_gift ? "gift" : ""}`}>
+      <div className="package-entry-head">
+        <strong>{title}</strong>
+        <Badge tone={entry.is_gift ? "live" : "default"}>{entry.mode === "compound" ? `复式·展开 ${entry.tickets} 注` : `单式·${entry.tickets} 注`}</Badge>
+      </div>
+      {entry.mode === "compound" ? (
+        <div className="package-pools">
+          <div><span>{labels.front}号码池</span><p>{(entry.front_pool_display || displayNumbers(entry.front_pool || [])).join(" ")}</p></div>
+          <div><span>{labels.back}号码池</span><p>{(entry.back_pool_display || displayNumbers(entry.back_pool || [])).join(" ")}</p></div>
+        </div>
+      ) : (
+        <div className="single-list package-single-list">
+          {(entry.items || []).map((item, index) => (
+            <div className="single-ticket" key={`${entry.repeat}-${entry.component_index}-${index}-${(item.front || []).join("-")}`}>
+              <p><b>{index + 1}</b> <span>{labels.front}</span> {(item.front_display || displayNumbers(item.front || [])).join(" ")} <span>{labels.back}</span> {(item.back_display || displayNumbers(item.back || [])).join(" ")}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PackagePlanBreakdown({ plan, labels }) {
+  const entries = plan.package_entries || [];
+  if (!entries.length) {
+    return (
+      <div className="single-list">
+        {(plan.items || []).slice(0, 8).map((item, index) => (
+          <div className="single-ticket" key={`legacy-package-${index}-${(item.front || []).join("-")}`}>
+            <p><b>{index + 1}</b> <span>{labels.front}</span> {(item.front_display || displayNumbers(item.front || [])).join(" ")} <span>{labels.back}</span> {(item.back_display || displayNumbers(item.back || [])).join(" ")}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  const visible = entries.slice(0, 6);
+  const remaining = entries.slice(6);
+  return (
+    <div className="package-plan-breakdown">
+      {visible.map((entry, index) => <PackageEntry entry={entry} key={`${entry.is_gift ? "gift" : "base"}-${entry.repeat}-${entry.component_index}-${index}`} labels={labels} />)}
+      {remaining.length > 0 && (
+        <details className="package-more-entries">
+          <summary>查看其余 {remaining.length} 个套餐组成</summary>
+          {remaining.map((entry, index) => <PackageEntry entry={entry} key={`${entry.is_gift ? "gift" : "base"}-${entry.repeat}-${entry.component_index}-more-${index}`} labels={labels} />)}
+        </details>
+      )}
+    </div>
+  );
+}
+
 function PlanCard({ plan, onSave, onRemove }) {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -1477,7 +1573,9 @@ function PlanCard({ plan, onSave, onRemove }) {
   };
   const playName = plan.play_name || (plan.scene === "SSQ" ? "双色球" : "大乐透");
 
-  const text = plan.mode === "dantuo"
+  const text = plan.mode === "package"
+    ? packagePlanText(plan, labels)
+    : plan.mode === "dantuo"
     ? `${playName} ${planModeLabel(plan.mode)}\n${labels.dan}：${plan.front_dan_display.join(" ")}\n${labels.tuo}：${plan.front_tuo_display.join(" ")}\n${labels.back}：${plan.back_display.join(" ")}\n共 ${plan.tickets} 注，费用 ${plan.cost} 元`
     : plan.mode === "compound"
       ? `${playName} 复式\n${labels.front}号码池：${plan.front_pool_display.join(" ")}\n${labels.back}号码池：${plan.back_pool_display.join(" ")}\n共 ${plan.tickets} 注，费用 ${plan.cost} 元`
@@ -1521,7 +1619,9 @@ function PlanCard({ plan, onSave, onRemove }) {
       <p className="plan-rule">{labels.rule}</p>
       {plan.reason && <p className="plan-reason">{plan.reason}</p>}
       {plan.score_basis && <p className="plan-score-basis">{plan.score_basis}</p>}
-      {plan.mode === "dantuo" ? (
+      {plan.mode === "package" ? (
+        <PackagePlanBreakdown labels={labels} plan={plan} />
+      ) : plan.mode === "dantuo" ? (
         <div className="number-groups">
           <div>
             <p>{labels.dan}（{plan.front_dan_display.length}个）</p>
@@ -1580,7 +1680,9 @@ function normalizeRecordPlan(record) {
 function SavedPlanDetails({ plan }) {
   const [copied, setCopied] = useState(false);
   const labels = plan.play_labels || planLabelsForScene(plan.scene || "DLT");
-  const text = plan.mode === "dantuo"
+  const text = plan.mode === "package"
+    ? packagePlanText(plan, labels)
+    : plan.mode === "dantuo"
     ? `${labels.dan}：${(plan.front_dan_display || displayNumbers(plan.front_dan || [])).join(" ")}\n${labels.tuo}：${(plan.front_tuo_display || displayNumbers(plan.front_tuo || [])).join(" ")}\n${labels.back}：${(plan.back_display || displayNumbers(plan.back || [])).join(" ")}`
     : plan.mode === "compound"
       ? `${labels.front}号码池：${(plan.front_pool_display || displayNumbers(plan.front_pool || [])).join(" ")}\n${labels.back}号码池：${(plan.back_pool_display || displayNumbers(plan.back_pool || [])).join(" ")}`
@@ -1598,7 +1700,9 @@ function SavedPlanDetails({ plan }) {
 
   return (
     <div className="saved-plan-details">
-      {plan.mode === "dantuo" ? (
+      {plan.mode === "package" ? (
+        <PackagePlanBreakdown labels={labels} plan={plan} />
+      ) : plan.mode === "dantuo" ? (
         <div className="saved-number-groups">
           <div><span>{labels.dan}</span><strong>{(plan.front_dan_display || displayNumbers(plan.front_dan || [])).join(" ")}</strong></div>
           <div><span>{labels.tuo}</span><strong>{(plan.front_tuo_display || displayNumbers(plan.front_tuo || [])).join(" ")}</strong></div>
@@ -1743,6 +1847,9 @@ function HistoryRecords({ records, onDelete, review, scene, onImport }) {
 }
 
 function ReviewPlanNumbers({ plan = {}, fallback, labels }) {
+  if (plan.mode === "package") {
+    return <p><b>套餐结构</b> {plan.package_structure || "-"}　<b>票面展开</b> {plan.tickets || 0} 注{Number(plan.package_multiplier || 1) > 1 && <>　<b>套餐数量</b> {plan.package_multiplier} 份</>}</p>;
+  }
   if (plan.mode === "dantuo") {
     return <p><b>{labels.dan}</b> {displayNumbers(plan.front_dan || []).join(" ")}　<b>{labels.tuo}</b> {displayNumbers(plan.front_tuo || []).join(" ")}　<b>{labels.back}</b> {displayNumbers(plan.back || []).join(" ")}</p>;
   }

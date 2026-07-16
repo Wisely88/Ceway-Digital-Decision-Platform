@@ -153,6 +153,8 @@ async def run_scene_flow(client: CdpClient, scene_name: str) -> dict:
     await wait_for_text(client, "随机模拟套餐出票")
     await click_text(client, "随机模拟套餐出票")
     await wait_for_text(client, "当前生成结果")
+    await wait_for_text(client, "单式·")
+    await wait_for_text(client, "复式·展开")
     await click_text(client, "保存方案")
     await wait_for_text(client, "已加入当期复盘")
     await wait_for_text(client, "当期复盘")

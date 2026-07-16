@@ -6,11 +6,11 @@ const DLT_PACKAGES = [
 ];
 
 const SSQ_PACKAGES = [
-  { amount: 18, structure: "单式5注 + 6+4复式", baseTickets: 9, components: [{ mode: "single", count: 5 }, { mode: "compound", front: 6, back: 4 }], giftAmount: 4, giftTickets: 2, giftStructure: "6+2复式", blueDistinct: true },
-  { amount: 28, structure: "7+1复式 + 6+7复式", baseTickets: 14, components: [{ mode: "compound", front: 7, back: 1 }, { mode: "compound", front: 6, back: 7 }], giftAmount: 6, giftTickets: 3, giftStructure: "6+3复式", blueDistinct: true },
-  { amount: 38, structure: "单式5注 + 7+2复式", baseTickets: 19, components: [{ mode: "single", count: 5 }, { mode: "compound", front: 7, back: 2 }], giftAmount: 8, giftTickets: 4, giftStructure: "6+4复式", blueDistinct: true },
-  { amount: 66, structure: "单式5注 + 8+1复式", baseTickets: 33, components: [{ mode: "single", count: 5 }, { mode: "compound", front: 8, back: 1 }], giftAmount: 14, giftTickets: 7, giftStructure: "6+7复式", blueDistinct: true },
-  { amount: 88, structure: "6+16复式 + 8+1复式", baseTickets: 44, components: [{ mode: "compound", front: 6, back: 16 }, { mode: "compound", front: 8, back: 1 }], giftAmount: 20, giftTickets: 10, giftStructure: "6+10复式", blueDistinct: false },
+  { amount: 18, structure: "单式5注 + 6+4复式", baseTickets: 9, components: [{ mode: "single", count: 5 }, { mode: "compound", front: 6, back: 4 }], giftAmount: 4, giftTickets: 2, giftStructure: "6+2复式", giftComponent: { mode: "compound", front: 6, back: 2 }, blueDistinct: true },
+  { amount: 28, structure: "7+1复式 + 6+7复式", baseTickets: 14, components: [{ mode: "compound", front: 7, back: 1 }, { mode: "compound", front: 6, back: 7 }], giftAmount: 6, giftTickets: 3, giftStructure: "6+3复式", giftComponent: { mode: "compound", front: 6, back: 3 }, blueDistinct: true },
+  { amount: 38, structure: "单式5注 + 7+2复式", baseTickets: 19, components: [{ mode: "single", count: 5 }, { mode: "compound", front: 7, back: 2 }], giftAmount: 8, giftTickets: 4, giftStructure: "6+4复式", giftComponent: { mode: "compound", front: 6, back: 4 }, blueDistinct: true },
+  { amount: 66, structure: "单式5注 + 8+1复式", baseTickets: 33, components: [{ mode: "single", count: 5 }, { mode: "compound", front: 8, back: 1 }], giftAmount: 14, giftTickets: 7, giftStructure: "6+7复式", giftComponent: { mode: "compound", front: 6, back: 7 }, blueDistinct: true },
+  { amount: 88, structure: "6+16复式 + 8+1复式", baseTickets: 44, components: [{ mode: "compound", front: 6, back: 16 }, { mode: "compound", front: 8, back: 1 }], giftAmount: 20, giftTickets: 10, giftStructure: "6+10复式", giftComponent: { mode: "compound", front: 6, back: 10 }, blueDistinct: false },
 ];
 
 export const PACKAGE_SOURCES = {

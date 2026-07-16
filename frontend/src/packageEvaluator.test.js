@@ -53,3 +53,11 @@ test("每个套餐的结构元数据都能展开为标注的基础注数", () =>
     });
   }
 });
+
+test("双色球赠票保留复式号码池结构", () => {
+  packageCatalog("SSQ").forEach((item) => {
+    assert.equal(item.giftComponent.mode, "compound");
+    assert.equal(item.giftComponent.front, 6);
+    assert.equal(item.giftComponent.back, item.giftTickets);
+  });
+});
