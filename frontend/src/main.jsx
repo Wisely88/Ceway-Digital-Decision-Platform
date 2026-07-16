@@ -1678,100 +1678,77 @@ function HistoryRecords({ records, onDelete, review, scene, onImport }) {
   );
 }
 
-function ReviewPanel({ review, onRefresh, scoreRows = [], scene = "DLT", currentDraw }) {
+function ReviewPlanNumbers({ plan = {}, fallback, labels }) {
+  if (plan.mode === "dantuo") {
+    return <p><b>{labels.dan}</b> {displayNumbers(plan.front_dan || []).join(" ")}　<b>{labels.tuo}</b> {displayNumbers(plan.front_tuo || []).join(" ")}　<b>{labels.back}</b> {displayNumbers(plan.back || []).join(" ")}</p>;
+  }
+  if (plan.mode === "compound") {
+    return <p><b>{labels.front}池</b> {displayNumbers(plan.front_pool || []).join(" ")}　<b>{labels.back}池</b> {displayNumbers(plan.back_pool || []).join(" ")}</p>;
+  }
+  const ticket = plan.items?.[0] || fallback || {};
+  return <p><b>{labels.front}</b> {displayNumbers(ticket.front || []).join(" ")}　<b>{labels.back}</b> {displayNumbers(ticket.back || []).join(" ")}{Number(plan.tickets || 0) > 1 ? `　共 ${plan.tickets} 注` : ""}</p>;
+}
+
+function ReviewPanel({ review, onRefresh, onDelete, scoreRows = [], scene = "DLT", currentDraw }) {
+  const [expandedId, setExpandedId] = useState(null);
   if (!review) return null;
   const summary = review.summary || {};
   const latestReviewed = (review.items || []).find((item) => item.status === "reviewed" && item.actual);
   const focusDraw = currentDraw || latestReviewed?.actual;
+  const labels = planLabelsForScene(scene);
   return (
-    <section className="panel wide review-panel" id="module-review">
+    <section className="panel wide review-panel simple-review" id="module-review">
       <div className="panel-title">
-        <div>
-          <h2>当期开奖号码与方案复盘</h2>
-          <p>开奖号码置顶，逐个核对已选方案、中奖金额与结构表现</p>
-        </div>
-        <button className="ghost-button compact" onClick={onRefresh} type="button">刷新复盘</button>
+        <div><h2>当期复盘</h2><p>保存的方案按时间排列；开奖后自动补充命中数和奖金。</p></div>
+        <button className="ghost-button compact" onClick={onRefresh} type="button">刷新</button>
       </div>
       {focusDraw && (
-        <div className="current-draw-review">
-          <div><span>最新期开奖</span><strong>第 {focusDraw.issue} 期</strong><small>{focusDraw.date}</small></div>
-          <div className="current-draw-balls"><span>{planLabelsForScene(scene).front}</span>{focusDraw.front.map((number) => <NumberBall key={`f-${number}`}>{formatNumber(number)}</NumberBall>)}<span>{planLabelsForScene(scene).back}</span>{focusDraw.back.map((number) => <NumberBall key={`b-${number}`} tone="back">{formatNumber(number)}</NumberBall>)}</div>
-          <ul>{drawStructureAnalysis(focusDraw, scene, scoreRows).map((note) => <li key={note}>{note}</li>)}</ul>
+        <div className="latest-draw-strip">
+          <div><span>最新开奖</span><strong>第 {focusDraw.issue} 期</strong><small>{focusDraw.date}</small></div>
+          <div className="current-draw-balls">{focusDraw.front.map((number) => <NumberBall key={`f-${number}`}>{formatNumber(number)}</NumberBall>)}<i>+</i>{focusDraw.back.map((number) => <NumberBall key={`b-${number}`} tone="back">{formatNumber(number)}</NumberBall>)}</div>
+          <p>{drawStructureAnalysis(focusDraw, scene, scoreRows)[0]}</p>
         </div>
       )}
-      <div className="review-summary">
-        <div><span>已复盘</span><strong>{summary.reviewed || 0}</strong></div>
-        <div><span>待开奖</span><strong>{summary.pending || 0}</strong></div>
-        <div><span>投入金额</span><strong>{summary.total_cost || 0} 元</strong></div>
-        <div><span>命中记录率</span><strong>{summary.record_hit_rate || 0}%</strong></div>
-        <div><span>最佳命中</span><strong>{summary.best_hit || "-"}</strong></div>
-        <div><span>最佳奖级</span><strong>{summary.best_prize_label || "-"}</strong></div>
-        <div><span>实际奖金</span><strong>{summary.roi_complete ? `${summary.total_prize || 0} 元` : "部分待补"}</strong></div>
-        <div><span>净收益</span><strong>{summary.roi_complete ? `${summary.net_profit || 0} 元` : "待奖金完整"}</strong></div>
-        <div><span>实际 ROI</span><strong>{summary.roi_complete && summary.roi !== null ? `${summary.roi}%` : "待奖金完整"}</strong></div>
+      <div className="simple-review-summary">
+        <span>待开奖 <b>{summary.pending || 0}</b></span>
+        <span>已复盘 <b>{summary.reviewed || 0}</b></span>
+        <span>累计奖金 <b>{summary.roi_complete ? `${summary.total_prize || 0} 元` : "待补齐"}</b></span>
       </div>
-      <div className="review-list">
-        {(review.items || []).slice(0, 6).map((item) => (
-          <article className="review-item" key={item.record_id || item.saved_at}>
-            {(() => {
-              const labels = lotteryLabels(item);
-              return item.status === "pending" ? (
-                <>
-                  <div>
-                    <strong>推荐期号 {item.recommended_issue || item.latest_issue || "-"}</strong>
-                    <span>{item.next_step || item.message} 保存后会在这里进入“待开奖/待复盘”队列。</span>
-                  </div>
-                  <Badge>{item.status_label || "待开奖"}</Badge>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <strong>实际开奖 {item.actual.issue}</strong>
-                    <span>{labels.front} {item.actual.front.map((number) => String(number).padStart(2, "0")).join(" ")} · {labels.back} {item.actual.back.map((number) => String(number).padStart(2, "0")).join(" ")}</span>
-                  </div>
-                  <div>
-                    <b>{item.best?.hit_label || "-"}</b>
-                    <span>{item.best?.prize_label || "-"}</span>
-                  </div>
-                  <Badge>{item.status_label || "已复盘"}</Badge>
-                  <div className="review-compare">
-                    <div>
-                      <span>推荐号码</span>
-                      <p>
-                        {labels.front} {(item.best?.front || []).map((number) => String(number).padStart(2, "0")).join(" ")}
-                        <br />
-                        {labels.back} {(item.best?.back || []).map((number) => String(number).padStart(2, "0")).join(" ")}
-                      </p>
-                    </div>
-                    <div>
-                      <span>开奖号码</span>
-                      <p>
-                        {labels.front} {item.actual.front.map((number) => String(number).padStart(2, "0")).join(" ")}
-                        <br />
-                        {labels.back} {item.actual.back.map((number) => String(number).padStart(2, "0")).join(" ")}
-                      </p>
-                    </div>
-                  </div>
-                  <p>
-                    推荐期号 {item.recommended_issue || item.latest_issue || "-"} · {planModeLabel(item.mode)} · {item.cost} 元 ·
-                    命中票数 {item.hit_tickets}/{item.tickets} · 命中率 {item.hit_rate}%
-                  </p>
-                  {Object.keys(item.prize_distribution || {}).length > 0 && (
-                    <p>奖级分布：{Object.entries(item.prize_distribution).map(([label, count]) => `${label} ${count} 注`).join("·")}</p>
-                  )}
-                  <p>
-                    实际奖金 {item.prize_amount_complete ? `${item.prize_amount || 0} 元` : "奖金数据待补齐"}
-                    {item.prize_amount_complete && ` · 净收益 ${item.net_profit || 0} 元 · ROI ${item.roi ?? 0}%`}
-                  </p>
-                  {item.prize_source && <p>奖金来源：{item.prize_source}</p>}
-                  <div className="review-analysis"><strong>结构点评</strong>{drawStructureAnalysis(item.actual, scene, scoreRows).map((note) => <p key={note}>{note}</p>)}</div>
-                </>
-              );
-            })()}
-          </article>
-        ))}
+      <div className="simple-review-list">
+        {(review.items || []).slice(0, 10).map((item) => {
+          const id = item.record_id || item.saved_at;
+          const plan = item.plan || {};
+          const pending = item.status === "pending";
+          const mode = plan.mode || item.mode || "single";
+          return (
+            <article className="simple-review-item" key={id}>
+              <div className="simple-review-head">
+                <div><strong>第 {item.recommended_issue || item.actual?.issue || item.latest_issue || "-"} 期 · {planModeLabel(mode)}</strong><span>{item.saved_at ? new Date(item.saved_at).toLocaleString("zh-CN", { hour12: false }) : ""}</span></div>
+                <Badge tone={pending ? "default" : "live"}>{pending ? "待开奖" : "已复盘"}</Badge>
+              </div>
+              <ReviewPlanNumbers plan={plan} fallback={item.best} labels={labels} />
+              <div className="simple-review-result">
+                <span>命中 <b>{pending ? "待开奖" : item.best?.hit_label || "0+0"}</b></span>
+                <span>奖级 <b>{pending ? "-" : item.best?.prize_label || "未中奖"}</b></span>
+                <span>奖金 <b>{pending ? "-" : item.prize_amount_complete ? `${item.prize_amount || 0} 元` : "待补齐"}</b></span>
+              </div>
+              <div className="simple-review-actions">
+                {!pending && <button className="ghost-button compact" onClick={() => setExpandedId(expandedId === id ? null : id)} type="button">{expandedId === id ? "收起分析" : "查看分析"}</button>}
+                {onDelete && item.record_id && <button className="ghost-button compact danger" onClick={() => onDelete(item.record_id)} type="button">删除</button>}
+              </div>
+              {expandedId === id && item.actual && (
+                <div className="simple-review-detail">
+                  <p><b>开奖号码</b> {labels.front} {displayNumbers(item.actual.front || []).join(" ")}　{labels.back} {displayNumbers(item.actual.back || []).join(" ")}</p>
+                  {drawStructureAnalysis(item.actual, scene, scoreRows).map((note) => <p key={note}>{note}</p>)}
+                  {Object.keys(item.prize_distribution || {}).length > 0 && <p>奖级分布：{Object.entries(item.prize_distribution).map(([label, count]) => `${label} ${count}注`).join("、")}</p>}
+                </div>
+              )}
+            </article>
+          );
+        })}
+        {(review.items || []).length === 0 && <p className="empty-text">还没有保存方案。请先到“选号工作台”生成并保存。</p>}
       </div>
-      <p className="review-disclaimer">{review.disclaimer}</p>
+      <p className="review-disclaimer">复盘只核对保存方案与实际开奖，不代表未来中奖概率。</p>
     </section>
   );
 }
@@ -2140,9 +2117,7 @@ function BettingPlanPanel({
   const [appended, setAppended] = useState(false);
 
   const addGeneratedPlans = (plans) => {
-    const existing = generated?.comparison_plans || (generated ? [generated] : []);
-    const merged = [...existing, ...plans].slice(-12);
-    onGenerated({ ...merged[0], comparison_plans: merged });
+    onGenerated(plans.length ? { ...plans[0], comparison_plans: plans } : null);
   };
 
   const removeGeneratedPlan = (index) => {
@@ -2424,8 +2399,8 @@ function BettingPlanPanel({
       {generated && (
         <div className="betting-result" id="generated-plan-result">
           <div className="section-kicker">
-            <span>本期已选号码组合</span>
-            <strong>{generated.comparison_plans?.length || 1} 个方案，可分别保存</strong>
+            <span>当前生成结果</span>
+            <strong>{generated.comparison_plans?.length || 1} 个方案，重新生成会替换</strong>
           </div>
           <div className={generated.comparison_plans?.length ? "plan-comparison-grid" : ""}>
             {(generated.comparison_plans || [generated]).map((plan, index) => (
@@ -2619,6 +2594,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
       await refreshReview();
       await refreshBehavior();
+      changeModule("review");
       setNotice("方案已加入当期复盘，开奖后自动核对。");
     } catch (err) {
       const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
@@ -2628,6 +2604,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
       setSavedPlans(nextPlans);
       await refreshReview();
       await refreshBehavior();
+      changeModule("review");
       setNotice(`方案已保存到本地并加入当期复盘。${err?.message ? `后端原因：${err.message}` : ""}`);
     }
   };
@@ -2763,10 +2740,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
           )}
 
           {activeModule === "review" && (
-            <>
-              <ReviewPanel review={review} onRefresh={refreshReview} scoreRows={dashboard.score_table} scene="DLT" currentDraw={(Array.isArray(draws) ? draws : draws?.items)?.[0]} />
-              <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} scene="DLT" onImport={importSyncedRecords} />
-            </>
+            <ReviewPanel review={review} onRefresh={refreshReview} onDelete={deleteRecord} scoreRows={dashboard.score_table} scene="DLT" currentDraw={(Array.isArray(draws) ? draws : draws?.items)?.[0]} />
           )}
           {activeModule === "trends" && (
             <>
@@ -2946,6 +2920,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
       await refreshReview();
       await refreshBehavior();
+      changeModule("review");
       setNotice("双色球方案已加入当期复盘，开奖后自动核对。");
     } catch (err) {
       const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
@@ -2955,6 +2930,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
       setSavedPlans(nextPlans);
       await refreshReview();
       await refreshBehavior();
+      changeModule("review");
       setNotice(`双色球方案已保存到本地并加入当期复盘。${err?.message ? `后端原因：${err.message}` : ""}`);
     }
   };
@@ -3121,10 +3097,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
           )}
 
           {activeModule === "review" && (
-            <>
-              <ReviewPanel review={review} onRefresh={refreshReview} scoreRows={scoreRows} scene="SSQ" currentDraw={(Array.isArray(draws) ? draws : draws?.items)?.[0]} />
-              <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} scene="SSQ" onImport={importSyncedRecords} />
-            </>
+            <ReviewPanel review={review} onRefresh={refreshReview} onDelete={deleteRecord} scoreRows={scoreRows} scene="SSQ" currentDraw={(Array.isArray(draws) ? draws : draws?.items)?.[0]} />
           )}
           {activeModule === "trends" && (
             <>

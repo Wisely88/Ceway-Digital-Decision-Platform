@@ -757,23 +757,15 @@ function reviewDemoPlan(plan, draw, prizeIssues = {}) {
 export async function getDemoReview() {
   const prizeIssues = await loadPrizeIssues(dltPrizeUrl);
   const records = JSON.parse(localStorage.getItem("ceway_demo_records") || "[]");
-  const fallback = records.length > 0 ? records : [
-    {
-      id: "demo-review-sample",
-      saved_at: new Date().toISOString(),
-      budget: 20,
-      strategy: "balanced",
-      latest_issue: "2025029",
-      plan: buildDantuoPlan(20, "balanced", scoreFront(buildTrends(30)), scoreBack(buildTrends(30))),
-    },
-  ];
-  const items = fallback.map((record) => {
+  const items = records.map((record) => {
     const draw = nextDemoDraw(record.latest_issue);
     if (!draw) {
       return {
         record_id: record.id,
         saved_at: record.saved_at,
         latest_issue: record.latest_issue,
+        recommended_issue: record.plan?.recommended_issue,
+        plan: record.plan,
         status: "pending",
         message: "推荐期之后暂无下一期开奖数据，暂不能复盘。",
       };
@@ -784,6 +776,7 @@ export async function getDemoReview() {
       latest_issue: record.latest_issue,
       strategy: record.strategy,
       budget: record.budget,
+      plan: record.plan,
       status: "reviewed",
       ...reviewDemoPlan(record.plan, draw, prizeIssues),
     };
@@ -972,6 +965,7 @@ export async function getDemoSsqReview() {
         saved_at: record.saved_at,
         latest_issue: record.latest_issue,
         recommended_issue: record.plan?.recommended_issue,
+        plan: record.plan,
         status: "pending",
         status_label: "待开奖",
         next_step: `等待第 ${record.plan?.recommended_issue || "下一"} 期开奖后复盘。`,
@@ -983,6 +977,7 @@ export async function getDemoSsqReview() {
       latest_issue: record.latest_issue,
       strategy: record.strategy,
       budget: record.budget,
+      plan: record.plan,
       status: "reviewed",
       status_label: "已复盘",
       ...reviewDemoSsqPlan(record.plan, draw, prizeIssues),

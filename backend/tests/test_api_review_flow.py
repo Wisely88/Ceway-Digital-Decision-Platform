@@ -109,6 +109,20 @@ class ApiReviewFlowTests(unittest.TestCase):
         finally:
             connection.close()
 
+    def test_pending_review_keeps_saved_plan_numbers(self) -> None:
+        db.replace_dlt_draws([
+            {"issue": "26001", "date": "2026-01-01", "front": [1, 2, 3, 4, 5], "back": [1, 2]},
+        ])
+        plan = {
+            "scene": "DLT", "mode": "single", "recommended_issue": "26002",
+            "items": [{"front": [6, 7, 8, 9, 10], "back": [3, 4]}], "tickets": 1, "cost": 2,
+        }
+        request("POST", "/records/dlt", {"budget": 2, "strategy": "balanced", "latest_issue": "26001", "plan": plan})
+        status, review = request("GET", "/review/dlt")
+        self.assertEqual(status, 200)
+        self.assertEqual(review["items"][0]["status"], "pending")
+        self.assertEqual(review["items"][0]["plan"]["items"][0]["front"], [6, 7, 8, 9, 10])
+
     def test_ssq_save_draw_and_review_flow(self) -> None:
         db.replace_ssq_draws(
             [
