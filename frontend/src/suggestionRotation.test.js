@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { rotateItems, selectScoredCombination, topScoreNumbers } from "./suggestionRotation.js";
+import { hasConsecutiveNumbers, rotateItems, selectScoredCombination, topScoreNumbers } from "./suggestionRotation.js";
 
 test("连续生成序号会轮换不同评分候选号码", () => {
   const rows = Array.from({ length: 10 }, (_, index) => ({ number: index + 1, total_score: 100 - index }));
@@ -40,6 +40,21 @@ test("后区组合在候选组合用完前不重复", () => {
     selectScoredCombination(rows, 12, 2, index + 1).slice().sort((a, b) => a - b).join("-")
   ));
   assert.equal(new Set(signatures).size, signatures.length);
+});
+
+test("大乐透后区避开前区号码并优先排除连号", () => {
+  const rows = Array.from({ length: 12 }, (_, index) => ({ number: index + 1, total_score: 100 - index }));
+  const selected = selectScoredCombination(rows, 12, 2, 1, [1, 2], { avoidConsecutive: true });
+  assert.equal(selected.some((number) => [1, 2].includes(number)), false);
+  assert.equal(hasConsecutiveNumbers(selected), false);
+});
+
+test("大乐透多次生成的后区均不使用连号", () => {
+  const rows = Array.from({ length: 12 }, (_, index) => ({ number: index + 1, total_score: 100 - index * 2 }));
+  for (let variant = 1; variant <= 12; variant += 1) {
+    const selected = selectScoredCombination(rows, 12, 2, variant, [1, 4], { avoidConsecutive: true });
+    assert.equal(hasConsecutiveNumbers(selected), false);
+  }
 });
 
 test("2胆和3胆都会随生成序号切换不同高分组合", () => {

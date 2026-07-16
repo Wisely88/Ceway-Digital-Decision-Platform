@@ -49,6 +49,19 @@ class GeneratorTests(unittest.TestCase):
         second_numbers = second.get("front_dan", second.get("items", [{}])[0].get("front"))
         self.assertNotEqual(first_numbers, second_numbers)
 
+    def test_dlt_back_numbers_avoid_front_overlap_and_consecutive_pairs(self) -> None:
+        plans = generate_plans(40, "balanced", score_rows(35), score_rows(12), variant=0)
+        for plan in plans:
+            if plan["mode"] == "dantuo":
+                front_numbers = set(plan["front_dan"])
+                backs = plan["back"]
+                self.assertTrue(front_numbers.isdisjoint(backs))
+                self.assertFalse(any(right - left == 1 for left, right in zip(backs, backs[1:])))
+            else:
+                for ticket in plan["items"]:
+                    self.assertTrue(set(ticket["front"]).isdisjoint(ticket["back"]))
+                    self.assertFalse(ticket["back"][1] - ticket["back"][0] == 1)
+
 
 class BackScoreTests(unittest.TestCase):
     def test_dlt_back_scores_include_heat_missing_and_balance_formula(self) -> None:

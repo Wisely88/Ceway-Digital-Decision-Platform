@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from itertools import combinations
 from math import comb
 
 
@@ -78,6 +79,22 @@ def budget_fit_sort_key(item: dict) -> tuple:
     return (-item["cost"], -item.get("tickets", 0), -item.get("score", 0))
 
 
+def has_consecutive_numbers(numbers: tuple[int, ...] | list[int]) -> bool:
+    ordered = sorted(numbers)
+    return any(current - previous == 1 for previous, current in zip(ordered, ordered[1:]))
+
+
+def select_dlt_back_numbers(ranked_back: list[int], count: int, excluded: list[int]) -> list[int]:
+    pool = [number for number in ranked_back if number not in set(excluded)]
+    if len(pool) < count:
+        pool = ranked_back
+    candidate_band = pool[: min(len(pool), count + 6)]
+    candidates = list(combinations(candidate_band, count))
+    separated = [candidate for candidate in candidates if not has_consecutive_numbers(candidate)]
+    selected = separated[0] if separated else (candidates[0] if candidates else tuple(pool[:count]))
+    return sorted(selected)
+
+
 def generate_single(
     budget: int,
     score_table: list[dict],
@@ -94,7 +111,7 @@ def generate_single(
         front_pool = ranked_front[index:] + ranked_front[:index]
         back_pool = ranked_back[index:] + ranked_back[:index]
         front = sorted(front_pool[:5])
-        back = sorted(back_pool[:2])
+        back = select_dlt_back_numbers(back_pool, 2, front)
         tickets.append(
             {
                 "front": front,
@@ -148,7 +165,7 @@ def generate_dantuo(
                     continue
                 front_dan = sorted(ranked_front[:dan_count])
                 front_tuo = sorted(ranked_front[dan_count : dan_count + tuo_count])
-                back = sorted(ranked_back[:back_count])
+                back = select_dlt_back_numbers(ranked_back, back_count, front_dan)
                 front_score = plan_score(front_dan + front_tuo, score_table)
                 candidates.append(
                     {

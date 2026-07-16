@@ -356,7 +356,14 @@ function buildSingleItems({ rules, frontRows, backRows, count, variant }) {
   const items = [];
   for (let index = 0; index < count; index += 1) {
     const front = selectScoredCombination(frontRows, rules.frontMax, rules.frontPick, variant + index);
-    const back = selectScoredCombination(backRows, rules.backMax, rules.backPick, variant + index);
+    const back = selectScoredCombination(
+      backRows,
+      rules.backMax,
+      rules.backPick,
+      variant + index,
+      rules.scene === "DLT" ? front : [],
+      { avoidConsecutive: rules.scene === "DLT" },
+    );
     items.push({
       front: [...front].sort((left, right) => left - right),
       back: [...back].sort((left, right) => left - right),
@@ -428,7 +435,14 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
     .sort((left, right) => left - right);
   const frontTuo = selectScoredCombination(scoreRows, rules.frontMax, safeTuo, variant, frontDan)
     .sort((left, right) => left - right);
-  const back = selectScoredCombination(backRows, rules.backMax, safeBack, variant).sort((left, right) => left - right);
+  const back = selectScoredCombination(
+    backRows,
+    rules.backMax,
+    safeBack,
+    variant,
+    scene === "DLT" ? frontDan : [],
+    { avoidConsecutive: scene === "DLT" },
+  ).sort((left, right) => left - right);
   const tickets = combinationCount(frontTuo.length, rules.frontPick - frontDan.length) * combinationCount(back.length, rules.backPick);
   const cost = tickets * 2;
   return {
@@ -451,7 +465,7 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
     tickets,
     reason: `按用户指定的 ${frontDan.length} 胆 ${frontTuo.length} 拖生成，费用 ${cost} 元。`,
     explanation: aiCommentaryForPlan({ mode: "dantuo" }, labels),
-    score_basis: `${labels.front}和${labels.back}均先按热度0.4 + 遗漏0.3 + 历史结构平衡0.3评分；${labels.back}${back.map((number) => `${formatNumber(number)}(${backScoreMap.get(number)?.total_score ?? backScoreMap.get(number)?.score ?? 0}分)`).join("、")}。`,
+    score_basis: `${labels.front}和${labels.back}均先按热度0.4 + 遗漏0.3 + 历史结构平衡0.3评分；${scene === "DLT" ? "再执行前区胆码与后区去重、后区非连号约束；" : ""}${labels.back}${back.map((number) => `${formatNumber(number)}(${backScoreMap.get(number)?.total_score ?? backScoreMap.get(number)?.score ?? 0}分)`).join("、")}。`,
     budget_analysis: {
       budget: Number(budget || 0),
       cost,

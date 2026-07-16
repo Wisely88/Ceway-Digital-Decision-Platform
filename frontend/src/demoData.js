@@ -378,6 +378,19 @@ function formatNumbers(numbers) {
   return numbers.map((number) => String(number).padStart(2, "0"));
 }
 
+function selectSeparatedBack(rankedBack, count, excluded = []) {
+  const excludedSet = new Set(excluded);
+  let pool = rankedBack.filter((number) => !excludedSet.has(number));
+  if (pool.length < count) pool = rankedBack;
+  const band = pool.slice(0, Math.min(pool.length, count + 6));
+  const candidates = choose(band, count);
+  const separated = candidates.filter((numbers) => {
+    const ordered = [...numbers].sort((left, right) => left - right);
+    return !ordered.some((number, index) => index > 0 && number - ordered[index - 1] === 1);
+  });
+  return [...(separated[0] || candidates[0] || pool.slice(0, count))].sort((left, right) => left - right);
+}
+
 function planScore(numbers, rows) {
   const scoreByNumber = new Map(rows.map((row) => [row.number, row.total_score]));
   return Math.round(numbers.reduce((sum, number) => sum + (scoreByNumber.get(number) || 0), 0) * 100) / 100;
@@ -396,7 +409,7 @@ function buildSinglePlan(budget, strategy, scores, backScores) {
     const frontPool = rankedFront.slice(index).concat(rankedFront.slice(0, index));
     const backPool = rankedBack.slice(index).concat(rankedBack.slice(0, index));
     const front = frontPool.slice(0, 5).sort((a, b) => a - b);
-    const back = backPool.slice(0, 2).sort((a, b) => a - b);
+    const back = selectSeparatedBack(backPool, 2, front);
     return {
       front,
       back,
@@ -436,7 +449,7 @@ function buildDantuoPlan(budget, strategy, scores, backScores) {
   if (!structure) return buildSinglePlan(budget, strategy, scores, backScores);
   const frontDan = rankedFront.slice(0, structure.danCount).sort((a, b) => a - b);
   const frontTuo = rankedFront.slice(structure.danCount, structure.danCount + structure.tuoCount).sort((a, b) => a - b);
-  const back = rankedBack.slice(0, structure.backCount).sort((a, b) => a - b);
+  const back = selectSeparatedBack(rankedBack, structure.backCount, frontDan);
   const score = planScore(frontDan.concat(frontTuo), scores);
   return {
     mode: "dantuo",

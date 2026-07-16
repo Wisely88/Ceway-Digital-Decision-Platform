@@ -45,7 +45,12 @@ function combinations(items, pick, start = 0, prefix = [], output = []) {
   return output;
 }
 
-export function selectScoredCombination(rows, max, pick, variant = 1, excludedNumbers = []) {
+export function hasConsecutiveNumbers(numbers) {
+  const sorted = [...numbers].map(Number).sort((left, right) => left - right);
+  return sorted.some((number, index) => index > 0 && number - sorted[index - 1] === 1);
+}
+
+export function selectScoredCombination(rows, max, pick, variant = 1, excludedNumbers = [], options = {}) {
   const safePick = Math.max(1, Math.min(Number(pick) || 1, max));
   const excluded = new Set((excludedNumbers || []).map(Number));
   const scoreByNumber = new Map(
@@ -64,6 +69,10 @@ export function selectScoredCombination(rows, max, pick, variant = 1, excludedNu
     }))
     .sort((left, right) => right.score - left.score || left.numbers.join("-").localeCompare(right.numbers.join("-")));
   if (!candidates.length) return ranked.slice(0, effectivePick);
-  const index = (Math.max(1, Math.floor(Number(variant) || 1)) - 1) % candidates.length;
-  return candidates[index].numbers;
+  const preferred = options.avoidConsecutive
+    ? candidates.filter((candidate) => !hasConsecutiveNumbers(candidate.numbers))
+    : candidates;
+  const selectable = preferred.length ? preferred : candidates;
+  const index = (Math.max(1, Math.floor(Number(variant) || 1)) - 1) % selectable.length;
+  return selectable[index].numbers;
 }
