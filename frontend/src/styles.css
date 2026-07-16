@@ -1996,7 +1996,19 @@ td {
 .section-kicker {
   align-items: center;
   display: flex;
+  gap: 12px;
   justify-content: space-between;
+}
+
+.section-kicker-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.save-all-button {
+  flex: 0 0 auto;
+  min-height: 40px;
 }
 
 .plan-card {
@@ -3295,6 +3307,16 @@ td {
 }
 
 @media (max-width: 640px) {
+  .section-kicker {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .save-all-button {
+    justify-content: center;
+    width: 100%;
+  }
+
   .scene-guide {
     margin-top: 18px;
     padding-top: 20px;

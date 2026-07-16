@@ -2156,6 +2156,7 @@ function BettingPlanPanel({
   budget,
   onBudgetChange,
   onSave,
+  onSaveAll,
   generated,
   onGenerated,
   decisionContext,
@@ -2177,6 +2178,7 @@ function BettingPlanPanel({
   const [manualDan, setManualDan] = useState([]);
   const [manualTuo, setManualTuo] = useState([]);
   const [message, setMessage] = useState("");
+  const [savingAll, setSavingAll] = useState(false);
   const variantStorageKey = `ceway_${scene.toLowerCase()}_suggestion_variant`;
   const [variant, setVariant] = useState(() => Number(sessionStorage.getItem(variantStorageKey) || 0));
   const [appended, setAppended] = useState(false);
@@ -2305,6 +2307,17 @@ function BettingPlanPanel({
     setManualDan([]);
     setManualTuo([]);
     setMessage("");
+  };
+
+  const saveAllGenerated = async () => {
+    const plans = generated?.comparison_plans || [];
+    if (!onSaveAll || plans.length < 2 || savingAll) return;
+    setSavingAll(true);
+    try {
+      await onSaveAll(plans);
+    } finally {
+      setSavingAll(false);
+    }
   };
 
   const dantuoTickets = combinationCount(Number(tuoCount || 0), rules.frontPick - Number(danCount || 0)) * combinationCount(Number(backCount || 0), rules.backPick);
@@ -2475,8 +2488,16 @@ function BettingPlanPanel({
       {generated && (
         <div className="betting-result" id="generated-plan-result">
           <div className="section-kicker">
-            <span>当前生成结果</span>
-            <strong>{generated.comparison_plans?.length || 1} 个方案，重新生成会替换</strong>
+            <div className="section-kicker-copy">
+              <span>当前生成结果</span>
+              <strong>{generated.comparison_plans?.length || 1} 个方案，重新生成会替换</strong>
+            </div>
+            {(generated.comparison_plans?.length || 0) > 1 && onSaveAll && (
+              <button className="primary-button save-all-button" disabled={savingAll} onClick={saveAllGenerated} type="button">
+                <Save size={16} />
+                {savingAll ? "正在保存..." : `一次保存全部（${generated.comparison_plans.length}）`}
+              </button>
+            )}
           </div>
           <div className={generated.comparison_plans?.length ? "plan-comparison-grid" : ""}>
             {(generated.comparison_plans || [generated]).map((plan, index) => (
@@ -2649,7 +2670,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
     return dashboard.top_numbers.map((number) => String(number).padStart(2, "0")).join(" ");
   }, [dashboard]);
 
-  const savePlan = async (plan) => {
+  const savePlan = async (plan, { navigate = true, refresh = true } = {}) => {
     const localRecord = {
       id: `${Date.now()}-${plan.strategy}-${plan.mode}`,
       saved_at: new Date().toISOString(),
@@ -2668,21 +2689,41 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
       mirrorCloudRecord("DLT", result.record);
       notifyCloudDataChanged();
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
-      await refreshReview();
-      await refreshBehavior();
-      changeModule("review");
-      setNotice("方案已加入当期复盘，开奖后自动核对。");
+      if (refresh) {
+        await refreshReview();
+        await refreshBehavior();
+      }
+      if (navigate) {
+        changeModule("review");
+        setNotice("方案已加入当期复盘，开奖后自动核对。");
+      }
     } catch (err) {
-      const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
-      localStorage.setItem("cbgo_saved_plans", JSON.stringify(nextPlans));
       mirrorCloudRecord("DLT", localRecord);
       notifyCloudDataChanged();
-      setSavedPlans(nextPlans);
-      await refreshReview();
-      await refreshBehavior();
-      changeModule("review");
-      setNotice(`方案已保存到本地并加入当期复盘。${err?.message ? `后端原因：${err.message}` : ""}`);
+      setSavedPlans((items) => {
+        const nextPlans = [localRecord, ...items].slice(0, 20);
+        localStorage.setItem("cbgo_saved_plans", JSON.stringify(nextPlans));
+        return nextPlans;
+      });
+      if (refresh) {
+        await refreshReview();
+        await refreshBehavior();
+      }
+      if (navigate) {
+        changeModule("review");
+        setNotice(`方案已保存到本地并加入当期复盘。${err?.message ? `后端原因：${err.message}` : ""}`);
+      }
     }
+  };
+
+  const saveAllPlans = async (plans) => {
+    for (const plan of plans) {
+      await savePlan(plan, { navigate: false, refresh: false });
+    }
+    await refreshReview();
+    await refreshBehavior();
+    changeModule("review");
+    setNotice(`已一次保存 ${plans.length} 个方案，开奖后将分别复盘。`);
   };
 
   const importSyncedRecords = async (records) => {
@@ -2811,6 +2852,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
               generated={generated}
               onGenerated={setGenerated}
               onSave={savePlan}
+              onSaveAll={saveAllPlans}
               decisionContext={{ principal, periodCap, records: savedPlans, reviewItems: review?.items || [], backtest, capital: dashboard.capital_state }}
             />
           )}
@@ -2979,7 +3021,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
     }
   };
 
-  const savePlan = async (plan) => {
+  const savePlan = async (plan, { navigate = true, refresh = true } = {}) => {
     const latestIssue = dashboard?.latest_issue || "";
     const localRecord = {
       id: `ssq-${Date.now()}-${plan.strategy}-${plan.mode}`,
@@ -2994,21 +3036,41 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
       mirrorCloudRecord("SSQ", result.record);
       notifyCloudDataChanged();
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
-      await refreshReview();
-      await refreshBehavior();
-      changeModule("review");
-      setNotice("双色球方案已加入当期复盘，开奖后自动核对。");
+      if (refresh) {
+        await refreshReview();
+        await refreshBehavior();
+      }
+      if (navigate) {
+        changeModule("review");
+        setNotice("双色球方案已加入当期复盘，开奖后自动核对。");
+      }
     } catch (err) {
-      const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
-      localStorage.setItem("cbgo_ssq_plans", JSON.stringify(nextPlans));
       mirrorCloudRecord("SSQ", localRecord);
       notifyCloudDataChanged();
-      setSavedPlans(nextPlans);
-      await refreshReview();
-      await refreshBehavior();
-      changeModule("review");
-      setNotice(`双色球方案已保存到本地并加入当期复盘。${err?.message ? `后端原因：${err.message}` : ""}`);
+      setSavedPlans((items) => {
+        const nextPlans = [localRecord, ...items].slice(0, 20);
+        localStorage.setItem("cbgo_ssq_plans", JSON.stringify(nextPlans));
+        return nextPlans;
+      });
+      if (refresh) {
+        await refreshReview();
+        await refreshBehavior();
+      }
+      if (navigate) {
+        changeModule("review");
+        setNotice(`双色球方案已保存到本地并加入当期复盘。${err?.message ? `后端原因：${err.message}` : ""}`);
+      }
     }
+  };
+
+  const saveAllPlans = async (plans) => {
+    for (const plan of plans) {
+      await savePlan(plan, { navigate: false, refresh: false });
+    }
+    await refreshReview();
+    await refreshBehavior();
+    changeModule("review");
+    setNotice(`已一次保存 ${plans.length} 个双色球方案，开奖后将分别复盘。`);
   };
 
   const importSyncedRecords = async (records) => {
@@ -3168,6 +3230,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
               generated={generated}
               onGenerated={setGenerated}
               onSave={savePlan}
+              onSaveAll={saveAllPlans}
               decisionContext={{ principal, periodCap, records: savedPlans, reviewItems: review?.items || [], backtest, capital: dashboard.capital }}
             />
           )}
