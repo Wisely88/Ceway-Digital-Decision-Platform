@@ -22,18 +22,19 @@ async function loadPrizeSnapshot(url) {
   return response.json();
 }
 
-function prizeFinancials(distribution, issueData, cost, appended = false) {
+function prizeFinancials(distribution, issueData, cost, appended = false, multiplier = 1) {
   const prizes = issueData?.prizes || {};
   const additionalPrizes = issueData?.additional_prizes || {};
   let prizeAmount = 0;
+  const safeMultiplier = Math.max(1, Math.min(99, Math.floor(Number(multiplier || 1))));
   const missing = [];
   Object.entries(distribution || {}).forEach(([label, count]) => {
     if (typeof prizes[label] !== "number") missing.push(label);
     else {
-      prizeAmount += prizes[label] * count;
+      prizeAmount += prizes[label] * count * safeMultiplier;
       if (appended) {
         if (typeof additionalPrizes[label] !== "number") missing.push(`${label}(追加)`);
-        else prizeAmount += additionalPrizes[label] * count;
+        else prizeAmount += additionalPrizes[label] * count * safeMultiplier;
       }
     }
   });
@@ -751,7 +752,7 @@ function reviewDemoPlan(plan, draw, prizeIssues = {}) {
     hit_rate: Math.round((hitTickets / Math.max(1, plan.tickets || details.length)) * 10000) / 100,
     prize_distribution: prizeDistribution,
   };
-  return { ...result, ...prizeFinancials(prizeDistribution, prizeIssues[draw.issue], result.cost, Boolean(plan.appended)) };
+  return { ...result, ...prizeFinancials(prizeDistribution, prizeIssues[draw.issue], result.cost, Boolean(plan.appended), plan.multiplier) };
 }
 
 export async function getDemoReview() {
@@ -945,7 +946,7 @@ function reviewDemoSsqPlan(plan, draw, prizeIssues = {}) {
     hit_rate: Math.round((hitTickets / Math.max(1, plan.tickets || details.length)) * 10000) / 100,
     prize_distribution: prizeDistribution,
   };
-  return { ...result, ...prizeFinancials(prizeDistribution, prizeIssues[draw.issue], result.cost) };
+  return { ...result, ...prizeFinancials(prizeDistribution, prizeIssues[draw.issue], result.cost, false, plan.multiplier) };
 }
 
 function nextDemoSsqDraw(issue) {

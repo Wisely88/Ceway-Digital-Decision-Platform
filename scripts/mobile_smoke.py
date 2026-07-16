@@ -98,6 +98,28 @@ async def click_text(client: CdpClient, text: str, selector: str = "button") -> 
     await asyncio.sleep(0.25)
 
 
+async def set_number_input(client: CdpClient, label_text: str, value: int) -> None:
+    encoded_label = json.dumps(label_text, ensure_ascii=False)
+    changed = await client.evaluate(
+        """
+        (() => {
+          const label = [...document.querySelectorAll('label')]
+            .find((node) => node.textContent.includes(%s));
+          const input = label?.querySelector('input[type="number"]');
+          if (!input) return false;
+          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+          setter.call(input, %s);
+          input.dispatchEvent(new Event('input', {bubbles: true}));
+          input.dispatchEvent(new Event('change', {bubbles: true}));
+          return true;
+        })()
+        """ % (encoded_label, int(value))
+    )
+    if not changed:
+        raise AssertionError(f"找不到数字输入框：{label_text}")
+    await asyncio.sleep(0.15)
+
+
 async def assert_no_document_overflow(client: CdpClient, context: str) -> None:
     metrics = await client.evaluate(
         "({clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth})"
@@ -112,8 +134,11 @@ async def run_scene_flow(client: CdpClient, scene_name: str) -> dict:
     await assert_no_document_overflow(client, f"{scene_name}工作台")
     await click_text(client, "选号工作台", ".side-nav-item")
     await wait_for_text(client, "生成智能推荐")
+    await wait_for_text(client, "单式倍数")
+    await set_number_input(client, "单式倍数", 3)
     await click_text(client, "生成智能推荐")
     await wait_for_text(client, "当前生成结果")
+    await wait_for_text(client, "30 元 · 5 注 × 3 倍")
     await click_text(client, "随机生成")
     await click_text(client, "生成随机号码")
     await wait_for_text(client, "纯随机号码已生成")

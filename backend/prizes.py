@@ -20,23 +20,33 @@ def load_prize_snapshot(scene: str) -> dict:
     return payload if isinstance(payload, dict) else {"source": "", "synced_at": "", "issues": {}}
 
 
-def prize_financials(distribution: dict[str, int], issue_prizes: dict | None, cost: float, appended: bool = False) -> dict:
+def prize_financials(
+    distribution: dict[str, int],
+    issue_prizes: dict | None,
+    cost: float,
+    appended: bool = False,
+    multiplier: int | str = 1,
+) -> dict:
     prizes = (issue_prizes or {}).get("prizes", {})
     additional_prizes = (issue_prizes or {}).get("additional_prizes", {})
     total = 0
     missing_labels = []
+    try:
+        safe_multiplier = max(1, min(99, int(float(multiplier or 1))))
+    except (TypeError, ValueError):
+        safe_multiplier = 1
     for label, count in distribution.items():
         amount = prizes.get(label)
         if not isinstance(amount, (int, float)) or amount < 0:
             missing_labels.append(label)
             continue
-        total += int(count) * amount
+        total += int(count) * amount * safe_multiplier
         if appended:
             additional_amount = additional_prizes.get(label)
             if not isinstance(additional_amount, (int, float)) or additional_amount < 0:
                 missing_labels.append(f"{label}(追加)")
             else:
-                total += int(count) * additional_amount
+                total += int(count) * additional_amount * safe_multiplier
     complete = not missing_labels
     net = total - cost
     roi = round((net / cost) * 100, 2) if cost and complete else None

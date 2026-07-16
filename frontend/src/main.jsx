@@ -452,7 +452,7 @@ function aiCommentaryForPlan(plan, labels) {
   ];
 }
 
-function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, ticketCount, danCount, tuoCount, backCount, latestIssue, recommendedIssue, variant, appended = false }) {
+function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, ticketCount, singleMultiplier = 1, danCount, tuoCount, backCount, latestIssue, recommendedIssue, variant, appended = false }) {
   const rules = sceneRules(scene);
   const labels = planLabelsForScene(scene);
   const backRows = backScoreRows?.length
@@ -462,8 +462,10 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
   const unitPrice = scene === "DLT" && appended ? 3 : 2;
 
   if (mode === "single") {
-    const count = Math.max(1, Math.min(100, Number(ticketCount || 1)));
+    const count = Math.max(1, Math.min(100, Math.floor(Number(ticketCount || 1))));
+    const multiplier = Math.max(1, Math.min(99, Math.floor(Number(singleMultiplier || 1))));
     const items = buildSingleItems({ rules, frontRows: scoreRows, backRows, count, variant });
+    const cost = items.length * unitPrice * multiplier;
     return {
       scene,
       play_name: rules.playName,
@@ -476,18 +478,20 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
       recommendation_label: `基于第 ${latestIssue || "-"} 期开奖数据，生成第 ${recommendedIssue || "下一"} 期历史规则单式方案。`,
       appended: scene === "DLT" && appended,
       unit_price: unitPrice,
-      cost: items.length * unitPrice,
+      multiplier,
+      cost,
       tickets: items.length,
+      total_bets: items.length * multiplier,
       items,
-      reason: `按历史评分与结构筛选生成 ${items.length} 注单式，${appended ? "已追加投注，" : ""}费用 ${items.length * unitPrice} 元。`,
+      reason: `按历史评分与结构筛选生成 ${items.length} 注单式 × ${multiplier} 倍，${appended ? "已追加投注，" : ""}费用 ${cost} 元。`,
       explanation: aiCommentaryForPlan({ mode: "single" }, labels),
       score_basis: `${labels.front}和${labels.back}均先按热度0.4 + 遗漏0.3 + 历史结构平衡0.3评分，再从高分候选带生成变体。`,
       budget_analysis: {
         budget: Number(budget || 0),
-        cost: items.length * unitPrice,
-        unused: Math.max(0, Number(budget || 0) - items.length * unitPrice),
-        utilization: Number(budget || 0) ? Math.round((items.length * unitPrice / Number(budget || 0)) * 10000) / 100 : 0,
-        explanation: "按照手动填写注数生成；如预算不足，系统自动压缩到预算范围内。",
+        cost,
+        unused: Math.max(0, Number(budget || 0) - cost),
+        utilization: Number(budget || 0) ? Math.round((cost / Number(budget || 0)) * 10000) / 100 : 0,
+        explanation: "按用户填写的单式注数和倍数生成。",
       },
     };
   }
@@ -563,18 +567,19 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
   };
 }
 
-function buildRandomBettingPlan({ scene, mode, ticketCount, danCount, tuoCount, backCount, latestIssue, recommendedIssue, appended = false }) {
+function buildRandomBettingPlan({ scene, mode, ticketCount, singleMultiplier = 1, danCount, tuoCount, backCount, latestIssue, recommendedIssue, appended = false }) {
   const rules = sceneRules(scene);
   const labels = planLabelsForScene(scene);
   const unitPrice = scene === "DLT" && appended ? 3 : 2;
   if (mode === "single") {
-    const count = Math.max(1, Math.min(100, Number(ticketCount || 1)));
+    const count = Math.max(1, Math.min(100, Math.floor(Number(ticketCount || 1))));
+    const multiplier = Math.max(1, Math.min(99, Math.floor(Number(singleMultiplier || 1))));
     const items = Array.from({ length: count }, () => {
       const front = randomSample(rules.frontMax, rules.frontPick);
       const back = randomSample(rules.backMax, rules.backPick, scene === "DLT" ? front : []);
       return { front, back, front_display: displayNumbers(front), back_display: displayNumbers(back), explanation: ["纯随机生成，不使用历史评分。"] };
     });
-    return { scene, play_name: rules.playName, play_labels: labels, mode: "single", source: "random_selection", strategy: "random_selection", based_on_issue: latestIssue, recommended_issue: recommendedIssue, recommendation_label: `第 ${recommendedIssue || "下一"} 期纯随机单式方案。`, appended: scene === "DLT" && appended, unit_price: unitPrice, cost: count * unitPrice, tickets: count, items, reason: "纯随机抽样生成，每个合法组合地位相同。" };
+    return { scene, play_name: rules.playName, play_labels: labels, mode: "single", source: "random_selection", strategy: "random_selection", based_on_issue: latestIssue, recommended_issue: recommendedIssue, recommendation_label: `第 ${recommendedIssue || "下一"} 期纯随机单式方案。`, appended: scene === "DLT" && appended, unit_price: unitPrice, multiplier, cost: count * unitPrice * multiplier, tickets: count, total_bets: count * multiplier, items, reason: `纯随机生成 ${count} 注单式 × ${multiplier} 倍，每个合法组合地位相同。` };
   }
   if (mode === "compound") {
     const frontPool = randomSample(rules.frontMax, Math.max(rules.frontPick + 1, Number(tuoCount || rules.frontPick + 1)));
@@ -643,7 +648,7 @@ function manualCommentary({ plan, scoreRows, labels }) {
   return notes;
 }
 
-function buildManualBettingPlan({ scene, mode, selectedFront, selectedBack, frontDan, frontTuo, latestIssue, recommendedIssue, budget, scoreRows, appended = false }) {
+function buildManualBettingPlan({ scene, mode, selectedFront, selectedBack, frontDan, frontTuo, latestIssue, recommendedIssue, budget, scoreRows, singleMultiplier = 1, appended = false }) {
   const rules = sceneRules(scene);
   const labels = planLabelsForScene(scene);
   const unitPrice = scene === "DLT" && appended ? 3 : 2;
@@ -658,6 +663,8 @@ function buildManualBettingPlan({ scene, mode, selectedFront, selectedBack, fron
       back_display: displayNumbers(selectedBack),
       explanation: ["人工选号，系统按评分和结构给出点评。"],
     };
+    const multiplier = Math.max(1, Math.min(99, Math.floor(Number(singleMultiplier || 1))));
+    const cost = unitPrice * multiplier;
     const plan = {
       scene,
       play_name: rules.playName,
@@ -670,11 +677,13 @@ function buildManualBettingPlan({ scene, mode, selectedFront, selectedBack, fron
       recommendation_label: `人工选择第 ${recommendedIssue || "下一"} 期单式方案，保存后等待开奖复盘。`,
       appended: scene === "DLT" && appended,
       unit_price: unitPrice,
-      budget_analysis: { budget: Number(budget || 0), cost: unitPrice, unused: Math.max(0, Number(budget || 0) - unitPrice), utilization: Number(budget || 0) ? Math.round((unitPrice / Number(budget || 0)) * 10000) / 100 : 0 },
-      cost: unitPrice,
+      multiplier,
+      budget_analysis: { budget: Number(budget || 0), cost, unused: Math.max(0, Number(budget || 0) - cost), utilization: Number(budget || 0) ? Math.round((cost / Number(budget || 0)) * 10000) / 100 : 0 },
+      cost,
       tickets: 1,
+      total_bets: multiplier,
       items: [item],
-      reason: "人工选号方案，系统仅按历史评分和结构规则点评，不预测开奖结果。",
+      reason: `人工选号单式 × ${multiplier} 倍，系统仅按历史评分和结构规则点评，不预测开奖结果。`,
     };
     plan.explanation = manualCommentary({ plan, scoreRows, labels });
     return plan;
@@ -1418,7 +1427,7 @@ function PlanCard({ plan, onSave, onRemove }) {
     ? `${playName} ${planModeLabel(plan.mode)}\n${labels.dan}：${plan.front_dan_display.join(" ")}\n${labels.tuo}：${plan.front_tuo_display.join(" ")}\n${labels.back}：${plan.back_display.join(" ")}\n共 ${plan.tickets} 注，费用 ${plan.cost} 元`
     : plan.mode === "compound"
       ? `${playName} 复式\n${labels.front}号码池：${plan.front_pool_display.join(" ")}\n${labels.back}号码池：${plan.back_pool_display.join(" ")}\n共 ${plan.tickets} 注，费用 ${plan.cost} 元`
-    : `${playName} ${planModeLabel(plan.mode)}\n${plan.items.map((item, index) => `${index + 1}. ${labels.front} ${item.front_display.join(" ")} + ${labels.back} ${item.back_display.join(" ")}`).join("\n")}`;
+    : `${playName} ${planModeLabel(plan.mode)} × ${Number(plan.multiplier || 1)} 倍\n${plan.items.map((item, index) => `${index + 1}. ${labels.front} ${item.front_display.join(" ")} + ${labels.back} ${item.back_display.join(" ")}`).join("\n")}\n共 ${plan.tickets} 组、${plan.total_bets || plan.tickets} 计费注，费用 ${plan.cost} 元`;
 
   const copy = async () => {
     try {
@@ -1446,9 +1455,10 @@ function PlanCard({ plan, onSave, onRemove }) {
         <Badge tone={plan.mode === "dantuo" ? "live" : "default"}>
           {plan.option_label || STRATEGY_LABELS[plan.strategy] || "策略"} · {planModeLabel(plan.mode)}
         </Badge>
-        <strong>{plan.cost} 元 · {plan.tickets} 注</strong>
+        <strong>{plan.cost} 元 · {plan.tickets} 注{plan.mode === "single" ? ` × ${Number(plan.multiplier || 1)} 倍` : ""}</strong>
       </div>
       {plan.appended && <Badge tone="live">大乐透追加投注 · 每注3元</Badge>}
+      {plan.mode === "single" && Number(plan.multiplier || 1) > 1 && <Badge>单式倍投 · {plan.multiplier} 倍</Badge>}
       <div className="plan-issue">
         <span>推荐期号</span>
         <strong>{plan.recommended_issue ? `第 ${plan.recommended_issue} 期` : "下一期开奖"}</strong>
@@ -1686,7 +1696,7 @@ function ReviewPlanNumbers({ plan = {}, fallback, labels }) {
     return <p><b>{labels.front}池</b> {displayNumbers(plan.front_pool || []).join(" ")}　<b>{labels.back}池</b> {displayNumbers(plan.back_pool || []).join(" ")}</p>;
   }
   const ticket = plan.items?.[0] || fallback || {};
-  return <p><b>{labels.front}</b> {displayNumbers(ticket.front || []).join(" ")}　<b>{labels.back}</b> {displayNumbers(ticket.back || []).join(" ")}{Number(plan.tickets || 0) > 1 ? `　共 ${plan.tickets} 注` : ""}</p>;
+  return <p><b>{labels.front}</b> {displayNumbers(ticket.front || []).join(" ")}　<b>{labels.back}</b> {displayNumbers(ticket.back || []).join(" ")}{Number(plan.tickets || 0) > 1 ? `　共 ${plan.tickets} 注` : ""}{Number(plan.multiplier || 1) > 1 ? `　× ${plan.multiplier} 倍` : ""}</p>;
 }
 
 function ReviewPanel({ review, onRefresh, onDelete, scoreRows = [], scene = "DLT", currentDraw }) {
@@ -1723,7 +1733,7 @@ function ReviewPanel({ review, onRefresh, onDelete, scoreRows = [], scene = "DLT
           return (
             <article className="simple-review-item" key={id}>
               <div className="simple-review-head">
-                <div><strong>第 {item.recommended_issue || item.actual?.issue || item.latest_issue || "-"} 期 · {planModeLabel(mode)}</strong><span>{item.saved_at ? new Date(item.saved_at).toLocaleString("zh-CN", { hour12: false }) : ""}</span></div>
+                <div><strong>第 {item.recommended_issue || item.actual?.issue || item.latest_issue || "-"} 期 · {planModeLabel(mode)}{mode === "single" && Number(plan.multiplier || 1) > 1 ? ` × ${plan.multiplier} 倍` : ""}</strong><span>{item.saved_at ? new Date(item.saved_at).toLocaleString("zh-CN", { hour12: false }) : ""}</span></div>
                 <Badge tone={pending ? "default" : "live"}>{pending ? "待开奖" : "已复盘"}</Badge>
               </div>
               <ReviewPlanNumbers plan={plan} fallback={item.best} labels={labels} />
@@ -2103,6 +2113,7 @@ function BettingPlanPanel({
   const [flow, setFlow] = useState("smart");
   const [mode, setMode] = useState("all");
   const [ticketCount, setTicketCount] = useState(5);
+  const [singleMultiplier, setSingleMultiplier] = useState(1);
   const [danCount, setDanCount] = useState(scene === "SSQ" ? 3 : 2);
   const [tuoCount, setTuoCount] = useState(scene === "SSQ" ? 5 : 5);
   const [compoundFrontCount, setCompoundFrontCount] = useState(scene === "SSQ" ? 7 : 6);
@@ -2165,7 +2176,8 @@ function BettingPlanPanel({
           backScoreRows,
           budget,
           mode: optionMode,
-          ticketCount: optionMode === "single" ? Math.max(1, Math.min(3, Math.floor(Number(budget || 0) / 2))) : ticketCount,
+          ticketCount,
+          singleMultiplier: optionMode === "single" ? singleMultiplier : 1,
           danCount,
           tuoCount: optionMode === "compound" ? compoundFrontCount : tuoCount,
           backCount,
@@ -2197,7 +2209,7 @@ function BettingPlanPanel({
     try {
       const requestedModes = mode === "all" ? ["dantuo", "compound", "single"] : [mode];
       const comparisonPlans = requestedModes.map((optionMode, index) => {
-        const plan = buildRandomBettingPlan({ scene, mode: optionMode, ticketCount, danCount, tuoCount: optionMode === "compound" ? compoundFrontCount : tuoCount, backCount, latestIssue: dashboard.latest_issue, recommendedIssue: dashboard.recommended_issue, appended });
+        const plan = buildRandomBettingPlan({ scene, mode: optionMode, ticketCount, singleMultiplier: optionMode === "single" ? singleMultiplier : 1, danCount, tuoCount: optionMode === "compound" ? compoundFrontCount : tuoCount, backCount, latestIssue: dashboard.latest_issue, recommendedIssue: dashboard.recommended_issue, appended });
         return { ...plan, option_label: `${planModeLabel(optionMode)}随机`, generation_variant: Date.now() + index, decision_brief: buildDecisionBrief({ plan, budget, ...decisionContext }) };
       });
       addGeneratedPlans(comparisonPlans);
@@ -2221,6 +2233,7 @@ function BettingPlanPanel({
         recommendedIssue: dashboard.recommended_issue,
         budget,
         scoreRows,
+        singleMultiplier: mode === "single" ? singleMultiplier : 1,
         appended,
       });
       const decisionBrief = buildDecisionBrief({ plan, budget, ...decisionContext });
@@ -2242,8 +2255,11 @@ function BettingPlanPanel({
 
   const dantuoTickets = combinationCount(Number(tuoCount || 0), rules.frontPick - Number(danCount || 0)) * combinationCount(Number(backCount || 0), rules.backPick);
   const compoundTickets = combinationCount(Number(compoundFrontCount || 0), rules.frontPick) * combinationCount(Number(backCount || 0), rules.backPick);
-  const estimatedTickets = mode === "all" ? dantuoTickets + compoundTickets + Number(ticketCount || 0) : mode === "dantuo" ? dantuoTickets : mode === "compound" ? compoundTickets : Number(ticketCount || 0);
-  const estimatedCost = Math.max(0, estimatedTickets * (scene === "DLT" && appended ? 3 : 2));
+  const singleTickets = Math.max(1, Math.min(100, Math.floor(Number(ticketCount || 1))));
+  const safeSingleMultiplier = Math.max(1, Math.min(99, Math.floor(Number(singleMultiplier || 1))));
+  const estimatedTickets = mode === "all" ? dantuoTickets + compoundTickets + singleTickets : mode === "dantuo" ? dantuoTickets : mode === "compound" ? compoundTickets : singleTickets;
+  const estimatedPaidTickets = mode === "all" ? dantuoTickets + compoundTickets + singleTickets * safeSingleMultiplier : mode === "single" ? singleTickets * safeSingleMultiplier : estimatedTickets;
+  const estimatedCost = Math.max(0, estimatedPaidTickets * (scene === "DLT" && appended ? 3 : 2));
 
   return (
     <section className="panel wide betting-panel" id="module-data">
@@ -2286,10 +2302,16 @@ function BettingPlanPanel({
                 <option value="single">单式</option>
               </select>
             </label>
-            {(flow === "smart" || flow === "random") && mode === "single" && (
+            {(flow === "smart" || flow === "random") && (mode === "single" || mode === "all") && (
               <label>
-                注数
+                单式注数
                 <input min="1" max="100" step="1" type="number" value={ticketCount} onChange={(event) => setTicketCount(Number(event.target.value))} />
+              </label>
+            )}
+            {(mode === "single" || ((flow === "smart" || flow === "random") && mode === "all")) && (
+              <label>
+                单式倍数
+                <input min="1" max="99" step="1" type="number" value={singleMultiplier} onChange={(event) => setSingleMultiplier(Math.max(1, Math.min(99, Number(event.target.value) || 1)))} />
               </label>
             )}
             {(flow === "smart" || flow === "random") && (mode === "dantuo" || mode === "all") && (
@@ -2321,9 +2343,9 @@ function BettingPlanPanel({
 
           {flow === "smart" || flow === "random" ? (
             <div className="betting-estimate">
-              <div><span>预计注数</span><strong>{estimatedTickets || 0} 注</strong></div>
+              <div><span>号码组合</span><strong>{estimatedTickets || 0} 注</strong></div>
               <div><span>预计费用</span><strong>{estimatedCost || 0} 元</strong></div>
-              <div><span>计价方式</span><strong>{scene === "DLT" && appended ? "追加3元/注" : "2元/注"}</strong></div>
+              <div><span>计费注数</span><strong>{estimatedPaidTickets || 0} 注</strong></div>
               <button className="primary-button strong" onClick={flow === "smart" ? createAiPlan : createRandomPlan} type="button">
                 <Play size={16} />
                 {flow === "smart" ? "生成智能推荐" : "生成随机号码"}

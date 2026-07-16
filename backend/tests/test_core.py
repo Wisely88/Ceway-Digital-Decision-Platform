@@ -180,6 +180,26 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(result["net_profit"], 594)
         self.assertTrue(result["prize_amount_complete"])
 
+    def test_single_multiplier_scales_prize_amount(self) -> None:
+        result = prize_financials(
+            {"五等奖": 1},
+            {"prizes": {"五等奖": 200}, "source": "官方接口"},
+            10,
+            multiplier=5,
+        )
+        self.assertEqual(result["prize_amount"], 1000)
+        self.assertEqual(result["net_profit"], 990)
+        self.assertEqual(result["roi"], 9900.0)
+
+    def test_invalid_legacy_multiplier_falls_back_to_one(self) -> None:
+        result = prize_financials(
+            {"五等奖": 1},
+            {"prizes": {"五等奖": 200}},
+            2,
+            multiplier="invalid",
+        )
+        self.assertEqual(result["prize_amount"], 200)
+
     def test_dlt_dantuo_counts_every_expanded_winning_ticket(self) -> None:
         plan = {
             "mode": "dantuo",
