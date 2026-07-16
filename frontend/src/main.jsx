@@ -9,6 +9,7 @@ import {
   Clipboard,
   Coins,
   Database,
+  BookOpen,
   ArrowLeft,
   GitCompare,
   FileStack,
@@ -25,6 +26,7 @@ import {
   Table2,
   TrendingUp,
   WalletCards,
+  Workflow,
 } from "lucide-react";
 import {
   deleteDltRecord,
@@ -841,6 +843,7 @@ function AppSidebar({ scenes, active = "DLT", activeModule = "overview", onModul
 }
 
 function SceneSelect({ scenes, onEnter }) {
+  const [guideTab, setGuideTab] = useState("play");
   const sceneDetails = {
     DLT: {
       title: "大乐透",
@@ -901,6 +904,57 @@ function SceneSelect({ scenes, onEnter }) {
             );
           })}
         </section>
+      </section>
+
+      <section className="scene-guide" aria-label="策维使用说明">
+        <div className="scene-guide-heading">
+          <div>
+            <Badge>了解策维</Badge>
+            <h2>先看懂规则，再做决定</h2>
+          </div>
+          <p>策维把历史数据、选号组合、成本和开奖复盘放在同一条流程中，帮助你看清自己的选择。</p>
+        </div>
+
+        <div className="scene-guide-tabs" role="tablist" aria-label="说明类型">
+          <button className={guideTab === "play" ? "active" : ""} onClick={() => setGuideTab("play")} role="tab" aria-selected={guideTab === "play"} type="button"><BookOpen size={17} />玩法说明</button>
+          <button className={guideTab === "logic" ? "active" : ""} onClick={() => setGuideTab("logic")} role="tab" aria-selected={guideTab === "logic"} type="button"><Workflow size={17} />运行逻辑</button>
+          <button className={guideTab === "value" ? "active" : ""} onClick={() => setGuideTab("value")} role="tab" aria-selected={guideTab === "value"} type="button"><ShieldAlert size={17} />系统优势</button>
+        </div>
+
+        {guideTab === "play" && (
+          <div className="scene-guide-content play-guide" role="tabpanel">
+            <div>
+              <strong>大乐透</strong>
+              <p>前区 35 选 5，后区 12 选 2。支持单式、复式、胆拖和追加投注。</p>
+            </div>
+            <div>
+              <strong>双色球</strong>
+              <p>红球 33 选 6，蓝球 16 选 1。支持单式、复式和胆拖。</p>
+            </div>
+            <div>
+              <strong>三种组合有什么不同</strong>
+              <p>单式是完整的一注号码；复式是多选号码后展开所有合法组合；胆拖是固定核心号码，用拖码扩展覆盖。</p>
+            </div>
+          </div>
+        )}
+
+        {guideTab === "logic" && (
+          <ol className="scene-guide-content logic-guide" role="tabpanel">
+            <li><span>1</span><div><strong>校验历史数据</strong><p>按开奖日期维护大乐透和双色球历史记录，标明最新期号和数据状态。</p></div></li>
+            <li><span>2</span><div><strong>计算可解释指标</strong><p>统计冷热、遗漏、奇偶、大小和和值，再以固定公式形成历史结构评分。</p></div></li>
+            <li><span>3</span><div><strong>生成或自选方案</strong><p>智能推荐使用历史评分；随机生成不使用评分；人工选号由你决定，系统只做结构点评。</p></div></li>
+            <li><span>4</span><div><strong>保存并等待复盘</strong><p>方案绑定下一期期号，开奖后自动核对命中数、奖级、奖金和当期结构。</p></div></li>
+          </ol>
+        )}
+
+        {guideTab === "value" && (
+          <div className="scene-guide-content value-guide" role="tabpanel">
+            <div><Database size={19} /><strong>数据可核对</strong><p>展示期号、日期、数据量和来源状态，不用不明样本冒充真实数据。</p></div>
+            <div><Activity size={19} /><strong>过程可解释</strong><p>指标、评分、组合方式和费用都能追溯，不用“神秘预测”代替说明。</p></div>
+            <div><Coins size={19} /><strong>成本看得清</strong><p>明确区分组合注数、倍数、追加和实际费用，减少无意识加码。</p></div>
+            <div><GitCompare size={19} /><strong>形成复盘闭环</strong><p>每次方案都能与实际开奖对照，让用户看到长期结果，而不只记住偶然命中。</p></div>
+          </div>
+        )}
       </section>
 
       <footer className="disclaimer scene-disclaimer">

@@ -172,6 +172,11 @@ async def run_test(websocket_url: str, url: str) -> dict:
         await wait_for_text(client, "选择彩种")
         await client.evaluate("localStorage.clear()")
         await assert_no_document_overflow(client, "场景选择页")
+        await click_text(client, "运行逻辑")
+        await wait_for_text(client, "保存并等待复盘")
+        await click_text(client, "系统优势")
+        await wait_for_text(client, "形成复盘闭环")
+        await assert_no_document_overflow(client, "首页说明区")
         dlt = await run_scene_flow(client, "大乐透")
         ssq = await run_scene_flow(client, "双色球")
         return {"viewport": "390x844", "dlt": dlt, "ssq": ssq, "status": "ok"}
