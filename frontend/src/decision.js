@@ -23,6 +23,17 @@ export function recentSpending(records = [], now = new Date(), days = 30) {
   }, 0);
 }
 
+export function recentPrizeWinnings(reviewItems = [], now = new Date(), days = 30) {
+  const cutoff = now.getTime() - days * DAY_MS;
+  return reviewItems.reduce((total, item) => {
+    const savedAt = Date.parse(item?.saved_at || "");
+    if (Number.isFinite(savedAt) && savedAt < cutoff) return total;
+    const result = item?.result || item || {};
+    if (result.prize_amount_complete !== true) return total;
+    return total + Math.max(0, finiteNumber(result.prize_amount));
+  }, 0);
+}
+
 export function cumulativeSpending(records = []) {
   let total = 0;
   return [...records]
@@ -55,6 +66,7 @@ export function buildDecisionBrief({
   principal,
   periodCap,
   records = [],
+  reviewItems = [],
   backtest,
   capital,
   now = new Date(),
@@ -66,19 +78,23 @@ export function buildDecisionBrief({
   const safePrincipal = Math.max(0, finiteNumber(principal));
   const safePeriodCap = Math.max(0, finiteNumber(periodCap, safePrincipal * 0.1));
   const periodSpent = recentSpending(records, now);
+  const reviewedPrize = recentPrizeWinnings(reviewItems, now);
+  const periodPrize = Math.max(reviewedPrize, Math.max(0, finiteNumber(capital?.last_prize)));
+  const periodNetSpent = Math.max(0, round(periodSpent - periodPrize));
   const projectedPeriodSpend = periodSpent + cost;
+  const projectedPeriodNetSpend = periodNetSpent + cost;
   const budgetUtilization = safeBudget ? round((cost / safeBudget) * 100, 1) : 0;
   const principalExposure = safePrincipal ? round((cost / safePrincipal) * 100, 2) : 0;
-  const periodUtilization = safePeriodCap ? round((projectedPeriodSpend / safePeriodCap) * 100, 1) : 0;
+  const periodUtilization = safePeriodCap ? round((projectedPeriodNetSpend / safePeriodCap) * 100, 1) : 0;
   const overBudget = safeBudget > 0 && cost > safeBudget;
-  const overPeriodCap = safePeriodCap > 0 && projectedPeriodSpend > safePeriodCap;
+  const overPeriodCap = safePeriodCap > 0 && projectedPeriodNetSpend > safePeriodCap;
   const escalating = hasEscalationPattern(records, cost);
   const levelUnits = finiteNumber(capital?.level_units, 1);
   const unprofitableStepUp = levelUnits > 1 && finiteNumber(capital?.round_profit) <= 0;
 
   const signals = [];
   if (overBudget) signals.push(`方案超出本期预算 ${round(cost - safeBudget)} 元`);
-  if (overPeriodCap) signals.push(`计入本期后，近30日投入将超过周期上限 ${round(projectedPeriodSpend - safePeriodCap)} 元`);
+  if (overPeriodCap) signals.push(`计入本期后，近30日净投入将超过周期上限 ${round(projectedPeriodNetSpend - safePeriodCap)} 元`);
   if (escalating) signals.push("最近三次方案费用连续上升，存在追投倾向");
   if (unprofitableStepUp) signals.push("当前处于加注级别，但上一轮没有形成净盈利");
   if (principalExposure > 5) signals.push(`单次投入占本金 ${principalExposure}%，暴露偏高`);
@@ -87,10 +103,15 @@ export function buildDecisionBrief({
   let riskLevel = "低";
   let riskTone = "safe";
   let action = "可按当前预算执行，开奖后复盘，不因未中奖追加。";
-  if (overBudget || overPeriodCap || escalating || unprofitableStepUp) {
+  const blockSave = overBudget || unprofitableStepUp;
+  if (blockSave) {
     riskLevel = "高";
     riskTone = "stop";
     action = "建议暂停或缩减方案，先恢复到基础预算。";
+  } else if (overPeriodCap || escalating) {
+    riskLevel = "高";
+    riskTone = "watch";
+    action = "已触发风险提醒，仍可继续生成和保存；请确认净投入上限，不要临时加码。";
   } else if (signals.length > 0 || periodUtilization >= 80) {
     riskLevel = "中";
     riskTone = "watch";
@@ -114,8 +135,11 @@ export function buildDecisionBrief({
     budget_utilization: budgetUtilization,
     principal_exposure: principalExposure,
     period_spent: periodSpent,
+    period_prize: periodPrize,
+    period_net_spent: periodNetSpent,
     period_cap: safePeriodCap,
     projected_period_spend: projectedPeriodSpend,
+    projected_period_net_spend: projectedPeriodNetSpend,
     period_utilization: periodUtilization,
     coverage_label: coverageLabel,
     multiplier: 1,
@@ -123,6 +147,7 @@ export function buildDecisionBrief({
     risk_tone: riskTone,
     signals: signals.length ? signals : ["未发现超预算、连续加码或高资金暴露"],
     escalation_detected: escalating,
+    block_save: blockSave,
     history_message: historyMessage,
     action,
     guardrails: [

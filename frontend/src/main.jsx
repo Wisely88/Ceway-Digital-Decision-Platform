@@ -53,7 +53,7 @@ import {
   syncDltHistory,
   syncSsqHistory,
 } from "./api";
-import { buildDecisionBrief, cumulativeSpending, recentSpending } from "./decision";
+import { buildDecisionBrief, cumulativeSpending, recentPrizeWinnings, recentSpending } from "./decision";
 import { evaluatePackage, packageCatalog, PACKAGE_SOURCES } from "./packageEvaluator";
 import { selectScoredCombination } from "./suggestionRotation";
 import { decodeSyncBundle, encodeSyncBundle } from "./syncCodec";
@@ -1103,7 +1103,9 @@ function DecisionBrief({ brief }) {
         <div><span>买的是什么</span><strong>{brief.coverage_label}</strong></div>
         <div><span>投注倍率</span><strong>{brief.multiplier} 倍</strong></div>
         <div><span>本金暴露</span><strong>{brief.principal_exposure}%</strong></div>
-        <div><span>近30日预计投入</span><strong>{brief.projected_period_spend} / {brief.period_cap} 元</strong></div>
+        <div><span>近30日成本</span><strong>{brief.period_spent} 元</strong></div>
+        <div><span>奖金抵扣</span><strong>{brief.period_prize} 元</strong></div>
+        <div><span>计入本期后净投入</span><strong>{brief.projected_period_net_spend} / {brief.period_cap} 元</strong></div>
         <div><span>连续加码</span><strong>{brief.escalation_detected ? "已触发提醒" : "未发现"}</strong></div>
       </div>
       <div className="decision-conclusion">
@@ -1130,6 +1132,7 @@ function CapitalPanel({
   records,
   generated,
   backtest,
+  review,
   onBudgetChange,
   onPrincipalChange,
   onBalanceChange,
@@ -1146,10 +1149,13 @@ function CapitalPanel({
     principal,
     periodCap,
     records: generated ? records : records.slice(1),
+    reviewItems: review?.items || [],
     backtest,
     capital,
   });
   const spent = recentSpending(records);
+  const prize = Math.max(recentPrizeWinnings(review?.items || []), Number(capital?.last_prize || 0));
+  const netSpent = Math.max(0, spent - prize);
 
   return (
     <section className="panel wide capital-panel" id="module-capital">
@@ -1199,6 +1205,14 @@ function CapitalPanel({
         <div>
           <span>近30日已投入</span>
           <strong>{spent} 元</strong>
+        </div>
+        <div>
+          <span>近30日已确认奖金</span>
+          <strong>{prize} 元</strong>
+        </div>
+        <div>
+          <span>近30日净投入</span>
+          <strong>{netSpent} 元</strong>
         </div>
         <div>
           <span>最大回撤</span>
@@ -1273,7 +1287,7 @@ function PlanCard({ plan, onSave }) {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   if (!plan) return null;
-  const saveBlocked = plan.decision_brief?.risk_tone === "stop";
+  const saveBlocked = plan.decision_brief?.block_save === true;
 
   const labels = {
     front: "前区",
@@ -1977,6 +1991,8 @@ function BettingPlanPanel({
   generated,
   onGenerated,
   decisionContext,
+  periodCap,
+  onPeriodCapChange,
 }) {
   const rules = sceneRules(scene);
   const labels = planLabelsForScene(scene);
@@ -2133,6 +2149,10 @@ function BettingPlanPanel({
               <input min="2" step="2" type="number" value={budget} onChange={(event) => onBudgetChange(Number(event.target.value))} />
             </label>
             <label>
+              近30日净投入上限
+              <input min="0" step="10" type="number" value={periodCap} onChange={(event) => onPeriodCapChange(Math.max(0, Number(event.target.value)))} />
+            </label>
+            <label>
               玩法
               <select value={mode} onChange={(event) => setMode(event.target.value)}>
                 <option value="dantuo">胆拖</option>
@@ -2269,7 +2289,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
   const [principal, setPrincipal] = useState(1000);
   const [balance, setBalance] = useState("");
   const [levelUnits, setLevelUnits] = useState(1);
-  const [periodCap, setPeriodCap] = useState(200);
+  const [periodCap, setPeriodCap] = useState(() => Number(localStorage.getItem("ceway_dlt_period_cap") || 200));
   const [activeModule, setActiveModule] = useState(initialModuleFromUrl);
   const [dashboard, setDashboard] = useState(null);
   const [generated, setGenerated] = useState(null);
@@ -2283,6 +2303,10 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    localStorage.setItem("ceway_dlt_period_cap", String(periodCap));
+  }, [periodCap]);
 
   const changeModule = (module) => {
     setActiveModule(module);
@@ -2569,10 +2593,12 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
               backScoreRows={dashboard.back_scoreboard}
               budget={budget}
               onBudgetChange={setBudget}
+              periodCap={periodCap}
+              onPeriodCapChange={setPeriodCap}
               generated={generated}
               onGenerated={setGenerated}
               onSave={savePlan}
-              decisionContext={{ principal, periodCap, records: savedPlans, backtest, capital: dashboard.capital_state }}
+              decisionContext={{ principal, periodCap, records: savedPlans, reviewItems: review?.items || [], backtest, capital: dashboard.capital_state }}
             />
           )}
 
@@ -2603,6 +2629,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
               records={savedPlans}
               generated={generated}
               backtest={backtest}
+              review={review}
               onBudgetChange={setBudget}
               onPrincipalChange={setPrincipal}
               onBalanceChange={setBalance}
@@ -2637,7 +2664,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
   const [principal, setPrincipal] = useState(1000);
   const [balance, setBalance] = useState("");
   const [levelUnits, setLevelUnits] = useState(1);
-  const [periodCap, setPeriodCap] = useState(200);
+  const [periodCap, setPeriodCap] = useState(() => Number(localStorage.getItem("ceway_ssq_period_cap") || 200));
   const [activeModule, setActiveModule] = useState(initialModuleFromUrl);
   const [dashboard, setDashboard] = useState(null);
   const [generated, setGenerated] = useState(null);
@@ -2651,6 +2678,10 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    localStorage.setItem("ceway_ssq_period_cap", String(periodCap));
+  }, [periodCap]);
 
   const changeModule = (module) => {
     setActiveModule(module);
@@ -2945,10 +2976,12 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
               backScoreRows={dashboard.back_scoreboard}
               budget={budget}
               onBudgetChange={setBudget}
+              periodCap={periodCap}
+              onPeriodCapChange={setPeriodCap}
               generated={generated}
               onGenerated={setGenerated}
               onSave={savePlan}
-              decisionContext={{ principal, periodCap, records: savedPlans, backtest, capital: dashboard.capital }}
+              decisionContext={{ principal, periodCap, records: savedPlans, reviewItems: review?.items || [], backtest, capital: dashboard.capital }}
             />
           )}
 
@@ -2979,6 +3012,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
               records={savedPlans}
               generated={generated}
               backtest={backtest}
+              review={review}
               onBudgetChange={setBudget}
               onPrincipalChange={setPrincipal}
               onBalanceChange={setBalance}
