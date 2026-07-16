@@ -57,6 +57,12 @@ test("大乐透多次生成的后区均不使用连号", () => {
   }
 });
 
+test("排除号码过多时会放宽分区去重但保持所选数量合法", () => {
+  const rows = Array.from({ length: 12 }, (_, index) => ({ number: index + 1, total_score: 100 - index }));
+  const selected = selectScoredCombination(rows, 12, 12, 1, [1, 2, 3, 4, 5, 6], { avoidConsecutive: true });
+  assert.equal(selected.length, 12);
+});
+
 test("2胆和3胆都会随生成序号切换不同高分组合", () => {
   const rows = Array.from({ length: 35 }, (_, index) => ({ number: index + 1, total_score: 100 - index }));
   for (const danCount of [2, 3]) {

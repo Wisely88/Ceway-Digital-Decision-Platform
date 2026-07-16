@@ -56,9 +56,13 @@ export function selectScoredCombination(rows, max, pick, variant = 1, excludedNu
   const scoreByNumber = new Map(
     (rows || []).map((row) => [Number(row.number), Number(row.total_score ?? row.score ?? 0)]),
   );
-  const ranked = Array.from({ length: max }, (_, index) => index + 1)
+  let ranked = Array.from({ length: max }, (_, index) => index + 1)
     .filter((number) => !excluded.has(number))
     .sort((left, right) => (scoreByNumber.get(right) || 0) - (scoreByNumber.get(left) || 0) || left - right);
+  if (ranked.length < safePick) {
+    ranked = Array.from({ length: max }, (_, index) => index + 1)
+      .sort((left, right) => (scoreByNumber.get(right) || 0) - (scoreByNumber.get(left) || 0) || left - right);
+  }
   const effectivePick = Math.min(safePick, ranked.length);
   const bandSize = Math.min(ranked.length, effectivePick + 4);
   const candidateBand = ranked.slice(0, bandSize);

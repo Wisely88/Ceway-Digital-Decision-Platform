@@ -226,6 +226,7 @@ def build_review(records: list[dict], history: list[dict], limit: int = 20, priz
                 result.get("prize_distribution", {}),
                 (prize_snapshot or {}).get("issues", {}).get(draw["issue"]),
                 result.get("cost", 0),
+                appended=bool(record.get("plan", {}).get("appended")),
             )
         )
         items.append(

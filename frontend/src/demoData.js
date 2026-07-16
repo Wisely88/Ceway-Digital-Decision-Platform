@@ -22,13 +22,20 @@ async function loadPrizeSnapshot(url) {
   return response.json();
 }
 
-function prizeFinancials(distribution, issueData, cost) {
+function prizeFinancials(distribution, issueData, cost, appended = false) {
   const prizes = issueData?.prizes || {};
+  const additionalPrizes = issueData?.additional_prizes || {};
   let prizeAmount = 0;
   const missing = [];
   Object.entries(distribution || {}).forEach(([label, count]) => {
     if (typeof prizes[label] !== "number") missing.push(label);
-    else prizeAmount += prizes[label] * count;
+    else {
+      prizeAmount += prizes[label] * count;
+      if (appended) {
+        if (typeof additionalPrizes[label] !== "number") missing.push(`${label}(追加)`);
+        else prizeAmount += additionalPrizes[label] * count;
+      }
+    }
   });
   const complete = missing.length === 0;
   const netProfit = complete ? prizeAmount - Number(cost || 0) : null;
@@ -744,7 +751,7 @@ function reviewDemoPlan(plan, draw, prizeIssues = {}) {
     hit_rate: Math.round((hitTickets / Math.max(1, plan.tickets || details.length)) * 10000) / 100,
     prize_distribution: prizeDistribution,
   };
-  return { ...result, ...prizeFinancials(prizeDistribution, prizeIssues[draw.issue], result.cost) };
+  return { ...result, ...prizeFinancials(prizeDistribution, prizeIssues[draw.issue], result.cost, Boolean(plan.appended)) };
 }
 
 export async function getDemoReview() {

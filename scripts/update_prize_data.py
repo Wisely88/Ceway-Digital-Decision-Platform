@@ -43,14 +43,20 @@ def normalize_dlt_prize(item: dict) -> tuple[str, dict] | None:
     if not issue:
         return None
     prizes = {}
+    additional_prizes = {}
     for row in item.get("prizeLevelList") or []:
         label = str(row.get("prizeLevel") or "").strip()
         amount = integer(row.get("stakeAmountFormat") or row.get("stakeAmount"))
-        if label and "追加" not in label and amount is not None and amount >= 0:
+        if not label or amount is None or amount < 0:
+            continue
+        if "追加" in label:
+            additional_prizes[re.sub(r"[（(]?追加[）)]?", "", label).strip()] = amount
+        else:
             prizes[label] = amount
     return issue, {
         "date": str(item.get("lotteryDrawTime") or "")[:10],
         "prizes": prizes,
+        "additional_prizes": additional_prizes,
         "sales": integer(item.get("totalSaleAmount")),
         "pool": integer(item.get("poolBalanceAfterdraw") or item.get("poolBalance")),
         "source": "中国体育彩票官方开奖接口",

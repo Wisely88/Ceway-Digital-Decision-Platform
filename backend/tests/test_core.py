@@ -169,6 +169,17 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(result["roi"], 1425.0)
         self.assertTrue(result["prize_amount_complete"])
 
+    def test_dlt_appended_prize_adds_official_additional_amount(self) -> None:
+        result = prize_financials(
+            {"五等奖": 2},
+            {"prizes": {"五等奖": 200}, "additional_prizes": {"五等奖": 100}, "source": "官方接口"},
+            6,
+            appended=True,
+        )
+        self.assertEqual(result["prize_amount"], 600)
+        self.assertEqual(result["net_profit"], 594)
+        self.assertTrue(result["prize_amount_complete"])
+
     def test_dlt_dantuo_counts_every_expanded_winning_ticket(self) -> None:
         plan = {
             "mode": "dantuo",

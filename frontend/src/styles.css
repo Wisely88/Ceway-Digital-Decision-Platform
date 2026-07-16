@@ -1443,7 +1443,7 @@ td {
   border: 1px solid rgba(83, 129, 179, 0.18);
   border-radius: 8px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   overflow: hidden;
 }
 
@@ -1472,7 +1472,9 @@ td {
   grid-template-columns: minmax(280px, 0.36fr) minmax(0, 0.64fr);
 }
 
-.betting-workspace.ai-workspace {
+.betting-workspace.ai-workspace,
+.betting-workspace.smart-workspace,
+.betting-workspace.random-workspace {
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -1480,8 +1482,29 @@ td {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.ai-workspace .compact-fields {
+.ai-workspace .compact-fields,
+.smart-workspace .compact-fields,
+.random-workspace .compact-fields {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.append-toggle {
+  align-items: center;
+  background: rgba(8, 23, 40, 0.56);
+  border: 1px solid rgba(83, 129, 179, 0.16);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.append-toggle input {
+  accent-color: #1680ff;
+  height: 18px;
+  margin: 0;
+  width: 18px;
 }
 
 .betting-controls,
@@ -1613,7 +1636,7 @@ td {
   align-items: end;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(150px, 0.25fr) minmax(150px, 0.25fr) minmax(260px, 0.5fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .package-confirm {
@@ -1652,6 +1675,85 @@ td {
 .package-table td:nth-child(2) span,
 .package-table td:nth-child(2) small {
   display: block;
+}
+
+.package-table tbody tr {
+  cursor: pointer;
+}
+
+.package-table tbody tr.selected {
+  background: rgba(22, 128, 255, 0.16);
+  box-shadow: inset 3px 0 #1680ff;
+}
+
+.package-generate-bar {
+  align-items: center;
+  background: rgba(8, 23, 40, 0.66);
+  border: 1px solid rgba(83, 129, 179, 0.18);
+  border-radius: 8px;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.package-generate-bar div {
+  display: grid;
+  gap: 3px;
+}
+
+.package-generate-bar span {
+  color: #91a8c0;
+  font-size: 12px;
+}
+
+.current-draw-review {
+  background: rgba(7, 22, 38, 0.7);
+  border: 1px solid rgba(83, 129, 179, 0.22);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(130px, 0.22fr) minmax(280px, 0.38fr) minmax(300px, 0.4fr);
+  margin-bottom: 14px;
+  padding: 14px;
+}
+
+.current-draw-review > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.current-draw-review span,
+.current-draw-review small {
+  color: #91a8c0;
+}
+
+.current-draw-review strong {
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.current-draw-balls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.current-draw-review ul,
+.review-analysis {
+  color: #b9cce0;
+  font-size: 13px;
+  margin: 0;
+}
+
+.review-analysis {
+  border-left: 3px solid #4d9fff;
+  grid-column: 1 / -1;
+  padding-left: 10px;
+}
+
+.review-analysis p {
+  margin: 4px 0;
 }
 
 .package-notes {
@@ -3095,6 +3197,19 @@ td {
   .plan-comparison-grid,
   .number-detail dl {
     grid-template-columns: 1fr;
+  }
+
+  .workflow-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .current-draw-review {
+    grid-template-columns: 1fr;
+  }
+
+  .package-generate-bar {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .package-confirm {

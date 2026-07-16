@@ -121,6 +121,7 @@ class PrizeSyncTests(unittest.TestCase):
         )
         self.assertEqual(issue, "26078")
         self.assertEqual(row["prizes"], {"一等奖": 8216073, "七等奖": 5})
+        self.assertEqual(row["additional_prizes"], {"一等奖": 6572858})
 
     def test_normalizes_ssq_actual_prize_amounts(self):
         issue, row = normalize_ssq_prize(

@@ -1,9 +1,9 @@
-# 策维（Ceway）数字决策平台 v1.10
+# 策维（Ceway）数字决策平台 v1.11
 
 Digital Decision Platform  
 Powered by CBGO Framework
 
-当前版本为“单用户云同步版”，已支持大乐透 DLT 与双色球 SSQ，并提供不开放注册的自用设备同步。
+当前版本为“精简选号工作台”，已支持大乐透 DLT 与双色球 SSQ 的智能推荐、纯随机生成、套餐模拟、自选号码和当期开奖复盘。
 
 产品主线：选号只是入口，决策解释和风险控制才是核心。系统会说明本期实际支出、组合覆盖、投注倍率、资金暴露、近 30 日投入、连续加码迹象和历史回测表现。
 
@@ -45,6 +45,7 @@ ceway/
 - [v1.8 验证闭环说明](docs/ceway_v1_8_validation_loop.md)
 - [v1.9 行为风控说明](docs/ceway_v1_9_behavior_risk.md)
 - [v1.10 单用户云同步说明](docs/ceway_v1_10_cloud_sync.md)
+- [v1.11 精简选号工作台](docs/ceway_v1_11_simplified_workbench.md)
 - [Backlog](docs/backlog.md)
 - [数据导入说明](docs/data_import.md)
 

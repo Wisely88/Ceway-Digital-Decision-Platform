@@ -156,8 +156,8 @@ const PRODUCT_STATUS = [
   },
   {
     label: "当前版本",
-    value: "V1.10 单用户云同步版",
-    detail: "固定内部账号、密码连接与 DLT/SSQ 方案同步",
+    value: "V1.11 精简选号工作台",
+    detail: "智能、随机、套餐、自选与当期开奖复盘",
     tone: "green",
   },
   {
@@ -215,6 +215,11 @@ const ROADMAP_ITEMS = [
     title: "单用户云同步版",
     description: "不开放注册，仅使用同步密码连接自用设备，合并 DLT/SSQ 历史方案。",
   },
+  {
+    version: "V1.11",
+    title: "精简选号工作台",
+    description: "三项主导航，统一智能推荐、随机生成、套餐模拟、自选号码和当期复盘。",
+  },
 ];
 
 const STRATEGY_LABELS = {
@@ -223,10 +228,15 @@ const STRATEGY_LABELS = {
   aggressive: "激进",
   manual_workbench: "系统建议",
   manual_selection: "人工选号",
+  random_selection: "随机生成",
+  package_simulation: "套餐模拟",
 };
 
 function planModeLabel(mode) {
-  return mode === "dantuo" ? "胆拖" : "单式";
+  if (mode === "dantuo") return "胆拖";
+  if (mode === "compound") return "复式";
+  if (mode === "package") return "套餐";
+  return "单式";
 }
 
 function lotteryLabels(source = {}) {
@@ -237,6 +247,22 @@ function lotteryLabels(source = {}) {
     back_hits: "后区命中",
     ...(source.play_labels || {}),
   };
+}
+
+function drawStructureAnalysis(actual, scene, scoreRows = []) {
+  if (!actual?.front?.length) return [];
+  const front = actual.front.map(Number).sort((left, right) => left - right);
+  const odd = front.filter((number) => number % 2 === 1).length;
+  const threshold = scene === "SSQ" ? 16 : 17;
+  const big = front.filter((number) => number > threshold).length;
+  const consecutive = front.filter((number, index) => index > 0 && number - front[index - 1] === 1).length;
+  const hotSet = new Set([...scoreRows].sort((left, right) => Number(right.heat_score || 0) - Number(left.heat_score || 0)).slice(0, Math.max(6, Math.ceil(scoreRows.length / 4))).map((row) => Number(row.number)));
+  const hotHits = front.filter((number) => hotSet.has(number)).length;
+  return [
+    `奇偶 ${odd}:${front.length - odd}，大小 ${big}:${front.length - big}，和值 ${front.reduce((sum, number) => sum + number, 0)}。`,
+    `连号关系 ${consecutive} 组；按当前统计窗口回看，热门候选命中 ${hotHits} 个。`,
+    "以上是开奖后的结构描述，只用于复盘选号覆盖，不反推下一期号码。",
+  ];
 }
 
 function classifyError(error, fallback = "操作失败") {
@@ -311,6 +337,41 @@ function combinationCount(total, pick) {
   return Math.round(result);
 }
 
+function chooseNumbers(items, pick, start = 0, prefix = [], output = []) {
+  if (prefix.length === pick) {
+    output.push([...prefix]);
+    return output;
+  }
+  for (let index = start; index <= items.length - (pick - prefix.length); index += 1) {
+    prefix.push(items[index]);
+    chooseNumbers(items, pick, index + 1, prefix, output);
+    prefix.pop();
+  }
+  return output;
+}
+
+function expandCompoundItems(frontPool, backPool, rules) {
+  return chooseNumbers(frontPool, rules.frontPick).flatMap((front) => (
+    chooseNumbers(backPool, rules.backPick).map((back) => ({
+      front: [...front].sort((left, right) => left - right),
+      back: [...back].sort((left, right) => left - right),
+      front_display: displayNumbers(front),
+      back_display: displayNumbers(back),
+      explanation: ["复式号码池展开后的单注组合。"],
+    }))
+  ));
+}
+
+function randomSample(max, count, excluded = []) {
+  const excludedSet = new Set(excluded);
+  const pool = rangeNumbers(max).filter((number) => !excludedSet.has(number));
+  for (let index = pool.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [pool[index], pool[randomIndex]] = [pool[randomIndex], pool[index]];
+  }
+  return pool.slice(0, count).sort((left, right) => left - right);
+}
+
 function displayNumbers(numbers) {
   return [...numbers].sort((left, right) => left - right).map(formatNumber);
 }
@@ -318,6 +379,7 @@ function displayNumbers(numbers) {
 function planFrontNumbers(plan) {
   if (!plan) return [];
   if (plan.mode === "dantuo") return [...(plan.front_dan || []), ...(plan.front_tuo || [])];
+  if (plan.mode === "compound") return plan.front_pool || [];
   return [...new Set((plan.items || []).flatMap((item) => item.front || []))];
 }
 
@@ -390,17 +452,17 @@ function aiCommentaryForPlan(plan, labels) {
   ];
 }
 
-function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, ticketCount, danCount, tuoCount, backCount, latestIssue, recommendedIssue, variant }) {
+function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, ticketCount, danCount, tuoCount, backCount, latestIssue, recommendedIssue, variant, appended = false }) {
   const rules = sceneRules(scene);
   const labels = planLabelsForScene(scene);
   const backRows = backScoreRows?.length
     ? backScoreRows
     : rangeNumbers(rules.backMax).map((number) => ({ number, total_score: 0 }));
   const backScoreMap = new Map(backRows.map((row) => [Number(row.number), row]));
+  const unitPrice = scene === "DLT" && appended ? 3 : 2;
 
   if (mode === "single") {
-    const affordable = Math.max(1, Math.floor(Number(budget || 0) / 2));
-    const count = Math.max(1, Math.min(Number(ticketCount || 1), affordable));
+    const count = Math.max(1, Math.min(100, Number(ticketCount || 1)));
     const items = buildSingleItems({ rules, frontRows: scoreRows, backRows, count, variant });
     return {
       scene,
@@ -412,19 +474,42 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
       based_on_issue: latestIssue,
       recommended_issue: recommendedIssue,
       recommendation_label: `基于第 ${latestIssue || "-"} 期开奖数据，生成第 ${recommendedIssue || "下一"} 期历史规则单式方案。`,
-      cost: items.length * 2,
+      appended: scene === "DLT" && appended,
+      unit_price: unitPrice,
+      cost: items.length * unitPrice,
       tickets: items.length,
       items,
-      reason: `按用户设置生成 ${items.length} 注单式，费用 ${items.length * 2} 元。`,
+      reason: `按历史评分与结构筛选生成 ${items.length} 注单式，${appended ? "已追加投注，" : ""}费用 ${items.length * unitPrice} 元。`,
       explanation: aiCommentaryForPlan({ mode: "single" }, labels),
       score_basis: `${labels.front}和${labels.back}均先按热度0.4 + 遗漏0.3 + 历史结构平衡0.3评分，再从高分候选带生成变体。`,
       budget_analysis: {
         budget: Number(budget || 0),
-        cost: items.length * 2,
-        unused: Math.max(0, Number(budget || 0) - items.length * 2),
-        utilization: Number(budget || 0) ? Math.round((items.length * 2 / Number(budget || 0)) * 10000) / 100 : 0,
+        cost: items.length * unitPrice,
+        unused: Math.max(0, Number(budget || 0) - items.length * unitPrice),
+        utilization: Number(budget || 0) ? Math.round((items.length * unitPrice / Number(budget || 0)) * 10000) / 100 : 0,
         explanation: "按照手动填写注数生成；如预算不足，系统自动压缩到预算范围内。",
       },
+    };
+  }
+
+  if (mode === "compound") {
+    const frontCount = Math.max(rules.frontPick + 1, Math.min(Number(tuoCount || rules.frontPick + 1), rules.frontMax));
+    const safeBack = Math.max(rules.backPick, Math.min(Number(backCount || rules.backPick), rules.backMax));
+    const frontPool = selectScoredCombination(scoreRows, rules.frontMax, frontCount, variant).sort((left, right) => left - right);
+    const backPool = selectScoredCombination(backRows, rules.backMax, safeBack, variant, scene === "DLT" ? frontPool : [], { avoidConsecutive: scene === "DLT" }).sort((left, right) => left - right);
+    const items = expandCompoundItems(frontPool, backPool, rules);
+    const cost = items.length * unitPrice;
+    return {
+      scene, play_name: rules.playName, play_labels: labels, mode: "compound", source: "rule_suggestion",
+      strategy: "manual_workbench", based_on_issue: latestIssue, recommended_issue: recommendedIssue,
+      recommendation_label: `基于第 ${latestIssue || "-"} 期开奖数据，生成第 ${recommendedIssue || "下一"} 期历史结构复式方案。`,
+      appended: scene === "DLT" && appended, unit_price: unitPrice, front_pool: frontPool, back_pool: backPool,
+      front_pool_display: displayNumbers(frontPool), back_pool_display: displayNumbers(backPool),
+      cost, tickets: items.length, items,
+      reason: `复式选择 ${frontPool.length} 个${labels.front}、${backPool.length} 个${labels.back}，展开 ${items.length} 注。`,
+      explanation: ["号码先按冷热、遗漏、奇偶、大小与和值结构评分，再展开复式组合。"],
+      score_basis: "历史指标仅用于筛选和分散组合，不改变每个号码的随机开奖概率。",
+      budget_analysis: { budget: Number(budget || 0), cost, unused: Math.max(0, Number(budget || 0) - cost), utilization: Number(budget || 0) ? Math.round((cost / Number(budget || 0)) * 10000) / 100 : 0, explanation: cost <= Number(budget || 0) ? "复式方案在当前预算内。" : "复式展开后超过预算，请减少号码池数量。" },
     };
   }
 
@@ -444,7 +529,7 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
     { avoidConsecutive: scene === "DLT" },
   ).sort((left, right) => left - right);
   const tickets = combinationCount(frontTuo.length, rules.frontPick - frontDan.length) * combinationCount(back.length, rules.backPick);
-  const cost = tickets * 2;
+  const cost = tickets * unitPrice;
   return {
     scene,
     play_name: rules.playName,
@@ -452,6 +537,8 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
     mode: "dantuo",
     source: "rule_suggestion",
     strategy: "manual_workbench",
+    appended: scene === "DLT" && appended,
+    unit_price: unitPrice,
     based_on_issue: latestIssue,
     recommended_issue: recommendedIssue,
     recommendation_label: `基于第 ${latestIssue || "-"} 期开奖数据，生成第 ${recommendedIssue || "下一"} 期历史规则胆拖方案。`,
@@ -476,9 +563,71 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
   };
 }
 
+function buildRandomBettingPlan({ scene, mode, ticketCount, danCount, tuoCount, backCount, latestIssue, recommendedIssue, appended = false }) {
+  const rules = sceneRules(scene);
+  const labels = planLabelsForScene(scene);
+  const unitPrice = scene === "DLT" && appended ? 3 : 2;
+  if (mode === "single") {
+    const count = Math.max(1, Math.min(100, Number(ticketCount || 1)));
+    const items = Array.from({ length: count }, () => {
+      const front = randomSample(rules.frontMax, rules.frontPick);
+      const back = randomSample(rules.backMax, rules.backPick, scene === "DLT" ? front : []);
+      return { front, back, front_display: displayNumbers(front), back_display: displayNumbers(back), explanation: ["纯随机生成，不使用历史评分。"] };
+    });
+    return { scene, play_name: rules.playName, play_labels: labels, mode: "single", source: "random_selection", strategy: "random_selection", based_on_issue: latestIssue, recommended_issue: recommendedIssue, recommendation_label: `第 ${recommendedIssue || "下一"} 期纯随机单式方案。`, appended: scene === "DLT" && appended, unit_price: unitPrice, cost: count * unitPrice, tickets: count, items, reason: "纯随机抽样生成，每个合法组合地位相同。" };
+  }
+  if (mode === "compound") {
+    const frontPool = randomSample(rules.frontMax, Math.max(rules.frontPick + 1, Number(tuoCount || rules.frontPick + 1)));
+    const backPool = randomSample(rules.backMax, Math.max(rules.backPick, Number(backCount || rules.backPick)), scene === "DLT" ? frontPool : []);
+    const items = expandCompoundItems(frontPool, backPool, rules);
+    return { scene, play_name: rules.playName, play_labels: labels, mode: "compound", source: "random_selection", strategy: "random_selection", based_on_issue: latestIssue, recommended_issue: recommendedIssue, recommendation_label: `第 ${recommendedIssue || "下一"} 期纯随机复式方案。`, appended: scene === "DLT" && appended, unit_price: unitPrice, front_pool: frontPool, back_pool: backPool, front_pool_display: displayNumbers(frontPool), back_pool_display: displayNumbers(backPool), cost: items.length * unitPrice, tickets: items.length, items, reason: "纯随机选择复式号码池并按规则展开。" };
+  }
+  const safeDan = Math.max(1, Math.min(Number(danCount || 1), rules.frontPick - 1));
+  const frontDan = randomSample(rules.frontMax, safeDan);
+  const frontTuo = randomSample(rules.frontMax, Math.max(rules.frontPick - safeDan, Number(tuoCount || rules.frontPick)), frontDan);
+  const back = randomSample(rules.backMax, Math.max(rules.backPick, Number(backCount || rules.backPick)), scene === "DLT" ? frontDan : []);
+  const tickets = combinationCount(frontTuo.length, rules.frontPick - frontDan.length) * combinationCount(back.length, rules.backPick);
+  return { scene, play_name: rules.playName, play_labels: labels, mode: "dantuo", source: "random_selection", strategy: "random_selection", based_on_issue: latestIssue, recommended_issue: recommendedIssue, recommendation_label: `第 ${recommendedIssue || "下一"} 期纯随机胆拖方案。`, appended: scene === "DLT" && appended, unit_price: unitPrice, front_dan: frontDan, front_tuo: frontTuo, back, front_dan_display: displayNumbers(frontDan), front_tuo_display: displayNumbers(frontTuo), back_display: displayNumbers(back), cost: tickets * unitPrice, tickets, reason: "胆码、拖码与后区均为纯随机抽样。" };
+}
+
+function buildPackagePlan({ scene, packageRow, latestIssue, recommendedIssue }) {
+  const rules = sceneRules(scene);
+  const labels = planLabelsForScene(scene);
+  const items = [];
+  for (let repeat = 0; repeat < packageRow.multiplier; repeat += 1) {
+    (packageRow.components || []).forEach((component) => {
+      if (component.mode === "single") {
+        for (let index = 0; index < component.count; index += 1) {
+          const front = randomSample(rules.frontMax, rules.frontPick);
+          const back = randomSample(rules.backMax, rules.backPick, scene === "DLT" ? front : []);
+          items.push({ front, back, front_display: displayNumbers(front), back_display: displayNumbers(back), explanation: ["套餐单式随机票。"] });
+        }
+      } else {
+        const frontPool = randomSample(rules.frontMax, component.front);
+        const backPool = randomSample(rules.backMax, component.back, scene === "DLT" ? frontPool : []);
+        items.push(...expandCompoundItems(frontPool, backPool, rules));
+      }
+    });
+  }
+  for (let index = 0; index < packageRow.giftTickets; index += 1) {
+    const front = randomSample(rules.frontMax, rules.frontPick);
+    const back = randomSample(rules.backMax, rules.backPick, scene === "DLT" ? front : []);
+    items.push({ front, back, front_display: displayNumbers(front), back_display: displayNumbers(back), explanation: ["活动赠票模拟号码。"] });
+  }
+  return {
+    scene, play_name: rules.playName, play_labels: labels, mode: "package", source: "package_simulation", strategy: "package_simulation",
+    based_on_issue: latestIssue, recommended_issue: recommendedIssue,
+    recommendation_label: `第 ${recommendedIssue || "下一"} 期 ${packageRow.amount} 元套餐模拟。`,
+    package_amount: packageRow.amount, package_structure: packageRow.structure, cost: packageRow.paid, tickets: items.length, items,
+    reason: `${packageRow.structure}，随机模拟 ${items.length} 注；${packageRow.giftAmount ? `包含已确认赠票 ${packageRow.giftTickets} 注。` : "未计入赠票。"}`,
+  };
+}
+
 function manualCommentary({ plan, scoreRows, labels }) {
   const scoreMap = new Map((scoreRows || []).map((row) => [Number(row.number), row]));
-  const frontNumbers = plan.mode === "dantuo" ? [...plan.front_dan, ...plan.front_tuo] : plan.items?.[0]?.front || [];
+  const frontNumbers = plan.mode === "dantuo"
+    ? [...plan.front_dan, ...plan.front_tuo]
+    : plan.mode === "compound" ? plan.front_pool || [] : plan.items?.[0]?.front || [];
   const scored = frontNumbers.map((number) => scoreMap.get(number)?.total_score || 0).filter(Boolean);
   const average = scored.length ? scored.reduce((sum, value) => sum + value, 0) / scored.length : 0;
   const oddCount = frontNumbers.filter((number) => number % 2 === 1).length;
@@ -486,7 +635,7 @@ function manualCommentary({ plan, scoreRows, labels }) {
   const notes = [
     `本方案${labels.front}平均评分约 ${average ? average.toFixed(1) : "-"}，可作为保存前的参考。`,
     `${labels.front}奇偶结构为 ${oddCount}:${frontNumbers.length - oddCount}，大号数量 ${bigCount} 个。`,
-    plan.cost <= plan.budget_analysis.budget ? "费用在预算范围内，可以保存后等待开奖复盘。" : "费用超过预算，建议减少拖码或降低注数。",
+    `当前组合展开 ${plan.tickets} 注，费用 ${plan.cost} 元；保存后等待开奖复盘。`,
   ];
   if (plan.mode === "dantuo" && plan.front_dan.length >= plan.front_tuo.length) {
     notes.push("胆码数量偏多，会降低拖码覆盖弹性，建议只把最有把握的号码放入胆码。");
@@ -494,9 +643,10 @@ function manualCommentary({ plan, scoreRows, labels }) {
   return notes;
 }
 
-function buildManualBettingPlan({ scene, mode, selectedFront, selectedBack, frontDan, frontTuo, latestIssue, recommendedIssue, budget, scoreRows }) {
+function buildManualBettingPlan({ scene, mode, selectedFront, selectedBack, frontDan, frontTuo, latestIssue, recommendedIssue, budget, scoreRows, appended = false }) {
   const rules = sceneRules(scene);
   const labels = planLabelsForScene(scene);
+  const unitPrice = scene === "DLT" && appended ? 3 : 2;
   if (mode === "single") {
     if (selectedFront.length !== rules.frontPick || selectedBack.length !== rules.backPick) {
       throw new Error(`单式需要选择 ${rules.frontPick} 个${labels.front}和 ${rules.backPick} 个${labels.back}。`);
@@ -518,11 +668,34 @@ function buildManualBettingPlan({ scene, mode, selectedFront, selectedBack, fron
       based_on_issue: latestIssue,
       recommended_issue: recommendedIssue,
       recommendation_label: `人工选择第 ${recommendedIssue || "下一"} 期单式方案，保存后等待开奖复盘。`,
-      budget_analysis: { budget: Number(budget || 0), cost: 2, unused: Math.max(0, Number(budget || 0) - 2), utilization: Number(budget || 0) ? Math.round((2 / Number(budget || 0)) * 10000) / 100 : 0 },
-      cost: 2,
+      appended: scene === "DLT" && appended,
+      unit_price: unitPrice,
+      budget_analysis: { budget: Number(budget || 0), cost: unitPrice, unused: Math.max(0, Number(budget || 0) - unitPrice), utilization: Number(budget || 0) ? Math.round((unitPrice / Number(budget || 0)) * 10000) / 100 : 0 },
+      cost: unitPrice,
       tickets: 1,
       items: [item],
       reason: "人工选号方案，系统仅按历史评分和结构规则点评，不预测开奖结果。",
+    };
+    plan.explanation = manualCommentary({ plan, scoreRows, labels });
+    return plan;
+  }
+
+  if (mode === "compound") {
+    if (selectedFront.length < rules.frontPick + 1 || selectedBack.length < rules.backPick) {
+      throw new Error(`复式至少选择 ${rules.frontPick + 1} 个${labels.front}和 ${rules.backPick} 个${labels.back}。`);
+    }
+    const items = expandCompoundItems(selectedFront, selectedBack, rules);
+    const cost = items.length * unitPrice;
+    const plan = {
+      scene, play_name: rules.playName, play_labels: labels, mode: "compound", source: "manual_selection", strategy: "manual_selection",
+      based_on_issue: latestIssue, recommended_issue: recommendedIssue,
+      recommendation_label: `人工选择第 ${recommendedIssue || "下一"} 期复式方案，保存后等待开奖复盘。`,
+      appended: scene === "DLT" && appended, unit_price: unitPrice,
+      front_pool: [...selectedFront].sort((left, right) => left - right), back_pool: [...selectedBack].sort((left, right) => left - right),
+      front_pool_display: displayNumbers(selectedFront), back_pool_display: displayNumbers(selectedBack),
+      cost, tickets: items.length, items,
+      budget_analysis: { budget: Number(budget || 0), cost, unused: Math.max(0, Number(budget || 0) - cost), utilization: Number(budget || 0) ? Math.round((cost / Number(budget || 0)) * 10000) / 100 : 0, explanation: cost <= Number(budget || 0) ? "人工复式方案符合当前预算。" : "人工复式方案超过预算，请减少号码池。" },
+      reason: "人工复式号码池，系统展开全部合法单注并进行结构点评。",
     };
     plan.explanation = manualCommentary({ plan, scoreRows, labels });
     return plan;
@@ -538,7 +711,7 @@ function buildManualBettingPlan({ scene, mode, selectedFront, selectedBack, fron
     throw new Error(`${labels.back}至少需要选择 ${rules.backPick} 个。`);
   }
   const tickets = combinationCount(frontTuo.length, rules.frontPick - frontDan.length) * combinationCount(selectedBack.length, rules.backPick);
-  const cost = tickets * 2;
+  const cost = tickets * unitPrice;
   const plan = {
     scene,
     play_name: rules.playName,
@@ -546,6 +719,8 @@ function buildManualBettingPlan({ scene, mode, selectedFront, selectedBack, fron
     mode: "dantuo",
     source: "manual_selection",
     strategy: "manual_selection",
+    appended: scene === "DLT" && appended,
+    unit_price: unitPrice,
     based_on_issue: latestIssue,
     recommended_issue: recommendedIssue,
     recommendation_label: `人工选择第 ${recommendedIssue || "下一"} 期胆拖方案，保存后等待开奖复盘。`,
@@ -581,16 +756,9 @@ function scoreSortLabel(sortKey) {
 }
 
 const MODULE_NAV_ITEMS = [
-  { key: "overview", label: "系统总览", icon: Home },
-  { key: "data", label: "投注方案", icon: FileStack },
-  { key: "review", label: "推荐复盘", icon: GitCompare },
-  { key: "behavior", label: "行为分析", icon: Gauge },
-  { key: "backtest", label: "历史回测", icon: Activity },
-  { key: "trends", label: "走势分析", icon: TrendingUp },
-  { key: "score", label: "号码评分", icon: Table2 },
-  { key: "capital", label: "风险控制", icon: Coins },
-  { key: "history", label: "历史记录", icon: History },
-  { key: "cloud", label: "云端同步", icon: Cloud },
+  { key: "data", label: "选号工作台", icon: FileStack },
+  { key: "review", label: "当期复盘", icon: GitCompare },
+  { key: "trends", label: "历史数据", icon: TrendingUp },
 ];
 
 const MODULE_TITLES = MODULE_NAV_ITEMS.reduce((items, item) => ({
@@ -600,7 +768,7 @@ const MODULE_TITLES = MODULE_NAV_ITEMS.reduce((items, item) => ({
 
 function initialModuleFromUrl() {
   const requested = new URLSearchParams(window.location.search).get("module");
-  return MODULE_NAV_ITEMS.some((item) => item.key === requested) ? requested : "overview";
+  return MODULE_NAV_ITEMS.some((item) => item.key === requested) ? requested : "data";
 }
 
 function updateModuleUrl(module) {
@@ -656,8 +824,8 @@ function AppSidebar({ scenes, active = "DLT", activeModule = "overview", onModul
 
       <div className="side-footer">
         <h3>产品理念</h3>
-        <p>策维不是彩票预测系统，而是帮助用户建立可解释、可控制预算、可持续优化的数字决策平台。</p>
-        <p>历史数据分析 · 预算约束 · 资金控制</p>
+        <p>策维不是彩票预测系统，而是把选号、保存和开奖核对整理成清晰可复用的操作流程。</p>
+        <p>完整历史数据 · 清晰选号方式 · 当期开奖复盘</p>
       </div>
     </aside>
   );
@@ -689,22 +857,12 @@ function SceneSelect({ scenes, onEnter }) {
 
   return (
     <main className="scene-page">
-      <header className="version-strip">
-        {PRODUCT_STATUS.map((item) => (
-          <div className={`version-pill ${item.tone}`} key={item.label}>
-            <span>{item.label}</span>
-            <strong>{item.value}</strong>
-            <em>{item.detail}</em>
-          </div>
-        ))}
-      </header>
-
       <section className="scene-shell">
         <div className="scene-shell-title">
           <div>
-            <Badge tone="live">场景选择页（所有版本通用）</Badge>
+            <Badge tone="live">v1.11 精简选号工作台</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
-            <p>Digital Decision Platform · Powered by CBGO Framework。当前版本为 v1.10 单用户云同步版，DLT 与 SSQ 共用完整决策闭环。</p>
+            <p>选择彩种，进入选号、保存和开奖复盘流程。</p>
           </div>
         </div>
 
@@ -736,53 +894,9 @@ function SceneSelect({ scenes, onEnter }) {
         </section>
       </section>
 
-      <section className="baseline-panel">
-        <div>
-          <Badge tone="live">v1.10 单用户云同步版</Badge>
-          <h2>当前交付范围</h2>
-          <p>选号只是入口；本版补齐方案比较、实际奖金复盘、跨设备同步和数据可追溯性。</p>
-        </div>
-        <div className="baseline-grid">
-          <article>
-            <h3>本版必须完成</h3>
-            <ul>
-              <li>大乐透与双色球双场景</li>
-              <li>冷热号、遗漏、奇偶比、大小比、和值</li>
-              <li>号码评分、单式、胆拖、预算控制</li>
-              <li>保存、复盘、历史回测与风险控制</li>
-            </ul>
-          </article>
-          <article>
-            <h3>本版不开发</h3>
-            <ul>
-              <li>开奖号码预测、论坛爬虫、无法核验的舆情数据</li>
-              <li>任何中奖率或收益率承诺</li>
-              <li>用历史命中结果预测下一期</li>
-              <li>诱导追投、翻倍或亏损后加码</li>
-            </ul>
-          </article>
-        </div>
-      </section>
-
-      <section className="roadmap-panel">
-        <div>
-          <Badge>后续迭代路线</Badge>
-          <h2>版本规划</h2>
-        </div>
-        <div className="roadmap-grid">
-          {ROADMAP_ITEMS.map((item) => (
-            <article className="roadmap-card" key={item.version}>
-              <Badge>{item.version}</Badge>
-              <h3>{item.title}</h3>
-              <p>{item.description}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
       <footer className="disclaimer scene-disclaimer">
         <ShieldAlert size={16} />
-        策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。彩票具有随机性，请理性参与。
+        策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅用于历史结构参考、号码组合管理与开奖复盘。彩票具有随机性，请理性参与。
       </footer>
     </main>
   );
@@ -1283,11 +1397,11 @@ function DataStatusPanel({ dataStatus, onImport }) {
   );
 }
 
-function PlanCard({ plan, onSave }) {
+function PlanCard({ plan, onSave, onRemove }) {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   if (!plan) return null;
-  const saveBlocked = plan.decision_brief?.block_save === true;
+  const saveBlocked = false;
 
   const labels = {
     front: "前区",
@@ -1302,6 +1416,8 @@ function PlanCard({ plan, onSave }) {
 
   const text = plan.mode === "dantuo"
     ? `${playName} ${planModeLabel(plan.mode)}\n${labels.dan}：${plan.front_dan_display.join(" ")}\n${labels.tuo}：${plan.front_tuo_display.join(" ")}\n${labels.back}：${plan.back_display.join(" ")}\n共 ${plan.tickets} 注，费用 ${plan.cost} 元`
+    : plan.mode === "compound"
+      ? `${playName} 复式\n${labels.front}号码池：${plan.front_pool_display.join(" ")}\n${labels.back}号码池：${plan.back_pool_display.join(" ")}\n共 ${plan.tickets} 注，费用 ${plan.cost} 元`
     : `${playName} ${planModeLabel(plan.mode)}\n${plan.items.map((item, index) => `${index + 1}. ${labels.front} ${item.front_display.join(" ")} + ${labels.back} ${item.back_display.join(" ")}`).join("\n")}`;
 
   const copy = async () => {
@@ -1332,28 +1448,12 @@ function PlanCard({ plan, onSave }) {
         </Badge>
         <strong>{plan.cost} 元 · {plan.tickets} 注</strong>
       </div>
+      {plan.appended && <Badge tone="live">大乐透追加投注 · 每注3元</Badge>}
       <div className="plan-issue">
         <span>推荐期号</span>
         <strong>{plan.recommended_issue ? `第 ${plan.recommended_issue} 期` : "下一期开奖"}</strong>
         <p>{plan.recommendation_label || "基于当前最新开奖数据生成下一期开奖推荐方案。"}</p>
       </div>
-      {plan.budget_analysis && (
-        <div className="budget-fit">
-          <div>
-            <span>预算匹配</span>
-            <strong>{plan.budget_analysis.cost} / {plan.budget_analysis.budget} 元</strong>
-          </div>
-          <div>
-            <span>预算占用</span>
-            <strong>{plan.budget_analysis.utilization}%</strong>
-          </div>
-          <div>
-            <span>未使用</span>
-            <strong>{plan.budget_analysis.unused} 元</strong>
-          </div>
-          <p>{plan.budget_analysis.explanation}</p>
-        </div>
-      )}
       <p className="plan-rule">{labels.rule}</p>
       {plan.reason && <p className="plan-reason">{plan.reason}</p>}
       {plan.score_basis && <p className="plan-score-basis">{plan.score_basis}</p>}
@@ -1372,6 +1472,11 @@ function PlanCard({ plan, onSave }) {
             <div>{plan.back_display.map((item) => <NumberBall key={item} tone="back">{item}</NumberBall>)}</div>
           </div>
         </div>
+      ) : plan.mode === "compound" ? (
+        <div className="number-groups compound-groups">
+          <div><p>{labels.front}号码池（{plan.front_pool_display.length}个）</p><div>{plan.front_pool_display.map((item) => <NumberBall key={item}>{item}</NumberBall>)}</div></div>
+          <div><p>{labels.back}号码池（{plan.back_pool_display.length}个）</p><div>{plan.back_pool_display.map((item) => <NumberBall key={item} tone="back">{item}</NumberBall>)}</div></div>
+        </div>
       ) : (
         <div className="single-list">
           {plan.items.slice(0, 8).map((item, index) => (
@@ -1387,7 +1492,6 @@ function PlanCard({ plan, onSave }) {
           {plan.explanation.map((item) => <span key={item}>{item}</span>)}
         </div>
       )}
-      <DecisionBrief brief={plan.decision_brief} />
       <div className="plan-actions">
         <button className="icon-button text-button" onClick={copy} type="button">
           <Clipboard size={16} />
@@ -1399,8 +1503,8 @@ function PlanCard({ plan, onSave }) {
             {saving ? "保存中..." : saveBlocked ? "风险过高，暂不保存" : "保存方案"}
           </button>
         )}
+        {onRemove && <button className="ghost-button compact" onClick={onRemove} type="button">移除</button>}
       </div>
-      {saveBlocked && <p className="save-blocked-note">先处理上方风险信号，再保存为待开奖方案。</p>}
     </article>
   );
 }
@@ -1414,6 +1518,8 @@ function SavedPlanDetails({ plan }) {
   const labels = plan.play_labels || planLabelsForScene(plan.scene || "DLT");
   const text = plan.mode === "dantuo"
     ? `${labels.dan}：${(plan.front_dan_display || displayNumbers(plan.front_dan || [])).join(" ")}\n${labels.tuo}：${(plan.front_tuo_display || displayNumbers(plan.front_tuo || [])).join(" ")}\n${labels.back}：${(plan.back_display || displayNumbers(plan.back || [])).join(" ")}`
+    : plan.mode === "compound"
+      ? `${labels.front}号码池：${(plan.front_pool_display || displayNumbers(plan.front_pool || [])).join(" ")}\n${labels.back}号码池：${(plan.back_pool_display || displayNumbers(plan.back_pool || [])).join(" ")}`
     : (plan.items || []).map((item, index) => `${index + 1}. ${labels.front} ${(item.front_display || displayNumbers(item.front || [])).join(" ")} + ${labels.back} ${(item.back_display || displayNumbers(item.back || [])).join(" ")}`).join("\n");
 
   const copy = async () => {
@@ -1433,6 +1539,11 @@ function SavedPlanDetails({ plan }) {
           <div><span>{labels.dan}</span><strong>{(plan.front_dan_display || displayNumbers(plan.front_dan || [])).join(" ")}</strong></div>
           <div><span>{labels.tuo}</span><strong>{(plan.front_tuo_display || displayNumbers(plan.front_tuo || [])).join(" ")}</strong></div>
           <div><span>{labels.back}</span><strong>{(plan.back_display || displayNumbers(plan.back || [])).join(" ")}</strong></div>
+        </div>
+      ) : plan.mode === "compound" ? (
+        <div className="saved-number-groups">
+          <div><span>{labels.front}号码池</span><strong>{(plan.front_pool_display || displayNumbers(plan.front_pool || [])).join(" ")}</strong></div>
+          <div><span>{labels.back}号码池</span><strong>{(plan.back_pool_display || displayNumbers(plan.back_pool || [])).join(" ")}</strong></div>
         </div>
       ) : (
         <div className="saved-ticket-list">
@@ -1567,18 +1678,27 @@ function HistoryRecords({ records, onDelete, review, scene, onImport }) {
   );
 }
 
-function ReviewPanel({ review, onRefresh }) {
+function ReviewPanel({ review, onRefresh, scoreRows = [], scene = "DLT", currentDraw }) {
   if (!review) return null;
   const summary = review.summary || {};
+  const latestReviewed = (review.items || []).find((item) => item.status === "reviewed" && item.actual);
+  const focusDraw = currentDraw || latestReviewed?.actual;
   return (
     <section className="panel wide review-panel" id="module-review">
       <div className="panel-title">
         <div>
-          <h2>推荐复盘</h2>
-          <p>对比已保存推荐方案与下一期开奖，统计历史命中表现</p>
+          <h2>当期开奖号码与方案复盘</h2>
+          <p>开奖号码置顶，逐个核对已选方案、中奖金额与结构表现</p>
         </div>
         <button className="ghost-button compact" onClick={onRefresh} type="button">刷新复盘</button>
       </div>
+      {focusDraw && (
+        <div className="current-draw-review">
+          <div><span>最新期开奖</span><strong>第 {focusDraw.issue} 期</strong><small>{focusDraw.date}</small></div>
+          <div className="current-draw-balls"><span>{planLabelsForScene(scene).front}</span>{focusDraw.front.map((number) => <NumberBall key={`f-${number}`}>{formatNumber(number)}</NumberBall>)}<span>{planLabelsForScene(scene).back}</span>{focusDraw.back.map((number) => <NumberBall key={`b-${number}`} tone="back">{formatNumber(number)}</NumberBall>)}</div>
+          <ul>{drawStructureAnalysis(focusDraw, scene, scoreRows).map((note) => <li key={note}>{note}</li>)}</ul>
+        </div>
+      )}
       <div className="review-summary">
         <div><span>已复盘</span><strong>{summary.reviewed || 0}</strong></div>
         <div><span>待开奖</span><strong>{summary.pending || 0}</strong></div>
@@ -1644,6 +1764,7 @@ function ReviewPanel({ review, onRefresh }) {
                     {item.prize_amount_complete && ` · 净收益 ${item.net_profit || 0} 元 · ROI ${item.roi ?? 0}%`}
                   </p>
                   {item.prize_source && <p>奖金来源：{item.prize_source}</p>}
+                  <div className="review-analysis"><strong>结构点评</strong>{drawStructureAnalysis(item.actual, scene, scoreRows).map((note) => <p key={note}>{note}</p>)}</div>
                 </>
               );
             })()}
@@ -1899,15 +2020,22 @@ function NumberPicker({ title, max, selected, onToggle, tone = "front", helper }
   );
 }
 
-function PackageEvaluator({ scene, budget, onBudgetChange }) {
+function PackageEvaluator({ scene, budget, dashboard, onGenerated, decisionContext }) {
   const [multiplier, setMultiplier] = useState(1);
   const [giftConfirmed, setGiftConfirmed] = useState(false);
+  const [selectedAmount, setSelectedAmount] = useState(packageCatalog(scene)[0]?.amount || 18);
   const source = PACKAGE_SOURCES[scene];
   const rows = useMemo(
     () => packageCatalog(scene).map((item) => evaluatePackage(item, { multiplier, giftConfirmed, budget })),
     [scene, multiplier, giftConfirmed, budget],
   );
   const isSsq = scene === "SSQ";
+  const selected = rows.find((row) => row.amount === selectedAmount) || rows[0];
+
+  const generatePackage = () => {
+    const plan = buildPackagePlan({ scene, packageRow: selected, latestIssue: dashboard.latest_issue, recommendedIssue: dashboard.recommended_issue });
+    onGenerated({ ...plan, decision_brief: buildDecisionBrief({ plan, budget, ...decisionContext }) });
+  };
 
   return (
     <div className="package-evaluator">
@@ -1921,10 +2049,6 @@ function PackageEvaluator({ scene, budget, onBudgetChange }) {
       </div>
 
       <div className="package-controls">
-        <label>
-          本期总预算
-          <input min="2" step="2" type="number" value={budget} onChange={(event) => onBudgetChange(Number(event.target.value))} />
-        </label>
         <label>
           套餐倍数
           <input min="1" max="20" step="1" type="number" value={multiplier} onChange={(event) => setMultiplier(Math.max(1, Number(event.target.value) || 1))} />
@@ -1952,12 +2076,11 @@ function PackageEvaluator({ scene, budget, onBudgetChange }) {
               <th>赠票</th>
               <th>票面展开</th>
               <th>单注实付</th>
-              <th>预算</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.amount}>
+              <tr className={row.amount === selectedAmount ? "selected" : ""} key={row.amount} onClick={() => setSelectedAmount(row.amount)}>
                 <td><strong>{row.amount}元</strong>{row.multiplier > 1 && <span>×{row.multiplier}</span>}</td>
                 <td><span>{row.structure}</span>{row.giftTickets > 0 && <small>赠 {row.giftStructure}{row.blueDistinct ? "·蓝球扩展" : ""}</small>}</td>
                 <td>{row.paid}元</td>
@@ -1965,11 +2088,15 @@ function PackageEvaluator({ scene, budget, onBudgetChange }) {
                 <td>{row.giftAmount > 0 ? `${row.giftAmount}元 / ${row.giftTickets}注` : "未计入"}</td>
                 <td>{row.faceAmount}元 / {row.totalTickets}注</td>
                 <td>{row.unitPaidCost}元</td>
-                <td><Badge tone={row.withinBudget ? "live" : "default"}>{row.withinBudget ? "预算内" : "超出"}</Badge></td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="package-generate-bar">
+        <div><strong>已选 {selected?.amount} 元套餐</strong><span>{selected?.structure}</span></div>
+        <button className="primary-button strong" onClick={generatePackage} type="button"><Play size={16} />随机模拟套餐出票</button>
       </div>
 
       <div className="package-notes">
@@ -1996,11 +2123,12 @@ function BettingPlanPanel({
 }) {
   const rules = sceneRules(scene);
   const labels = planLabelsForScene(scene);
-  const [flow, setFlow] = useState("ai");
-  const [mode, setMode] = useState("dantuo");
+  const [flow, setFlow] = useState("smart");
+  const [mode, setMode] = useState("all");
   const [ticketCount, setTicketCount] = useState(5);
   const [danCount, setDanCount] = useState(scene === "SSQ" ? 3 : 2);
   const [tuoCount, setTuoCount] = useState(scene === "SSQ" ? 5 : 5);
+  const [compoundFrontCount, setCompoundFrontCount] = useState(scene === "SSQ" ? 7 : 6);
   const [backCount, setBackCount] = useState(rules.backPick);
   const [manualFront, setManualFront] = useState([]);
   const [manualBack, setManualBack] = useState([]);
@@ -2009,6 +2137,19 @@ function BettingPlanPanel({
   const [message, setMessage] = useState("");
   const variantStorageKey = `ceway_${scene.toLowerCase()}_suggestion_variant`;
   const [variant, setVariant] = useState(() => Number(sessionStorage.getItem(variantStorageKey) || 0));
+  const [appended, setAppended] = useState(false);
+
+  const addGeneratedPlans = (plans) => {
+    const existing = generated?.comparison_plans || (generated ? [generated] : []);
+    const merged = [...existing, ...plans].slice(-12);
+    onGenerated({ ...merged[0], comparison_plans: merged });
+  };
+
+  const removeGeneratedPlan = (index) => {
+    const plans = generated?.comparison_plans || (generated ? [generated] : []);
+    const next = plans.filter((_, itemIndex) => itemIndex !== index);
+    onGenerated(next.length ? { ...next[0], comparison_plans: next } : null);
+  };
 
   const revealGenerated = () => {
     window.requestAnimationFrame(() => {
@@ -2040,12 +2181,8 @@ function BettingPlanPanel({
   const createAiPlan = () => {
     try {
       const nextVariant = variant + 1;
-      const optionSpecs = [
-        { optionLabel: "主推方案", optionMode: mode, offset: 0 },
-        { optionLabel: "备选方案 A", optionMode: mode, offset: 1 },
-        { optionLabel: "备选方案 B", optionMode: mode, offset: 2 },
-        { optionLabel: "单式兜底", optionMode: "single", offset: 3 },
-      ];
+      const requestedModes = mode === "all" ? ["dantuo", "compound", "single"] : [mode];
+      const optionSpecs = requestedModes.map((optionMode, offset) => ({ optionLabel: `${planModeLabel(optionMode)}推荐`, optionMode, offset }));
       const comparisonPlans = optionSpecs.map(({ optionLabel, optionMode, offset }) => {
         const plan = buildAiBettingPlan({
           scene,
@@ -2055,11 +2192,12 @@ function BettingPlanPanel({
           mode: optionMode,
           ticketCount: optionMode === "single" ? Math.max(1, Math.min(3, Math.floor(Number(budget || 0) / 2))) : ticketCount,
           danCount,
-          tuoCount,
+          tuoCount: optionMode === "compound" ? compoundFrontCount : tuoCount,
           backCount,
           latestIssue: dashboard.latest_issue,
           recommendedIssue: dashboard.recommended_issue,
           variant: nextVariant + offset,
+          appended,
         });
         return {
           ...plan,
@@ -2069,11 +2207,26 @@ function BettingPlanPanel({
         };
       });
       const plan = comparisonPlans[0];
-      const followingVariant = nextVariant + optionSpecs.length;
+      const followingVariant = nextVariant + Math.max(1, optionSpecs.length);
       setVariant(followingVariant);
       sessionStorage.setItem(variantStorageKey, String(followingVariant));
-      onGenerated({ ...plan, comparison_plans: comparisonPlans });
-      setMessage(plan.cost <= Number(budget || 0) ? `第 ${nextVariant} 批建议已生成，可比较主推、备选和单式兜底。` : "方案已生成，但费用超过预算，请调整胆拖数量。");
+      addGeneratedPlans(comparisonPlans);
+      setMessage(`第 ${nextVariant} 批智能推荐已生成，已加入本期号码组合。`);
+      revealGenerated();
+    } catch (err) {
+      setMessage(err.message);
+    }
+  };
+
+  const createRandomPlan = () => {
+    try {
+      const requestedModes = mode === "all" ? ["dantuo", "compound", "single"] : [mode];
+      const comparisonPlans = requestedModes.map((optionMode, index) => {
+        const plan = buildRandomBettingPlan({ scene, mode: optionMode, ticketCount, danCount, tuoCount: optionMode === "compound" ? compoundFrontCount : tuoCount, backCount, latestIssue: dashboard.latest_issue, recommendedIssue: dashboard.recommended_issue, appended });
+        return { ...plan, option_label: `${planModeLabel(optionMode)}随机`, generation_variant: Date.now() + index, decision_brief: buildDecisionBrief({ plan, budget, ...decisionContext }) };
+      });
+      addGeneratedPlans(comparisonPlans);
+      setMessage("纯随机号码已生成，未使用冷热、遗漏或评分数据。");
       revealGenerated();
     } catch (err) {
       setMessage(err.message);
@@ -2093,9 +2246,10 @@ function BettingPlanPanel({
         recommendedIssue: dashboard.recommended_issue,
         budget,
         scoreRows,
+        appended,
       });
       const decisionBrief = buildDecisionBrief({ plan, budget, ...decisionContext });
-      onGenerated({ ...plan, decision_brief: decisionBrief });
+      addGeneratedPlans([{ ...plan, decision_brief: decisionBrief }]);
       setMessage("人工方案已生成点评，可保存后进入待开奖复盘。");
       revealGenerated();
     } catch (err) {
@@ -2111,33 +2265,37 @@ function BettingPlanPanel({
     setMessage("");
   };
 
-  const estimatedTickets = mode === "dantuo"
-    ? combinationCount(Number(tuoCount || 0), rules.frontPick - Number(danCount || 0)) * combinationCount(Number(backCount || 0), rules.backPick)
-    : Number(ticketCount || 0);
-  const estimatedCost = Math.max(0, estimatedTickets * 2);
+  const dantuoTickets = combinationCount(Number(tuoCount || 0), rules.frontPick - Number(danCount || 0)) * combinationCount(Number(backCount || 0), rules.backPick);
+  const compoundTickets = combinationCount(Number(compoundFrontCount || 0), rules.frontPick) * combinationCount(Number(backCount || 0), rules.backPick);
+  const estimatedTickets = mode === "all" ? dantuoTickets + compoundTickets + Number(ticketCount || 0) : mode === "dantuo" ? dantuoTickets : mode === "compound" ? compoundTickets : Number(ticketCount || 0);
+  const estimatedCost = Math.max(0, estimatedTickets * (scene === "DLT" && appended ? 3 : 2));
 
   return (
     <section className="panel wide betting-panel" id="module-data">
       <div className="panel-title">
         <div>
-          <h2>投注方案</h2>
-          <p>先选择系统建议或人工选号，再生成方案、保存记录，等待开奖后自动复盘。</p>
+          <h2>选号工作台</h2>
+          <p>智能推荐、纯随机、套餐模拟和自选号码统一汇入本期号码组合。</p>
         </div>
         <Badge tone="live">第 {dashboard.recommended_issue || "下一"} 期</Badge>
       </div>
 
       <div className="workflow-tabs">
-        <button className={flow === "ai" ? "active" : ""} onClick={() => setFlow("ai")} type="button">
+        <button className={flow === "smart" ? "active" : ""} onClick={() => setFlow("smart")} type="button">
           <Sparkles size={16} />
-          系统建议
+          智能推荐
         </button>
-        <button className={flow === "manual" ? "active" : ""} onClick={() => setFlow("manual")} type="button">
+        <button className={flow === "random" ? "active" : ""} onClick={() => setFlow("random")} type="button">
+          <RefreshCw size={16} />
+          随机生成
+        </button>
+        <button className={flow === "manual" ? "active" : ""} onClick={() => { setFlow("manual"); if (mode === "all") setMode("single"); }} type="button">
           <Table2 size={16} />
-          人工选号点评
+          自选号码
         </button>
         <button className={flow === "package" ? "active" : ""} onClick={() => setFlow("package")} type="button">
           <WalletCards size={16} />
-          套餐评估
+          套餐模拟
         </button>
       </div>
 
@@ -2145,27 +2303,21 @@ function BettingPlanPanel({
         {flow !== "package" && <div className="betting-controls">
           <div className="field-grid compact-fields">
             <label>
-              本期预算
-              <input min="2" step="2" type="number" value={budget} onChange={(event) => onBudgetChange(Number(event.target.value))} />
-            </label>
-            <label>
-              近30日净投入上限
-              <input min="0" step="10" type="number" value={periodCap} onChange={(event) => onPeriodCapChange(Math.max(0, Number(event.target.value)))} />
-            </label>
-            <label>
               玩法
               <select value={mode} onChange={(event) => setMode(event.target.value)}>
+                {flow !== "manual" && <option value="all">三种同时生成</option>}
                 <option value="dantuo">胆拖</option>
+                <option value="compound">复式</option>
                 <option value="single">单式</option>
               </select>
             </label>
-            {flow === "ai" && mode === "single" && (
+            {(flow === "smart" || flow === "random") && mode === "single" && (
               <label>
                 注数
-                <input min="1" step="1" type="number" value={ticketCount} onChange={(event) => setTicketCount(Number(event.target.value))} />
+                <input min="1" max="100" step="1" type="number" value={ticketCount} onChange={(event) => setTicketCount(Number(event.target.value))} />
               </label>
             )}
-            {flow === "ai" && mode === "dantuo" && (
+            {(flow === "smart" || flow === "random") && (mode === "dantuo" || mode === "all") && (
               <>
                 <label>
                   胆数
@@ -2181,16 +2333,25 @@ function BettingPlanPanel({
                 </label>
               </>
             )}
+            {(flow === "smart" || flow === "random") && mode === "compound" && (
+              <>
+                <label>{labels.front}池数量<input min={rules.frontPick + 1} max={10} step="1" type="number" value={compoundFrontCount} onChange={(event) => setCompoundFrontCount(Number(event.target.value))} /></label>
+                <label>{labels.back}池数量<input min={rules.backPick} max={rules.backMax} step="1" type="number" value={backCount} onChange={(event) => setBackCount(Number(event.target.value))} /></label>
+              </>
+            )}
+            {scene === "DLT" && flow !== "package" && (
+              <label className="append-toggle"><input checked={appended} type="checkbox" onChange={(event) => setAppended(event.target.checked)} />追加投注（每注3元）</label>
+            )}
           </div>
 
-          {flow === "ai" ? (
+          {flow === "smart" || flow === "random" ? (
             <div className="betting-estimate">
               <div><span>预计注数</span><strong>{estimatedTickets || 0} 注</strong></div>
               <div><span>预计费用</span><strong>{estimatedCost || 0} 元</strong></div>
-              <div><span>预算状态</span><strong>{estimatedCost <= Number(budget || 0) ? "符合" : "超出"}</strong></div>
-              <button className="primary-button strong" onClick={createAiPlan} type="button">
+              <div><span>计价方式</span><strong>{scene === "DLT" && appended ? "追加3元/注" : "2元/注"}</strong></div>
+              <button className="primary-button strong" onClick={flow === "smart" ? createAiPlan : createRandomPlan} type="button">
                 <Play size={16} />
-                {generated?.source === "rule_suggestion" ? "再生成一组" : "生成系统建议"}
+                {flow === "smart" ? "生成智能推荐" : "生成随机号码"}
               </button>
             </div>
           ) : (
@@ -2210,20 +2371,20 @@ function BettingPlanPanel({
 
         {flow === "manual" && (
           <div className="manual-picker">
-            {mode === "single" ? (
+            {mode === "single" || mode === "compound" ? (
               <>
                 <NumberPicker
-                  title={`${labels.front}（选 ${rules.frontPick} 个）`}
+                  title={mode === "single" ? `${labels.front}（选 ${rules.frontPick} 个）` : `${labels.front}号码池（至少 ${rules.frontPick + 1} 个）`}
                   max={rules.frontMax}
                   selected={manualFront}
-                  onToggle={(number) => toggleNumber(manualFront, setManualFront, number, rules.frontPick)}
-                  helper="用于生成一注人工单式方案。"
+                  onToggle={(number) => toggleNumber(manualFront, setManualFront, number, mode === "single" ? rules.frontPick : 10)}
+                  helper={mode === "single" ? "用于生成一注自选单式。" : "复式会展开号码池内全部合法单注。"}
                 />
                 <NumberPicker
-                  title={`${labels.back}（选 ${rules.backPick} 个）`}
+                  title={mode === "single" ? `${labels.back}（选 ${rules.backPick} 个）` : `${labels.back}号码池（至少 ${rules.backPick} 个）`}
                   max={rules.backMax}
                   selected={manualBack}
-                  onToggle={(number) => toggleNumber(manualBack, setManualBack, number, rules.backPick)}
+                  onToggle={(number) => toggleNumber(manualBack, setManualBack, number, mode === "single" ? rules.backPick : rules.backMax)}
                   tone="back"
                 />
               </>
@@ -2256,22 +2417,23 @@ function BettingPlanPanel({
           </div>
         )}
         {flow === "package" && (
-          <PackageEvaluator scene={scene} budget={budget} onBudgetChange={onBudgetChange} />
+          <PackageEvaluator scene={scene} budget={budget} onBudgetChange={onBudgetChange} dashboard={dashboard} onGenerated={(plan) => addGeneratedPlans([plan])} decisionContext={decisionContext} />
         )}
       </div>
 
-      {generated && flow !== "package" && (
+      {generated && (
         <div className="betting-result" id="generated-plan-result">
           <div className="section-kicker">
-            <span>{generated.source === "manual_selection" ? "人工方案点评" : "系统方案比较"}</span>
-            <strong>{generated.source === "manual_selection" ? `${generated.cost} 元 · ${generated.tickets} 注` : "4 个方案独立保存"}</strong>
+            <span>本期已选号码组合</span>
+            <strong>{generated.comparison_plans?.length || 1} 个方案，可分别保存</strong>
           </div>
           <div className={generated.comparison_plans?.length ? "plan-comparison-grid" : ""}>
-            {(generated.comparison_plans || [generated]).map((plan) => (
+            {(generated.comparison_plans || [generated]).map((plan, index) => (
               <PlanCard
                 key={`${plan.option_label || "manual"}-${plan.generation_variant || 0}`}
                 plan={plan}
                 onSave={onSave}
+                onRemove={() => removeGeneratedPlan(index)}
               />
             ))}
           </div>
@@ -2440,14 +2602,14 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
     const localRecord = {
       id: `${Date.now()}-${plan.strategy}-${plan.mode}`,
       saved_at: new Date().toISOString(),
-      budget,
+      budget: Number(plan.cost || 0),
       strategy,
       latest_issue: dashboard.latest_issue,
       plan,
     };
     try {
       const result = await saveDltRecord({
-        budget,
+        budget: Number(plan.cost || 0),
         strategy,
         latestIssue: dashboard.latest_issue,
         plan,
@@ -2457,8 +2619,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
       await refreshReview();
       await refreshBehavior();
-      changeModule("history");
-      setNotice("方案已保存到后端历史记录。");
+      setNotice("方案已加入当期复盘，开奖后自动核对。");
     } catch (err) {
       const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
       localStorage.setItem("cbgo_saved_plans", JSON.stringify(nextPlans));
@@ -2467,8 +2628,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
       setSavedPlans(nextPlans);
       await refreshReview();
       await refreshBehavior();
-      changeModule("history");
-      setNotice(`后端保存失败，方案已保存到本地浏览器。${err?.message ? `原因：${err.message}` : ""}`);
+      setNotice(`方案已保存到本地并加入当期复盘。${err?.message ? `后端原因：${err.message}` : ""}`);
     }
   };
 
@@ -2602,54 +2762,31 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
             />
           )}
 
-          {activeModule === "review" && <ReviewPanel review={review} onRefresh={refreshReview} />}
-          {activeModule === "behavior" && <BehaviorPanel behavior={behavior} onRefresh={refreshBehavior} />}
-          {activeModule === "backtest" && <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} strategy={strategy} onStrategyChange={setStrategy} />}
+          {activeModule === "review" && (
+            <>
+              <ReviewPanel review={review} onRefresh={refreshReview} scoreRows={dashboard.score_table} scene="DLT" currentDraw={(Array.isArray(draws) ? draws : draws?.items)?.[0]} />
+              <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} scene="DLT" onImport={importSyncedRecords} />
+            </>
+          )}
           {activeModule === "trends" && (
-            <TrendPanel
-              dashboard={dashboard}
-              scoreRows={dashboard.score_table}
-              windowSize={windowSize}
-              onWindowChange={(value) => {
-                setWindowSize(value);
-                loadDashboard({ window: value });
-              }}
-            />
-          )}
-          {activeModule === "score" && <ScoreTable rows={dashboard.score_table} selectedNumbers={planFrontNumbers(generated)} />}
-          {activeModule === "capital" && (
-            <CapitalPanel
-              capital={dashboard.capital_state}
-              budget={budget}
-              principal={principal}
-              balance={balance}
-              lastPrize={lastPrize}
-              levelUnits={levelUnits}
-              periodCap={periodCap}
-              records={savedPlans}
-              generated={generated}
-              backtest={backtest}
-              review={review}
-              onBudgetChange={setBudget}
-              onPrincipalChange={setPrincipal}
-              onBalanceChange={setBalance}
-              onLastPrizeChange={setLastPrize}
-              onLevelChange={setLevelUnits}
-              onPeriodCapChange={setPeriodCap}
-              onApply={loadDashboard}
-            />
-          )}
-          {activeModule === "history" && <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} scene="DLT" onImport={importSyncedRecords} />}
-          {activeModule === "cloud" && (
-            <Suspense fallback={<div className="panel chart-loading">正在加载云同步...</div>}>
-              <CloudSyncPanelView scene="DLT" onApply={importSyncedRecords} />
-            </Suspense>
+            <>
+              <DataManagementPanel status={dataStorage} draws={draws} onSearchDraws={(issue) => refreshDataStorage({ offset: 0, issue })} onPageDraws={(offset, issue) => refreshDataStorage({ offset, issue })} onSync={syncHistory} />
+              <TrendPanel
+                dashboard={dashboard}
+                scoreRows={dashboard.score_table}
+                windowSize={windowSize}
+                onWindowChange={(value) => {
+                  setWindowSize(value);
+                  loadDashboard({ window: value });
+                }}
+              />
+            </>
           )}
         </section>
 
         <footer className="disclaimer footer-note">
           <ShieldAlert size={16} />
-          {dashboard.disclaimer} 彩票具有随机性，请理性娱乐，量力而行。
+          策维不预测开奖结果，仅提供历史结构参考、号码组合管理与开奖复盘。彩票具有随机性，请理性娱乐。
         </footer>
       </section>
     </main>
@@ -2797,20 +2934,19 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
     const localRecord = {
       id: `ssq-${Date.now()}-${plan.strategy}-${plan.mode}`,
       saved_at: new Date().toISOString(),
-      budget,
+      budget: Number(plan.cost || 0),
       strategy,
       latest_issue: latestIssue,
       plan,
     };
     try {
-      const result = await saveSsqRecord({ budget, strategy, latestIssue, plan });
+      const result = await saveSsqRecord({ budget: Number(plan.cost || 0), strategy, latestIssue, plan });
       mirrorCloudRecord("SSQ", result.record);
       notifyCloudDataChanged();
       setSavedPlans((items) => [result.record, ...items].slice(0, 100));
       await refreshReview();
       await refreshBehavior();
-      changeModule("history");
-      setNotice("双色球方案已保存。");
+      setNotice("双色球方案已加入当期复盘，开奖后自动核对。");
     } catch (err) {
       const nextPlans = [localRecord, ...savedPlans].slice(0, 20);
       localStorage.setItem("cbgo_ssq_plans", JSON.stringify(nextPlans));
@@ -2819,8 +2955,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
       setSavedPlans(nextPlans);
       await refreshReview();
       await refreshBehavior();
-      changeModule("history");
-      setNotice(`后端保存失败，双色球方案已保存到本地浏览器。${err?.message ? `原因：${err.message}` : ""}`);
+      setNotice(`双色球方案已保存到本地并加入当期复盘。${err?.message ? `后端原因：${err.message}` : ""}`);
     }
   };
 
@@ -2985,54 +3120,31 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
             />
           )}
 
-          {activeModule === "review" && <ReviewPanel review={review} onRefresh={refreshReview} />}
-          {activeModule === "behavior" && <BehaviorPanel behavior={behavior} onRefresh={refreshBehavior} />}
-          {activeModule === "backtest" && <BacktestPanel backtest={backtest} onRefresh={refreshBacktest} strategy={strategy} onStrategyChange={setStrategy} />}
+          {activeModule === "review" && (
+            <>
+              <ReviewPanel review={review} onRefresh={refreshReview} scoreRows={scoreRows} scene="SSQ" currentDraw={(Array.isArray(draws) ? draws : draws?.items)?.[0]} />
+              <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} scene="SSQ" onImport={importSyncedRecords} />
+            </>
+          )}
           {activeModule === "trends" && (
-            <TrendPanel
-              dashboard={ssqView}
-              scoreRows={scoreRows}
-              windowSize={windowSize}
-              onWindowChange={(value) => {
-                setWindowSize(value);
-                loadDashboard({ window: value });
-              }}
-            />
-          )}
-          {activeModule === "score" && <ScoreTable rows={scoreRows} selectedNumbers={planFrontNumbers(generated)} />}
-          {activeModule === "capital" && (
-            <CapitalPanel
-              capital={dashboard.capital}
-              budget={budget}
-              principal={principal}
-              balance={balance}
-              lastPrize={lastPrize}
-              levelUnits={levelUnits}
-              periodCap={periodCap}
-              records={savedPlans}
-              generated={generated}
-              backtest={backtest}
-              review={review}
-              onBudgetChange={setBudget}
-              onPrincipalChange={setPrincipal}
-              onBalanceChange={setBalance}
-              onLastPrizeChange={setLastPrize}
-              onLevelChange={setLevelUnits}
-              onPeriodCapChange={setPeriodCap}
-              onApply={loadDashboard}
-            />
-          )}
-          {activeModule === "history" && <HistoryRecords records={savedPlans} onDelete={deleteRecord} review={review} scene="SSQ" onImport={importSyncedRecords} />}
-          {activeModule === "cloud" && (
-            <Suspense fallback={<div className="panel chart-loading">正在加载云同步...</div>}>
-              <CloudSyncPanelView scene="SSQ" onApply={importSyncedRecords} />
-            </Suspense>
+            <>
+              <DataManagementPanel status={dataStorage} draws={draws} onSearchDraws={(issue) => refreshDataStorage({ offset: 0, issue })} onPageDraws={(offset, issue) => refreshDataStorage({ offset, issue })} onSync={syncHistory} />
+              <TrendPanel
+                dashboard={ssqView}
+                scoreRows={scoreRows}
+                windowSize={windowSize}
+                onWindowChange={(value) => {
+                  setWindowSize(value);
+                  loadDashboard({ window: value });
+                }}
+              />
+            </>
           )}
         </section>
 
         <footer className="disclaimer footer-note">
           <ShieldAlert size={16} />
-          {dashboard.disclaimer} 彩票具有随机性，请理性娱乐，量力而行。
+          策维不预测开奖结果，仅提供历史结构参考、号码组合管理与开奖复盘。彩票具有随机性，请理性娱乐。
         </footer>
       </section>
     </main>

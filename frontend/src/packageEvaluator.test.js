@@ -36,3 +36,20 @@ test("大乐透88元套餐按组合结构展开为44注", () => {
   assert.equal(result.withinBudget, true);
 });
 
+test("每个套餐的结构元数据都能展开为标注的基础注数", () => {
+  for (const scene of ["DLT", "SSQ"]) {
+    const frontPick = scene === "DLT" ? 5 : 6;
+    const backPick = scene === "DLT" ? 2 : 1;
+    const combinations = (total, pick) => {
+      let value = 1;
+      for (let index = 1; index <= pick; index += 1) value = (value * (total - index + 1)) / index;
+      return Math.round(value);
+    };
+    packageCatalog(scene).forEach((item) => {
+      const tickets = item.components.reduce((sum, component) => (
+        sum + (component.mode === "single" ? component.count : combinations(component.front, frontPick) * combinations(component.back, backPick))
+      ), 0);
+      assert.equal(tickets, item.baseTickets, `${scene} ${item.amount}元套餐结构不一致`);
+    });
+  }
+});
