@@ -193,11 +193,22 @@ def commit_data(game: str) -> None:
     run(["git", "push", "origin", "main"], timeout=120)
 
 
+def frontend_dependencies_are_stale(frontend_dir: Path = FRONTEND_DIR) -> bool:
+    node_modules = frontend_dir / "node_modules"
+    package_lock = frontend_dir / "package-lock.json"
+    return (
+        not node_modules.exists()
+        or (package_lock.exists() and package_lock.stat().st_mtime > node_modules.stat().st_mtime)
+    )
+
+
 def build_pages() -> None:
     npm = shutil.which("npm", path=AUTOMATION_PATH)
     if not npm:
         raise RuntimeError("未找到 npm，无法构建 GitHub Pages")
-    if not (FRONTEND_DIR / "node_modules").exists():
+    node_modules = FRONTEND_DIR / "node_modules"
+    if frontend_dependencies_are_stale():
+        log("前端依赖有更新，执行 npm ci")
         run([npm, "ci"], cwd=FRONTEND_DIR, timeout=600)
     run([npm, "run", "build:pages"], cwd=FRONTEND_DIR, timeout=300)
 

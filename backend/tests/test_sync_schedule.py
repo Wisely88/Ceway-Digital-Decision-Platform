@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -16,7 +17,7 @@ from scripts.update_dlt_history import (
     merge_rows as merge_dlt_rows,
     parse_78500_payload,
 )
-from scripts.run_draw_update import scheduled_game, write_run_status
+from scripts.run_draw_update import frontend_dependencies_are_stale, scheduled_game, write_run_status
 from scripts.update_prize_data import normalize_dlt_prize, normalize_ssq_prize, save_snapshot
 from scripts.update_ssq_history import (
     expected_draw_date,
@@ -98,6 +99,19 @@ class LocalAutomationScheduleTests(unittest.TestCase):
             payload = json.loads(written.read_text(encoding="utf-8"))
 
         self.assertIsNotNone(payload["last_success_at"])
+
+    def test_frontend_dependency_refresh_follows_package_lock_timestamp(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            frontend = Path(temp_dir)
+            node_modules = frontend / "node_modules"
+            node_modules.mkdir()
+            package_lock = frontend / "package-lock.json"
+            package_lock.write_text("{}\n", encoding="utf-8")
+            os.utime(node_modules, (100, 100))
+            os.utime(package_lock, (99, 99))
+            self.assertFalse(frontend_dependencies_are_stale(frontend))
+            os.utime(package_lock, (101, 101))
+            self.assertTrue(frontend_dependencies_are_stale(frontend))
 
 
 class SsqSyncScheduleTests(unittest.TestCase):
