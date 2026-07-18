@@ -120,6 +120,9 @@ export async function syncCloudState() {
   });
   if (writeError) throw writeError;
   applyLocalState(merged);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("ceway-cloud-state-applied"));
+  }
   return {
     state: merged,
     dlt_count: merged.dlt_records.length,

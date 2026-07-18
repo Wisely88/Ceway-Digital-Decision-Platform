@@ -32,6 +32,7 @@ export function CloudSyncAgent() {
       }, 600);
     };
     window.addEventListener("ceway-cloud-data-changed", sync);
+    sync();
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener("ceway-cloud-data-changed", sync);

@@ -27,6 +27,7 @@ import {
   TrendingUp,
   WalletCards,
   Workflow,
+  X,
 } from "lucide-react";
 import {
   deleteDltRecord,
@@ -76,6 +77,21 @@ function ChartFallback({ height = 250 }) {
 
 function Badge({ children, tone = "default" }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;
+}
+
+function CloudSyncDialog({ onApply, onClose, scene }) {
+  return (
+    <div className="dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div aria-label="数据备份" aria-modal="true" className="cloud-sync-dialog" role="dialog">
+        <button aria-label="关闭数据备份" className="dialog-close icon-button" onClick={onClose} title="关闭" type="button">
+          <X size={18} />
+        </button>
+        <Suspense fallback={<div className="chart-loading">正在加载数据备份...</div>}>
+          <CloudSyncPanelView scene={scene} onApply={onApply} />
+        </Suspense>
+      </div>
+    </div>
+  );
 }
 
 function StatCard({ icon: Icon, label, value, meta }) {
@@ -2652,6 +2668,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [showCloudSync, setShowCloudSync] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("ceway_dlt_period_cap", String(periodCap));
@@ -2686,6 +2703,12 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
   };
 
   useEffect(() => {
+    const restoreCloudState = () => {
+      getDltRecords().then(setSavedPlans).catch(() => {});
+      getDltReview().then(setReview).catch(() => {});
+      getDltBehavior().then(setBehavior).catch(() => {});
+    };
+    window.addEventListener("ceway-cloud-state-applied", restoreCloudState);
     loadDashboard();
     getDltRecords()
       .then((records) => setSavedPlans(records))
@@ -2706,6 +2729,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
       .catch(() => setBacktest(null));
     getDltDataStatus().then(setDataStorage).catch(() => setDataStorage(null));
     getDltDraws({ limit: 12 }).then(setDraws).catch(() => setDraws({ items: [], total: 0, limit: 12, offset: 0, issue: "" }));
+    return () => window.removeEventListener("ceway-cloud-state-applied", restoreCloudState);
   }, []);
 
   const refreshDataStorage = async ({ offset = 0, issue = drawIssue } = {}) => {
@@ -2920,6 +2944,10 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
             <p>Powered by CBGO Framework · DLT Module　当前期号：{dashboard.latest_issue}　数据截至：{dashboard.data_status?.latest_date || "-"}　<span className="status-dot" />运行状态：正常</p>
           </div>
           <div className="topbar-actions">
+            <button className="ghost-button" onClick={() => setShowCloudSync(true)} type="button">
+              <Cloud size={16} />
+              数据备份
+            </button>
             <button className="ghost-button" onClick={onBack} type="button">
               <ArrowLeft size={16} />
               返回场景页
@@ -2996,6 +3024,17 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
           策维不预测开奖结果，仅提供历史结构参考、号码组合管理与开奖复盘。彩票具有随机性，请理性娱乐。
         </footer>
       </section>
+      {showCloudSync && (
+        <CloudSyncDialog
+          scene="DLT"
+          onApply={async (records) => {
+            setSavedPlans(records);
+            await refreshReview();
+            await refreshBehavior();
+          }}
+          onClose={() => setShowCloudSync(false)}
+        />
+      )}
     </main>
   );
 }
@@ -3022,6 +3061,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [showCloudSync, setShowCloudSync] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("ceway_ssq_period_cap", String(periodCap));
@@ -3056,6 +3096,12 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
   };
 
   useEffect(() => {
+    const restoreCloudState = () => {
+      getSsqRecords().then(setSavedPlans).catch(() => {});
+      getSsqReview().then(setReview).catch(() => {});
+      getSsqBehavior().then(setBehavior).catch(() => {});
+    };
+    window.addEventListener("ceway-cloud-state-applied", restoreCloudState);
     loadDashboard();
     getSsqRecords()
       .then((records) => setSavedPlans(records))
@@ -3076,6 +3122,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
       .catch(() => setBacktest(null));
     getSsqDataStatus().then(setDataStorage).catch(() => setDataStorage(null));
     getSsqDraws({ limit: 12 }).then(setDraws).catch(() => setDraws({ items: [], total: 0, limit: 12, offset: 0, issue: "" }));
+    return () => window.removeEventListener("ceway-cloud-state-applied", restoreCloudState);
   }, []);
 
   const refreshDataStorage = async ({ offset = 0, issue = drawIssue } = {}) => {
@@ -3298,6 +3345,10 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
             <p>Powered by CBGO Framework · SSQ Module　当前期号：{dashboard.latest_issue}　数据截至：{dashboard.storage?.latest_date || "-"}　推荐期号：{dashboard.recommended_issue || "下一期"}　<span className="status-dot" />运行状态：正常</p>
           </div>
           <div className="topbar-actions">
+            <button className="ghost-button" onClick={() => setShowCloudSync(true)} type="button">
+              <Cloud size={16} />
+              数据备份
+            </button>
             <button className="ghost-button" onClick={onBack} type="button">
               <ArrowLeft size={16} />
               返回场景页
@@ -3374,6 +3425,17 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
           策维不预测开奖结果，仅提供历史结构参考、号码组合管理与开奖复盘。彩票具有随机性，请理性娱乐。
         </footer>
       </section>
+      {showCloudSync && (
+        <CloudSyncDialog
+          scene="SSQ"
+          onApply={async (records) => {
+            setSavedPlans(records);
+            await refreshReview();
+            await refreshBehavior();
+          }}
+          onClose={() => setShowCloudSync(false)}
+        />
+      )}
     </main>
   );
 }

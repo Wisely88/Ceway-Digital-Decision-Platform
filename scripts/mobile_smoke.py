@@ -132,6 +132,20 @@ async def run_scene_flow(client: CdpClient, scene_name: str) -> dict:
     await click_text(client, scene_name, ".scene-tile")
     await wait_for_text(client, "选号工作台")
     await assert_no_document_overflow(client, f"{scene_name}工作台")
+    await click_text(client, "数据备份")
+    await wait_for_text(client, "输入同步密码")
+    backup_closed = await client.evaluate(
+        """
+        (() => {
+          const button = document.querySelector('button[aria-label="关闭数据备份"]');
+          if (!button) return false;
+          button.click();
+          return true;
+        })()
+        """
+    )
+    if not backup_closed:
+        raise AssertionError(f"{scene_name}数据备份弹窗无法关闭")
     await click_text(client, "选号工作台", ".side-nav-item")
     await wait_for_text(client, "生成智能推荐")
     await wait_for_text(client, "单式倍数")
@@ -178,6 +192,18 @@ async def run_scene_flow(client: CdpClient, scene_name: str) -> dict:
     )
     if single_ticket_count < 1:
         raise AssertionError(f"{scene_name}复盘中的单式号码为空")
+    await client.call("Page.reload")
+    await wait_for_text(client, "策维（Ceway）数字决策平台")
+    await wait_for_text(client, "当期复盘")
+    persisted_modes = await client.evaluate(
+        """
+        [...document.querySelectorAll('.simple-review-head strong')]
+          .map((node) => node.textContent.trim())
+        """
+    )
+    for expected_mode in ("胆拖", "复式", "单式"):
+        if not any(expected_mode in heading for heading in persisted_modes):
+            raise AssertionError(f"{scene_name}重新打开后复盘缺少{expected_mode}：{persisted_modes}")
     await click_text(client, "选号工作台", ".side-nav-item")
     await wait_for_text(client, "生成智能推荐")
     await click_text(client, "随机生成")

@@ -3157,6 +3157,36 @@ td {
   padding: 12px 14px;
 }
 
+.dialog-backdrop {
+  align-items: center;
+  background: rgba(1, 9, 18, 0.78);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 20px;
+  position: fixed;
+  z-index: 100;
+}
+
+.cloud-sync-dialog {
+  max-height: calc(100vh - 40px);
+  max-width: 940px;
+  overflow: auto;
+  position: relative;
+  width: 100%;
+}
+
+.cloud-sync-dialog .cloud-sync-panel {
+  margin: 0;
+}
+
+.dialog-close {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  z-index: 2;
+}
+
 .cloud-sync-panel {
   max-width: 920px;
 }
@@ -3389,6 +3419,24 @@ td {
   .scene-header {
     min-height: 220px;
     padding: 28px;
+  }
+}
+
+@media (max-width: 600px) {
+  .dialog-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .cloud-sync-dialog {
+    max-height: 88vh;
+  }
+
+  .cloud-sync-dialog .cloud-sync-panel {
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 8px 8px 0 0;
+    border-right: 0;
   }
 }
 
