@@ -22,3 +22,18 @@ test("sync bundle rejects damaged input", () => {
 test("sync bundle rejects oversized input", () => {
   assert.throws(() => decodeSyncBundle(`CEWAY1.${"a".repeat(2_000_001)}`, "DLT"), /大小上限/);
 });
+
+test("sync bundle preserves complete package and multiplier fields", () => {
+  const records = [{
+    id: "package-1",
+    plan: {
+      mode: "package",
+      multiplier: 4,
+      package_structure: "单式6注 + 5+3复式",
+      package_entries: [{ mode: "compound", front_pool: [1, 2, 3, 4, 5], back_pool: [1, 2, 3] }],
+      items: [{ front: [1, 2, 3, 4, 5], back: [1, 2] }],
+    },
+  }];
+  const decoded = decodeSyncBundle(encodeSyncBundle("DLT", records), "DLT");
+  assert.deepEqual(decoded.records, records);
+});

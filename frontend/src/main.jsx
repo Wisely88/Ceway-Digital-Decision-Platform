@@ -892,7 +892,7 @@ function SceneSelect({ scenes, onEnter }) {
       <section className="scene-shell">
         <div className="scene-shell-title">
           <div>
-            <Badge tone="live">v1.11 精简选号工作台</Badge>
+            <Badge tone="live">v1.12 正式使用版</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
             <p>选择彩种，进入选号、保存和开奖复盘流程。</p>
           </div>

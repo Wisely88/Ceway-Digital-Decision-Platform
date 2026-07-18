@@ -217,6 +217,28 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(result["prize_distribution"], {"一等奖": 1, "四等奖": 4})
         self.assertEqual(result["best"]["prize_label"], "一等奖")
 
+    def test_dlt_package_reviews_each_expanded_ticket(self) -> None:
+        plan = {
+            "mode": "package",
+            "cost": 18,
+            "tickets": 2,
+            "package_entries": [
+                {"mode": "single", "tickets": 1},
+                {"mode": "compound", "tickets": 1, "front_pool": [1, 2, 3, 4, 5], "back_pool": [1, 2]},
+            ],
+            "items": [
+                {"front": [1, 2, 3, 4, 5], "back": [1, 2]},
+                {"front": [6, 7, 8, 9, 10], "back": [3, 4]},
+            ],
+        }
+        draw = {"issue": "26079", "date": "2026-07-15", "front": [1, 2, 3, 4, 5], "back": [1, 2]}
+
+        result = review_plan(plan, draw)
+
+        self.assertEqual(result["tickets"], 2)
+        self.assertEqual(result["hit_tickets"], 1)
+        self.assertEqual(result["prize_distribution"], {"一等奖": 1})
+
     def test_ssq_dantuo_counts_every_expanded_winning_ticket(self) -> None:
         plan = {
             "mode": "dantuo",

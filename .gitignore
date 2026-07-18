@@ -5,4 +5,5 @@ backend/data/ceway.sqlite3
 frontend/node_modules/
 frontend/dist/
 .logs/
+status/
 .DS_Store

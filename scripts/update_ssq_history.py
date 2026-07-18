@@ -133,17 +133,39 @@ def fill_latest_new_draw_date(
     now: datetime | None = None,
 ) -> list[dict]:
     draw_date = expected_draw_date(now)
-    if not draw_date:
-        return incoming_rows
-    current_issues = {row["issue"] for row in current_rows}
-    new_rows = [row for row in incoming_rows if row["issue"] not in current_issues]
+    current_by_issue = {row["issue"]: row for row in current_rows}
+    latest_current_issue = max(current_by_issue, default="")
+    new_rows = sorted(
+        [
+            row
+            for row in incoming_rows
+            if row["issue"] not in current_by_issue
+            or (row["issue"] == latest_current_issue and not current_by_issue[row["issue"]].get("date"))
+        ],
+        key=lambda row: row["issue"],
+    )
     if not new_rows:
         return incoming_rows
-    latest_new_issue = max(row["issue"] for row in new_rows)
+    dated_current = [row for row in current_rows if row.get("date")]
+    previous_date = (
+        datetime.fromisoformat(max(dated_current, key=lambda row: row["issue"])["date"]).date()
+        if dated_current
+        else None
+    )
+    inferred_dates = {}
+    for row in new_rows:
+        if row.get("date"):
+            previous_date = datetime.fromisoformat(row["date"]).date()
+        elif previous_date:
+            candidate = previous_date + timedelta(days=1)
+            while candidate.weekday() not in SSQ_DRAW_WEEKDAYS:
+                candidate += timedelta(days=1)
+            inferred_dates[row["issue"]] = candidate.isoformat()
+            previous_date = candidate
+    if draw_date and len(new_rows) == 1:
+        inferred_dates[new_rows[0]["issue"]] = draw_date
     return [
-        {**row, "date": row.get("date") or draw_date}
-        if row["issue"] == latest_new_issue
-        else row
+        {**row, "date": row.get("date") or inferred_dates.get(row["issue"], "")}
         for row in incoming_rows
     ]
 

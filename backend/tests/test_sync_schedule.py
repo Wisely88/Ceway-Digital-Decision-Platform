@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 from scripts.update_dlt_history import (
     expected_draw_date as expected_dlt_draw_date,
+    fill_latest_new_draw_date as fill_latest_new_dlt_draw_date,
     merge_rows as merge_dlt_rows,
     parse_78500_payload,
 )
@@ -45,6 +46,13 @@ class DltSyncScheduleTests(unittest.TestCase):
         now = datetime(2026, 7, 12, 0, 30, tzinfo=SHANGHAI_TZ)
         self.assertEqual(expected_dlt_draw_date(now), "2026-07-11")
 
+    def test_infers_delayed_dlt_date_from_previous_draw(self):
+        current = [{"issue": "26079", "date": "2026-07-15", "front": [], "back": []}]
+        incoming = [{"issue": "26080", "date": "", "front": [], "back": []}]
+        now = datetime(2026, 7, 19, 12, 0, tzinfo=SHANGHAI_TZ)
+        rows = fill_latest_new_dlt_draw_date(incoming, current, now)
+        self.assertEqual(rows[0]["date"], "2026-07-18")
+
 
 class LocalAutomationScheduleTests(unittest.TestCase):
     def test_selects_dlt_on_monday_evening(self):
@@ -69,6 +77,27 @@ class LocalAutomationScheduleTests(unittest.TestCase):
         self.assertEqual(payload["game"], "ssq")
         self.assertEqual(payload["message"], "测试失败通知")
         self.assertIn("updated_at", payload)
+        self.assertEqual(payload["last_failure_message"], "测试失败通知")
+
+    def test_skipped_run_does_not_hide_previous_failure(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target = Path(temp_dir) / "status" / "latest.json"
+            write_run_status("failed", "ssq", "数据源暂时不可用", status_file=target)
+            written = write_run_status("skipped", "auto", "当前不是开奖检查时段", status_file=target)
+            payload = json.loads(written.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["status"], "skipped")
+        self.assertEqual(payload["last_failure_message"], "数据源暂时不可用")
+        self.assertIsNotNone(payload["last_failure_at"])
+
+    def test_success_timestamp_survives_later_skipped_run(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target = Path(temp_dir) / "status" / "latest.json"
+            write_run_status("ok", "dlt", "自动更新任务完成", status_file=target)
+            written = write_run_status("skipped", "auto", "当前不是开奖检查时段", status_file=target)
+            payload = json.loads(written.read_text(encoding="utf-8"))
+
+        self.assertIsNotNone(payload["last_success_at"])
 
 
 class SsqSyncScheduleTests(unittest.TestCase):
@@ -104,6 +133,13 @@ class SsqSyncScheduleTests(unittest.TestCase):
         rows = fill_latest_new_draw_date(incoming, current, now)
         self.assertEqual(rows[-1]["date"], "2026-07-14")
         self.assertEqual(rows[0]["date"], "")
+
+    def test_infers_delayed_ssq_date_from_previous_draw(self):
+        current = [{"issue": "2026080", "date": "2026-07-14", "front": [], "back": []}]
+        incoming = [{"issue": "2026081", "date": "", "front": [], "back": []}]
+        now = datetime(2026, 7, 18, 12, 0, tzinfo=SHANGHAI_TZ)
+        rows = fill_latest_new_draw_date(incoming, current, now)
+        self.assertEqual(rows[0]["date"], "2026-07-16")
 
 
 class PrizeSyncTests(unittest.TestCase):

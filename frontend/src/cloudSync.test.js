@@ -18,3 +18,20 @@ test("云同步同时保留大乐透与双色球记录", () => {
   assert.equal(merged.dlt_records.length, 1);
   assert.equal(merged.ssq_records.length, 1);
 });
+
+test("云同步完整保留套餐结构、复式号码池和单式倍率", () => {
+  const packageRecord = {
+    id: "package",
+    saved_at: "2026-07-18T00:00:00Z",
+    plan: {
+      mode: "package",
+      multiplier: 3,
+      package_entries: [
+        { mode: "compound", front_pool: [1, 2, 3, 4, 5, 6], back_pool: [1, 2, 3] },
+      ],
+      items: [{ front: [1, 2, 3, 4, 5], back: [1, 2] }],
+    },
+  };
+  const merged = mergeSyncState({ dlt_records: [packageRecord] }, {});
+  assert.deepEqual(merged.dlt_records[0].plan, packageRecord.plan);
+});

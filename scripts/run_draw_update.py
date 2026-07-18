@@ -52,12 +52,27 @@ def log(message: str) -> None:
 def write_run_status(status: str, game: str, message: str, status_file: Path | None = None) -> Path:
     target = status_file or STATUS_FILE
     target.parent.mkdir(parents=True, exist_ok=True)
+    previous = {}
+    if target.exists():
+        try:
+            previous = json.loads(target.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            previous = {}
+    updated_at = datetime.now(SHANGHAI_TZ).isoformat()
     payload = {
         "status": status,
         "game": game,
         "message": message,
-        "updated_at": datetime.now(SHANGHAI_TZ).isoformat(),
+        "updated_at": updated_at,
+        "last_success_at": previous.get("last_success_at"),
+        "last_failure_at": previous.get("last_failure_at"),
+        "last_failure_message": previous.get("last_failure_message"),
     }
+    if status == "ok":
+        payload["last_success_at"] = updated_at
+    elif status == "failed":
+        payload["last_failure_at"] = updated_at
+        payload["last_failure_message"] = message
     temporary = target.with_suffix(target.suffix + ".tmp")
     temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     temporary.replace(target)

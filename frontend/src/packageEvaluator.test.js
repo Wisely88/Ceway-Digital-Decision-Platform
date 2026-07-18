@@ -61,3 +61,22 @@ test("双色球赠票保留复式号码池结构", () => {
     assert.equal(item.giftComponent.back, item.giftTickets);
   });
 });
+
+test("全部套餐在倍投和赠票条件下保持金额与注数一致", () => {
+  for (const scene of ["DLT", "SSQ"]) {
+    for (const item of packageCatalog(scene)) {
+      for (const multiplier of [1, 2, 5]) {
+        const result = evaluatePackage(item, {
+          multiplier,
+          giftConfirmed: scene === "SSQ",
+          budget: item.amount * multiplier,
+        });
+        assert.equal(result.paid, item.amount * multiplier);
+        assert.equal(result.baseTickets, item.baseTickets * multiplier);
+        assert.equal(result.totalTickets, (item.baseTickets + (scene === "SSQ" ? item.giftTickets : 0)) * multiplier);
+        assert.equal(result.faceAmount, (item.amount + (scene === "SSQ" ? item.giftAmount : 0)) * multiplier);
+        assert.equal(result.withinBudget, true);
+      }
+    }
+  }
+});
