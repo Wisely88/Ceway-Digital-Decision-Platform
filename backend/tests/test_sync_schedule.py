@@ -17,7 +17,7 @@ from scripts.update_dlt_history import (
     parse_78500_payload,
 )
 from scripts.run_draw_update import scheduled_game, write_run_status
-from scripts.update_prize_data import normalize_dlt_prize, normalize_ssq_prize
+from scripts.update_prize_data import normalize_dlt_prize, normalize_ssq_prize, save_snapshot
 from scripts.update_ssq_history import (
     expected_draw_date,
     fill_latest_new_draw_date,
@@ -143,6 +143,25 @@ class SsqSyncScheduleTests(unittest.TestCase):
 
 
 class PrizeSyncTests(unittest.TestCase):
+    def test_unchanged_prize_snapshot_keeps_original_sync_time(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target = Path(temp_dir) / "prizes.json"
+            target.write_text(
+                json.dumps(
+                    {
+                        "source": "测试接口",
+                        "synced_at": "2026-07-18T00:00:00+08:00",
+                        "issues": {"1": {"prizes": {"一等奖": 5}}},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            save_snapshot(target, "测试接口", {"1": {"prizes": {"一等奖": 5}}})
+            payload = json.loads(target.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["synced_at"], "2026-07-18T00:00:00+08:00")
+
     def test_normalizes_dlt_actual_prize_amounts(self):
         issue, row = normalize_dlt_prize(
             {

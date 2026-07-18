@@ -138,17 +138,21 @@ def fetch_ssq(full: bool) -> dict[str, dict]:
 
 
 def save_snapshot(path: Path, source: str, incoming: dict[str, dict]) -> int:
-    existing = {}
+    previous_payload = {}
     if path.exists():
         try:
-            existing = json.loads(path.read_text(encoding="utf-8")).get("issues", {})
+            previous_payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            existing = {}
+            previous_payload = {}
+    existing = previous_payload.get("issues", {})
     issues = {**existing, **incoming}
+    sorted_issues = dict(sorted(issues.items()))
+    if previous_payload.get("source") == source and previous_payload.get("issues") == sorted_issues:
+        return len(sorted_issues)
     payload = {
         "source": source,
         "synced_at": datetime.now(SHANGHAI_TZ).isoformat(),
-        "issues": dict(sorted(issues.items())),
+        "issues": sorted_issues,
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
