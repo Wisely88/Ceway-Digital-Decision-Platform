@@ -55,6 +55,7 @@ import {
   syncDltHistory,
   syncSsqHistory,
 } from "./api";
+import { createRecordId } from "./recordIdentity.js";
 import { buildDecisionBrief, cumulativeSpending, recentPrizeWinnings, recentSpending } from "./decision";
 import { evaluatePackage, packageCatalog, PACKAGE_SOURCES } from "./packageEvaluator";
 import { selectScoredCombination } from "./suggestionRotation";
@@ -1904,10 +1905,17 @@ function ReviewPanel({ review, onRefresh, onDelete, scoreRows = [], scene = "DLT
                 <span>奖金 <b>{pending ? "-" : item.prize_amount_complete ? `${item.prize_amount || 0} 元` : "待补齐"}</b></span>
               </div>
               <div className="simple-review-actions">
-                {!pending && <button className="ghost-button compact" onClick={() => setExpandedId(expandedId === id ? null : id)} type="button">{expandedId === id ? "收起分析" : "查看分析"}</button>}
+                <button className="ghost-button compact" onClick={() => setExpandedId(expandedId === id ? null : id)} type="button">
+                  {expandedId === id ? "收起详情" : pending ? "查看全部号码" : "查看分析"}
+                </button>
                 {onDelete && item.record_id && <button className="ghost-button compact danger" onClick={() => onDelete(item.record_id)} type="button">删除</button>}
               </div>
-              {expandedId === id && item.actual && (
+              {expandedId === id && pending && (
+                <div className="simple-review-detail">
+                  <SavedPlanDetails plan={plan} />
+                </div>
+              )}
+              {expandedId === id && !pending && item.actual && (
                 <div className="simple-review-detail">
                   <p><b>开奖号码</b> {labels.front} {displayNumbers(item.actual.front || []).join(" ")}　{labels.back} {displayNumbers(item.actual.back || []).join(" ")}</p>
                   {drawStructureAnalysis(item.actual, scene, scoreRows).map((note) => <p key={note}>{note}</p>)}
@@ -2779,7 +2787,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
 
   const savePlan = async (plan, { navigate = true, refresh = true } = {}) => {
     const localRecord = {
-      id: `${Date.now()}-${plan.strategy}-${plan.mode}`,
+      id: createRecordId(`dlt-${plan.strategy || strategy}-${plan.mode}`),
       saved_at: new Date().toISOString(),
       budget: Number(plan.cost || 0),
       strategy,
@@ -3131,7 +3139,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
   const savePlan = async (plan, { navigate = true, refresh = true } = {}) => {
     const latestIssue = dashboard?.latest_issue || "";
     const localRecord = {
-      id: `ssq-${Date.now()}-${plan.strategy}-${plan.mode}`,
+      id: createRecordId(`ssq-${plan.strategy || strategy}-${plan.mode}`),
       saved_at: new Date().toISOString(),
       budget: Number(plan.cost || 0),
       strategy,

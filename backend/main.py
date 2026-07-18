@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -261,7 +262,7 @@ def delete_record_dlt(record_id: str) -> dict:
 @app.post("/records/dlt")
 def create_record_dlt(request: RecordRequest) -> dict:
     record = {
-        "id": f"dlt-{datetime.now(timezone.utc).timestamp()}",
+        "id": f"dlt-{uuid.uuid4()}",
         "saved_at": datetime.now(timezone.utc).isoformat(),
         "budget": request.budget,
         "strategy": request.strategy,
@@ -554,7 +555,7 @@ def delete_record_ssq(record_id: str) -> dict:
 @app.post("/records/ssq")
 def create_record_ssq(request: RecordRequest) -> dict:
     record = {
-        "id": f"ssq-{datetime.now(timezone.utc).timestamp()}",
+        "id": f"ssq-{uuid.uuid4()}",
         "saved_at": datetime.now(timezone.utc).isoformat(),
         "budget": request.budget,
         "strategy": request.strategy,

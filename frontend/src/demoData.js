@@ -1,5 +1,6 @@
 import dltHistoryCsv from "../../backend/data/dlt_history.csv?raw";
 import ssqHistoryCsv from "../../backend/data/ssq_history.csv?raw";
+import { createRecordId } from "./recordIdentity.js";
 import dltPrizeUrl from "../../backend/data/dlt_prizes.json?url";
 import ssqPrizeUrl from "../../backend/data/ssq_prizes.json?url";
 import { buildBehaviorProfile } from "./behavior";
@@ -655,7 +656,7 @@ export async function getDemoBehavior(scene) {
 export function saveDemoRecord({ budget, strategy, latestIssue, plan }) {
   const records = JSON.parse(localStorage.getItem("ceway_demo_records") || "[]");
   const record = {
-    id: `demo-${Date.now()}`,
+    id: createRecordId("demo"),
     saved_at: new Date().toISOString(),
     budget,
     strategy,
@@ -670,7 +671,7 @@ export function saveDemoRecord({ budget, strategy, latestIssue, plan }) {
 export function saveDemoSsqRecord({ budget, strategy, latestIssue, plan }) {
   const records = JSON.parse(localStorage.getItem("ceway_demo_ssq_records") || "[]");
   const record = {
-    id: `demo-ssq-${Date.now()}`,
+    id: createRecordId("demo-ssq"),
     saved_at: new Date().toISOString(),
     budget,
     strategy,

@@ -142,6 +142,42 @@ async def run_scene_flow(client: CdpClient, scene_name: str) -> dict:
     await click_text(client, "一次保存全部")
     await wait_for_text(client, "已一次保存 3 个")
     await wait_for_text(client, "当期复盘")
+    saved_modes = await client.evaluate(
+        """
+        [...document.querySelectorAll('.simple-review-head strong')]
+          .map((node) => node.textContent.trim())
+        """
+    )
+    for expected_mode in ("胆拖", "复式", "单式"):
+        if not any(expected_mode in heading for heading in saved_modes):
+            raise AssertionError(f"{scene_name}批量保存后复盘缺少{expected_mode}：{saved_modes}")
+    single_expanded = await client.evaluate(
+        """
+        (() => {
+          const item = [...document.querySelectorAll('.simple-review-item')]
+            .find((node) => node.querySelector('.simple-review-head strong')?.textContent.includes('单式'));
+          const button = item?.querySelector('.simple-review-actions button');
+          if (!button || button.disabled) return false;
+          button.scrollIntoView({block: 'center'});
+          button.click();
+          return true;
+        })()
+        """
+    )
+    if not single_expanded:
+        raise AssertionError(f"{scene_name}复盘中的单式方案无法展开")
+    await asyncio.sleep(0.25)
+    single_ticket_count = await client.evaluate(
+        """
+        (() => {
+          const item = [...document.querySelectorAll('.simple-review-item')]
+            .find((node) => node.querySelector('.simple-review-head strong')?.textContent.includes('单式'));
+          return item?.querySelectorAll('.saved-ticket-list p').length || 0;
+        })()
+        """
+    )
+    if single_ticket_count < 1:
+        raise AssertionError(f"{scene_name}复盘中的单式号码为空")
     await click_text(client, "选号工作台", ".side-nav-item")
     await wait_for_text(client, "生成智能推荐")
     await click_text(client, "随机生成")

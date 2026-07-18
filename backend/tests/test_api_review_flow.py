@@ -123,6 +123,30 @@ class ApiReviewFlowTests(unittest.TestCase):
         self.assertEqual(review["items"][0]["status"], "pending")
         self.assertEqual(review["items"][0]["plan"]["items"][0]["front"], [6, 7, 8, 9, 10])
 
+    def test_batch_save_keeps_dantuo_compound_and_single_records(self) -> None:
+        db.replace_dlt_draws([
+            {"issue": "26001", "date": "2026-01-01", "front": [1, 2, 3, 4, 5], "back": [1, 2]},
+        ])
+        plans = [
+            {"mode": "dantuo", "front_dan": [1], "front_tuo": [2, 3, 4, 5, 6], "back": [1, 2], "tickets": 5, "cost": 10},
+            {"mode": "compound", "items": [{"front": [1, 2, 3, 4, 5], "back": [1, 2]}], "tickets": 1, "cost": 2},
+            {"mode": "single", "items": [{"front": [6, 7, 8, 9, 10], "back": [3, 4]}], "tickets": 1, "cost": 2},
+        ]
+        ids = []
+        for plan in plans:
+            status, saved = request(
+                "POST",
+                "/records/dlt",
+                {"budget": plan["cost"], "strategy": "balanced", "latest_issue": "26001", "plan": plan},
+            )
+            self.assertEqual(status, 200)
+            ids.append(saved["record"]["id"])
+
+        status, review = request("GET", "/review/dlt")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(set(ids)), 3)
+        self.assertEqual({item["plan"]["mode"] for item in review["items"]}, {"dantuo", "compound", "single"})
+
     def test_ssq_save_draw_and_review_flow(self) -> None:
         db.replace_ssq_draws(
             [
