@@ -56,13 +56,13 @@ class DltSyncScheduleTests(unittest.TestCase):
 
 
 class LocalAutomationScheduleTests(unittest.TestCase):
-    def test_selects_dlt_on_monday_evening(self):
+    def test_checks_both_games_on_monday_evening(self):
         now = datetime(2026, 7, 13, 22, 30, tzinfo=SHANGHAI_TZ)
-        self.assertEqual(scheduled_game(now), "dlt")
+        self.assertEqual(scheduled_game(now), "all")
 
-    def test_after_midnight_retry_uses_previous_ssq_draw_day(self):
+    def test_after_midnight_retry_checks_both_games(self):
         now = datetime(2026, 7, 15, 0, 30, tzinfo=SHANGHAI_TZ)
-        self.assertEqual(scheduled_game(now), "ssq")
+        self.assertEqual(scheduled_game(now), "all")
 
     def test_skips_when_previous_day_has_no_supported_draw(self):
         now = datetime(2026, 7, 18, 0, 30, tzinfo=SHANGHAI_TZ)

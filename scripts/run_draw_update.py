@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -123,15 +124,32 @@ def run(
     return result
 
 
+def run_with_retry(
+    command: list[str],
+    *,
+    cwd: Path = ROOT_DIR,
+    timeout: int = 120,
+    attempts: int = 3,
+    delay: int = 4,
+) -> subprocess.CompletedProcess[str]:
+    last_result = None
+    for attempt in range(1, attempts + 1):
+        last_result = run(command, cwd=cwd, timeout=timeout, check=False)
+        if last_result.returncode == 0:
+            return last_result
+        if attempt < attempts:
+            log(f"命令失败，{delay} 秒后重试（{attempt}/{attempts}）：{' '.join(command)}")
+            time.sleep(delay)
+    raise RuntimeError(f"命令连续失败 {attempts} 次：{' '.join(command)}")
+
+
 def scheduled_game(now: datetime | None = None) -> str | None:
     local_now = now.astimezone(SHANGHAI_TZ) if now else datetime.now(SHANGHAI_TZ)
     draw_day = local_now.date()
     if local_now.hour < 2:
         draw_day -= timedelta(days=1)
-    if draw_day.weekday() in DLT_DRAW_WEEKDAYS:
-        return "dlt"
-    if draw_day.weekday() in SSQ_DRAW_WEEKDAYS:
-        return "ssq"
+    if draw_day.weekday() in DLT_DRAW_WEEKDAYS | SSQ_DRAW_WEEKDAYS:
+        return "all"
     return None
 
 
@@ -156,11 +174,11 @@ def refresh_checkout() -> None:
     if data_changed():
         log("检测到上次未完成的数据更新，先继续本地恢复流程")
         return
-    run(["git", "fetch", "origin", "main"], timeout=120)
+    run_with_retry(["git", "fetch", "origin", "main"], timeout=120)
     run(["git", "merge", "--ff-only", "origin/main"])
     ahead = run(["git", "rev-list", "--count", "origin/main..HEAD"]).stdout.strip()
     if ahead and int(ahead) > 0:
-        run(["git", "push", "origin", "main"], timeout=120)
+        run_with_retry(["git", "push", "origin", "main"], timeout=120)
 
 
 def update_history(game: str) -> None:
@@ -190,7 +208,7 @@ def commit_data(game: str) -> None:
     run(["git", "add", *[str(path) for path in DATA_FILES]])
     today = datetime.now(SHANGHAI_TZ).date().isoformat()
     run(["git", "commit", "-m", f"Update {game} lottery history ({today})"])
-    run(["git", "push", "origin", "main"], timeout=120)
+    run_with_retry(["git", "push", "origin", "main"], timeout=120)
 
 
 def frontend_dependencies_are_stale(frontend_dir: Path = FRONTEND_DIR) -> bool:
@@ -233,7 +251,7 @@ def publish_pages() -> None:
     remote = run(["git", "remote", "get-url", "origin"]).stdout.strip()
     with tempfile.TemporaryDirectory(prefix="ceway-pages-") as temp_dir:
         pages_dir = Path(temp_dir) / "site"
-        run(
+        run_with_retry(
             ["git", "clone", "--depth", "1", "--branch", "gh-pages", remote, str(pages_dir)],
             cwd=ROOT_DIR,
             timeout=120,
@@ -247,7 +265,7 @@ def publish_pages() -> None:
         run(["git", "config", "user.name", "Ceway Data Updater"], cwd=pages_dir)
         run(["git", "config", "user.email", "ceway-updater@local.invalid"], cwd=pages_dir)
         run(["git", "commit", "-m", "Publish latest lottery history"], cwd=pages_dir)
-        run(["git", "push", "origin", "HEAD:gh-pages"], cwd=pages_dir, timeout=120)
+        run_with_retry(["git", "push", "origin", "HEAD:gh-pages"], cwd=pages_dir, timeout=120)
         log("GitHub Pages 已发布")
 
 
