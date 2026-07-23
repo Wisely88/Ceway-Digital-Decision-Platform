@@ -247,6 +247,28 @@ def replace_pages_files(pages_dir: Path) -> None:
             shutil.copy2(child, target)
 
 
+def github_repo_slug(remote: str) -> str:
+    normalized = remote.strip().removesuffix(".git")
+    if normalized.startswith("git@github.com:"):
+        return normalized.split(":", 1)[1]
+    marker = "github.com/"
+    if marker in normalized:
+        return normalized.split(marker, 1)[1]
+    raise RuntimeError(f"无法从远程地址识别 GitHub 仓库：{remote}")
+
+
+def trigger_pages_build(remote: str) -> None:
+    gh = shutil.which("gh", path=AUTOMATION_PATH)
+    if not gh:
+        raise RuntimeError("未找到 gh，无法触发 GitHub Pages 构建")
+    repo = github_repo_slug(remote)
+    run_with_retry(
+        [gh, "api", "--method", "POST", f"repos/{repo}/pages/builds"],
+        timeout=30,
+    )
+    log("GitHub Pages 构建已触发")
+
+
 def publish_pages() -> None:
     remote = run(["git", "remote", "get-url", "origin"]).stdout.strip()
     with tempfile.TemporaryDirectory(prefix="ceway-pages-") as temp_dir:
@@ -266,6 +288,7 @@ def publish_pages() -> None:
         run(["git", "config", "user.email", "ceway-updater@local.invalid"], cwd=pages_dir)
         run(["git", "commit", "-m", "Publish latest lottery history"], cwd=pages_dir)
         run_with_retry(["git", "push", "origin", "HEAD:gh-pages"], cwd=pages_dir, timeout=120)
+        trigger_pages_build(remote)
         log("GitHub Pages 已发布")
 
 

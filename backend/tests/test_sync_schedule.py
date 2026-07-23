@@ -17,7 +17,12 @@ from scripts.update_dlt_history import (
     merge_rows as merge_dlt_rows,
     parse_78500_payload,
 )
-from scripts.run_draw_update import frontend_dependencies_are_stale, scheduled_game, write_run_status
+from scripts.run_draw_update import (
+    frontend_dependencies_are_stale,
+    github_repo_slug,
+    scheduled_game,
+    write_run_status,
+)
 from scripts.update_prize_data import normalize_dlt_prize, normalize_ssq_prize, save_snapshot
 from scripts.update_ssq_history import (
     expected_draw_date,
@@ -112,6 +117,17 @@ class LocalAutomationScheduleTests(unittest.TestCase):
             self.assertFalse(frontend_dependencies_are_stale(frontend))
             os.utime(package_lock, (101, 101))
             self.assertTrue(frontend_dependencies_are_stale(frontend))
+
+    def test_extracts_github_repo_from_https_and_ssh_remotes(self):
+        expected = "Wisely88/Ceway-Digital-Decision-Platform"
+        self.assertEqual(
+            github_repo_slug("https://github.com/Wisely88/Ceway-Digital-Decision-Platform.git"),
+            expected,
+        )
+        self.assertEqual(
+            github_repo_slug("git@github.com:Wisely88/Ceway-Digital-Decision-Platform.git"),
+            expected,
+        )
 
 
 class SsqSyncScheduleTests(unittest.TestCase):
