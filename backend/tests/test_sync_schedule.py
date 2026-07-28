@@ -26,9 +26,13 @@ from scripts.run_draw_update import (
 from scripts.update_prize_data import normalize_dlt_prize, normalize_ssq_prize, save_snapshot
 from scripts.update_ssq_history import (
     expected_draw_date,
+    fill_bounded_schedule_dates,
     fill_latest_new_draw_date,
     merge_rows as merge_ssq_rows,
+    merge_verified_archive_dates,
     normalize_cwl_row,
+    parse_78500_issue_html,
+    parse_78500_year_html,
 )
 from scripts.validate_lottery_history import validate_file
 
@@ -138,6 +142,47 @@ class LocalAutomationScheduleTests(unittest.TestCase):
 
 
 class SsqSyncScheduleTests(unittest.TestCase):
+    def test_parses_78500_year_archive_row(self):
+        rows = parse_78500_year_html(
+            """
+            <tr><td>2003001</td><td>2003-02-23</td><td>
+            <span class="red">10</span><span class="red">11</span>
+            <span class="red">12</span><span class="red">13</span>
+            <span class="red">26</span><span class="red">28</span>
+            <span class="blue">11</span></td></tr>
+            """
+        )
+        self.assertEqual(rows[0]["date"], "2003-02-23")
+        self.assertEqual(rows[0]["front"], [10, 11, 12, 13, 26, 28])
+
+    def test_archive_date_requires_matching_numbers(self):
+        current = [{"issue": "2003001", "date": "", "front": [1, 2, 3, 4, 5, 6], "back": [7]}]
+        archive = [{"issue": "2003001", "date": "2003-02-23", "front": [1, 2, 3, 4, 5, 8], "back": [7]}]
+        with self.assertRaisesRegex(ValueError, "归档号码与现有历史不一致"):
+            merge_verified_archive_dates(current, archive)
+
+    def test_parses_78500_issue_detail_and_uses_first_blue_ball(self):
+        row = parse_78500_issue_html(
+            "2005001",
+            """
+            <li class="rb_kj">01</li><li class="rb_kj">07</li>
+            <li class="rb_kj">08</li><li class="rb_kj">23</li>
+            <li class="rb_kj">27</li><li class="rb_kj">28</li>
+            <li class="b_kj">14</li><li class="b_kj">11</li>
+            <span id="endTime">2005年01月02日 星期日</span>
+            """,
+        )
+        self.assertEqual(row["date"], "2005-01-02")
+        self.assertEqual(row["back"], [14])
+
+    def test_fills_only_uniquely_bounded_schedule_date(self):
+        rows = [
+            {"issue": "2005003", "date": "2005-01-06"},
+            {"issue": "2005004", "date": ""},
+            {"issue": "2005005", "date": "2005-01-11"},
+        ]
+        self.assertEqual(fill_bounded_schedule_dates(rows)[1]["date"], "2005-01-09")
+
     def test_normalizes_official_cwl_result(self):
         row = normalize_cwl_row(
             {
@@ -222,6 +267,26 @@ class SsqSyncScheduleTests(unittest.TestCase):
                     minimum_rows=1,
                     allowed_weekdays={1, 3, 6},
                 )
+
+    def test_accepts_declared_historical_draw_day_exception(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target = Path(temp_dir) / "ssq.csv"
+            target.write_text(
+                "issue,date,f1,f2,f3,f4,f5,f6,b1\n"
+                "2007041,2007-04-13,1,2,3,4,5,6,7\n",
+                encoding="utf-8",
+            )
+            result = validate_file(
+                target,
+                front_count=6,
+                front_max=33,
+                back_count=1,
+                back_max=16,
+                minimum_rows=1,
+                allowed_weekdays={1, 3, 6},
+                exception_dates={"2007-04-13"},
+            )
+            self.assertEqual(result["latest_issue"], "2007041")
 
 
 class PrizeSyncTests(unittest.TestCase):

@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import csv
+from html import unescape
 import json
 import re
 import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -137,6 +140,165 @@ def fetch_78500(timeout: int = 8) -> list[dict]:
     return sorted(rows, key=lambda row: row["issue"])
 
 
+def parse_78500_year_html(text: str) -> list[dict]:
+    rows = []
+    pattern = re.compile(
+        r"<tr[^>]*>.*?<td[^>]*>\s*(\d{7})\s*</td>\s*"
+        r"<td[^>]*>\s*(\d{4}-\d{2}-\d{2})\s*</td>(.*?)</tr>",
+        re.IGNORECASE | re.DOTALL,
+    )
+    for issue, draw_date, body in pattern.findall(unescape(text)):
+        front = [int(number) for number in re.findall(r'class=["\']red["\'][^>]*>\s*(\d+)', body, re.IGNORECASE)]
+        back = [int(number) for number in re.findall(r'class=["\']blue["\'][^>]*>\s*(\d+)', body, re.IGNORECASE)]
+        if len(front) == 6 and len(set(front)) == 6 and len(back) == 1:
+            rows.append({"issue": issue, "date": draw_date, "front": sorted(front), "back": back})
+    return sorted(rows, key=lambda row: row["issue"])
+
+
+def fetch_78500_year(year: int, timeout: int = 12) -> list[dict]:
+    url = "https://kaijiang.78500.cn/ssq/"
+    rows = []
+    for start, end in ((1, 80), (81, 199)):
+        form = urlencode(
+            {
+                "year": str(year),
+                "action": "range",
+                "startqi": f"{year}{start:03d}",
+                "endqi": f"{year}{end:03d}",
+            }
+        ).encode()
+        request = Request(
+            url,
+            data=form,
+            headers={
+                "User-Agent": USER_AGENT,
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Referer": url,
+            },
+        )
+        with urlopen(request, timeout=timeout) as response:
+            content = response.read()
+            charset = response.headers.get_content_charset() or "gb18030"
+            text = content.decode(charset, errors="replace")
+        rows.extend(parse_78500_year_html(text))
+    rows = sorted({row["issue"]: row for row in rows}.values(), key=lambda row: row["issue"])
+    if not rows or any(not row["issue"].startswith(str(year)) for row in rows):
+        raise ValueError(f"彩宝贝未返回 {year} 年可用的双色球归档数据")
+    return rows
+
+
+def parse_78500_issue_html(issue: str, text: str) -> dict:
+    date_match = re.search(
+        r'id=["\']endTime["\'][^>]*>\s*(\d{4})年(\d{2})月(\d{2})日',
+        text,
+        re.IGNORECASE,
+    )
+    if not date_match:
+        date_match = re.search(
+            r'class=["\']phase["\'][^>]*>\s*(\d{4})-(\d{2})-(\d{2})',
+            text,
+            re.IGNORECASE,
+        )
+    front = [
+        int(number)
+        for number in re.findall(
+            r'class=["\'](?:rb_kj|c-red)["\'][^>]*>\s*(\d+)',
+            text,
+            re.IGNORECASE,
+        )
+    ]
+    back = [
+        int(number)
+        for number in re.findall(
+            r'class=["\'](?:b_kj|c-blue)["\'][^>]*>\s*(\d+)',
+            text,
+            re.IGNORECASE,
+        )
+    ]
+    if not date_match or len(front) != 6 or len(set(front)) != 6 or not back:
+        raise ValueError(f"彩宝贝双色球第 {issue} 期详情页格式不完整")
+    year, month, day = date_match.groups()
+    return {
+        "issue": issue,
+        "date": f"{year}-{month}-{day}",
+        "front": sorted(front),
+        "back": [back[0]],
+    }
+
+
+def fetch_78500_issue(issue: str, timeout: int = 10) -> dict:
+    url = f"https://m.78500.cn/kaijiang/ssq/{issue}.html"
+    for attempt in range(3):
+        try:
+            request = Request(
+                url,
+                headers={
+                    "User-Agent": USER_AGENT,
+                    "Accept": "text/html,application/xhtml+xml",
+                    "Referer": "https://m.78500.cn/kaijiang/ssq/",
+                },
+            )
+            with urlopen(request, timeout=timeout) as response:
+                content = response.read()
+                charset = response.headers.get_content_charset() or "gb18030"
+                text = content.decode(charset, errors="replace")
+            break
+        except HTTPError as exc:
+            if exc.code != 403 or attempt == 2:
+                raise
+            time.sleep(0.5 * (attempt + 1))
+    return parse_78500_issue_html(issue, text)
+
+
+def fetch_78500_issues(issues: list[str]) -> list[dict]:
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        return list(executor.map(fetch_78500_issue, issues))
+
+
+def merge_verified_archive_dates(current_rows: list[dict], archive_rows: list[dict]) -> list[dict]:
+    archive = {row["issue"]: row for row in archive_rows}
+    merged = []
+    for row in current_rows:
+        archived = archive.get(row["issue"])
+        if not archived:
+            merged.append(row)
+            continue
+        if row["front"] != archived["front"] or row["back"] != archived["back"]:
+            raise ValueError(f"双色球第 {row['issue']} 期归档号码与现有历史不一致")
+        merged.append({**row, "date": row.get("date") or archived["date"]})
+    return merged
+
+
+def fill_bounded_schedule_dates(rows: list[dict]) -> list[dict]:
+    filled = [dict(row) for row in rows]
+    dated_indexes = [index for index, row in enumerate(filled) if row.get("date")]
+    for left_index, right_index in zip(dated_indexes, dated_indexes[1:]):
+        missing_count = right_index - left_index - 1
+        if missing_count <= 0:
+            continue
+        left_date = datetime.fromisoformat(filled[left_index]["date"]).date()
+        right_date = datetime.fromisoformat(filled[right_index]["date"]).date()
+        candidate = left_date + timedelta(days=1)
+        candidates = []
+        while candidate < right_date:
+            if candidate.weekday() in SSQ_DRAW_WEEKDAYS:
+                candidates.append(candidate.isoformat())
+            candidate += timedelta(days=1)
+        if len(candidates) != missing_count:
+            continue
+        for offset, draw_date in enumerate(candidates, start=1):
+            if not filled[left_index + offset].get("date"):
+                filled[left_index + offset]["date"] = draw_date
+    return filled
+
+
+def fetch_78500_archive(start_year: int = 2003, end_year: int = 2012) -> list[dict]:
+    rows = []
+    for year in range(start_year, end_year + 1):
+        rows.extend(fetch_78500_year(year))
+    return sorted(rows, key=lambda row: row["issue"])
+
+
 def expected_draw_date(now: datetime | None = None) -> str:
     local_now = now.astimezone(SHANGHAI_TZ) if now else datetime.now(SHANGHAI_TZ)
     candidate = local_now.date()
@@ -200,12 +362,16 @@ def fetch_source(
         return fetch_78500(), "78500"
     if source == "auto":
         errors = []
-        for name, fetcher in (
-            ("cwl", lambda: fetch_cwl_recent(all_pages=all_pages, max_pages=max_pages)),
-            ("78500", fetch_78500),
-        ):
+        for name, fetcher in (("cwl", lambda: fetch_cwl_recent(all_pages=all_pages, max_pages=max_pages)), ("78500", fetch_78500)):
             try:
-                return fetcher(), name
+                rows = fetcher()
+                if name == "cwl" and all_pages:
+                    rows = [*fetch_78500_archive(), *rows]
+                    name = "cwl+78500-archive"
+                elif name == "78500" and all_pages:
+                    rows = [*fetch_78500_archive(), *rows]
+                    name = "78500+archive"
+                return rows, name
             except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as exc:
                 errors.append(f"{name}: {exc}")
         raise ValueError("双色球主数据源和备用数据源均更新失败；" + " | ".join(errors))
@@ -268,6 +434,22 @@ def main() -> int:
             )
 
         current_rows = [] if args.mode == "replace" else read_csv_file(args.export_csv)
+        if args.source == "auto" and args.all:
+            verified_current = merge_verified_archive_dates(current_rows, incoming_rows)
+            verified_current = fill_bounded_schedule_dates(verified_current)
+            unresolved = [
+                row["issue"]
+                for row in verified_current
+                if not row.get("date") and row["issue"] < "2013001"
+            ]
+            if unresolved:
+                verified_current = merge_verified_archive_dates(
+                    verified_current,
+                    fetch_78500_issues(unresolved),
+                )
+            if any(not row.get("date") for row in verified_current):
+                raise ValueError("双色球全量日期回填后仍存在空日期")
+            incoming_rows = merge_rows(verified_current, incoming_rows)
         incoming_rows = fill_latest_new_draw_date(incoming_rows, current_rows)
         final_rows = incoming_rows if args.mode == "replace" else merge_rows(current_rows, incoming_rows)
         csv_text = rows_to_csv(final_rows)

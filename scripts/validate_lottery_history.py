@@ -22,6 +22,7 @@ def validate_file(
     back_max: int,
     minimum_rows: int,
     allowed_weekdays: set[int],
+    exception_dates: set[str] | None = None,
 ) -> dict:
     with path.open(newline="", encoding="utf-8-sig") as file:
         rows = list(csv.DictReader(file))
@@ -59,7 +60,7 @@ def validate_file(
         dated_section_started = True
         if parsed_date > datetime.now(SHANGHAI_TZ).date():
             raise ValueError(f"{path.name} 第 {row['issue']} 期开奖日期晚于当前日期")
-        if parsed_date.weekday() not in allowed_weekdays:
+        if parsed_date.weekday() not in allowed_weekdays and raw_date not in (exception_dates or set()):
             raise ValueError(f"{path.name} 第 {row['issue']} 期开奖日期不符合固定开奖日：{raw_date}")
         if previous_date is not None and parsed_date <= previous_date:
             raise ValueError(
@@ -104,6 +105,7 @@ def main() -> int:
             back_max=16,
             minimum_rows=3400,
             allowed_weekdays={1, 3, 6},
+            exception_dates={"2007-04-13", "2009-03-13", "2009-12-11"},
         ),
     ]
     print(json.dumps({"status": "ok", "datasets": results}, ensure_ascii=False, indent=2))
