@@ -1,3 +1,5 @@
+import { deleteArchivedRecord } from "./recordStore.js";
+
 const RAW_API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === "true"
   || window.location.hostname.endsWith("github.io");
@@ -100,10 +102,11 @@ export function getDltRecords() {
 
 export function deleteDltRecord(id) {
   if (STATIC_DEMO) {
-    const records = JSON.parse(localStorage.getItem("ceway_demo_records") || "[]")
-      .filter((record) => record.id !== id);
-    localStorage.setItem("ceway_demo_records", JSON.stringify(records));
-    return Promise.resolve({ status: "ok", deleted: true, id });
+    return Promise.resolve(deleteArchivedRecord("DLT", id)).then((deleted) => ({
+      status: "ok",
+      deleted,
+      id,
+    }));
   }
   return request(`/records/dlt/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
@@ -215,10 +218,11 @@ export function getSsqRecords() {
 
 export function deleteSsqRecord(id) {
   if (STATIC_DEMO) {
-    const records = JSON.parse(localStorage.getItem("ceway_demo_ssq_records") || "[]")
-      .filter((record) => record.id !== id);
-    localStorage.setItem("ceway_demo_ssq_records", JSON.stringify(records));
-    return Promise.resolve({ status: "ok", deleted: true, id });
+    return Promise.resolve(deleteArchivedRecord("SSQ", id)).then((deleted) => ({
+      status: "ok",
+      deleted,
+      id,
+    }));
   }
   return request(`/records/ssq/${encodeURIComponent(id)}`, { method: "DELETE" });
 }

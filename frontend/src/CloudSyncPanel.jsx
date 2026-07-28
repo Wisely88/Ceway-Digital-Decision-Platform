@@ -106,16 +106,23 @@ export default function CloudSyncPanel({ scene = "DLT", onApply }) {
     }
   };
 
-  const exportBackup = () => {
-    const state = collectLocalState();
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `ceway-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setStatus(`本地备份已导出：大乐透 ${state.dlt_records.length} 条，双色球 ${state.ssq_records.length} 条。`);
+  const exportBackup = async () => {
+    setBusy(true);
+    try {
+      const state = await collectLocalState();
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `ceway-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setStatus(`本地备份已导出：大乐透 ${state.dlt_records.length} 条，双色球 ${state.ssq_records.length} 条。`);
+    } catch (error) {
+      setStatus(`导出失败：${readableError(error)}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const importBackup = async (event) => {
@@ -124,7 +131,7 @@ export default function CloudSyncPanel({ scene = "DLT", onApply }) {
     if (!file) return;
     setBusy(true);
     try {
-      const state = importLocalBackup(await file.text());
+      const state = await importLocalBackup(await file.text());
       const records = scene === "SSQ" ? state.ssq_records : state.dlt_records;
       if (onApply) await onApply(records);
       setStatus(`本地备份已恢复：大乐透 ${state.dlt_records.length} 条，双色球 ${state.ssq_records.length} 条。`);

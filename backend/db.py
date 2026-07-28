@@ -259,7 +259,7 @@ def save_ssq_record_db(record: dict) -> list[dict]:
     return load_ssq_records_db()
 
 
-def load_ssq_records_db(limit: int = 100) -> list[dict]:
+def load_ssq_records_db(limit: int = 1000) -> list[dict]:
     init_db_ssq()
     with connect() as connection:
         rows = connection.execute(
@@ -452,7 +452,7 @@ def save_dlt_record_db(record: dict) -> list[dict]:
     return load_dlt_records_db()
 
 
-def load_dlt_records_db(limit: int = 100) -> list[dict]:
+def load_dlt_records_db(limit: int = 1000) -> list[dict]:
     init_db()
     with connect() as connection:
         rows = connection.execute(

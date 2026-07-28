@@ -47,7 +47,7 @@ from prizes import load_prize_snapshot
 from scorer import score_back_numbers, score_front_numbers, score_ssq_back_numbers, score_ssq_front_numbers
 
 
-app = FastAPI(title="Ceway v1.12.2 Stable API")
+app = FastAPI(title="Ceway v1.12.3 Stable API")
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 app.add_middleware(
@@ -169,7 +169,7 @@ def build_dlt_payload(
             "subtitle": "Digital Decision Platform",
             "framework": "Powered by CBGO Framework",
             "baseline": "v1.2 MVP",
-            "version": "v1.12.2 Stable",
+            "version": "v1.12.3 Stable",
         },
         "disclaimer": "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
         "history_count": len(history),
@@ -274,7 +274,7 @@ def create_record_dlt(request: RecordRequest) -> dict:
 
 
 @app.get("/review/dlt")
-def review_dlt(limit: int = Query(default=20, ge=1, le=100)) -> dict:
+def review_dlt(limit: int = Query(default=1000, ge=1, le=1000)) -> dict:
     try:
         payload = build_review(load_dlt_records(), load_dlt_history(), limit=limit, prize_snapshot=load_prize_snapshot("DLT"))
         save_review_results(payload.get("items", []))
@@ -475,7 +475,7 @@ def build_ssq_payload(
             "subtitle": "Digital Decision Platform",
             "framework": "Powered by CBGO Framework",
             "baseline": "v1.2 MVP",
-            "version": "v1.12.2 Stable",
+            "version": "v1.12.3 Stable",
         },
         "disclaimer": "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
         "history_count": len(history),
@@ -567,7 +567,7 @@ def create_record_ssq(request: RecordRequest) -> dict:
 
 
 @app.get("/review/ssq")
-def review_ssq(limit: int = Query(default=20, ge=1, le=100)) -> dict:
+def review_ssq(limit: int = Query(default=1000, ge=1, le=1000)) -> dict:
     try:
         payload = build_ssq_review(load_ssq_records(), load_ssq_history(), limit=limit, prize_snapshot=load_prize_snapshot("SSQ"))
         save_ssq_review_results(payload.get("items", []))

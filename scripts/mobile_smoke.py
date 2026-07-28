@@ -128,6 +128,52 @@ async def assert_no_document_overflow(client: CdpClient, context: str) -> None:
         raise AssertionError(f"{context} 横向溢出：{metrics}")
 
 
+async def seed_dlt_archive(client: CdpClient, count: int = 31) -> None:
+    seeded = await client.evaluate(
+        """
+        new Promise((resolve, reject) => {
+          const request = indexedDB.open('ceway-record-archive', 1);
+          request.onupgradeneeded = () => {
+            const store = request.result.createObjectStore('records', {keyPath: '_archive_key'});
+            store.createIndex('scene', '_scene', {unique: false});
+          };
+          request.onerror = () => reject(request.error?.message || 'open failed');
+          request.onsuccess = () => {
+            const database = request.result;
+            const transaction = database.transaction('records', 'readwrite');
+            const store = transaction.objectStore('records');
+            for (let index = 0; index < %s; index += 1) {
+              const id = `seed-${index}`;
+              store.put({
+                _archive_key: `DLT:${id}`,
+                _scene: 'DLT',
+                id,
+                saved_at: new Date(Date.UTC(2025, 0, index + 1)).toISOString(),
+                budget: 2,
+                strategy: 'balanced',
+                latest_issue: '26084',
+                plan: {
+                  mode: 'single',
+                  cost: 2,
+                  tickets: 1,
+                  recommended_issue: String(27001 + index),
+                  items: [{front: [1, 2, 3, 4, 5], back: [1, 2]}],
+                },
+              });
+            }
+            transaction.oncomplete = () => {
+              database.close();
+              resolve(true);
+            };
+            transaction.onerror = () => reject(transaction.error?.message || 'seed failed');
+          };
+        })
+        """ % count
+    )
+    if not seeded:
+        raise AssertionError("无法预置 IndexedDB 历史方案")
+
+
 async def run_scene_flow(client: CdpClient, scene_name: str) -> dict:
     await click_text(client, scene_name, ".scene-tile")
     await wait_for_text(client, "选号工作台")
@@ -204,6 +250,11 @@ async def run_scene_flow(client: CdpClient, scene_name: str) -> dict:
     for expected_mode in ("胆拖", "复式", "单式"):
         if not any(expected_mode in heading for heading in persisted_modes):
             raise AssertionError(f"{scene_name}重新打开后复盘缺少{expected_mode}：{persisted_modes}")
+    if scene_name == "大乐透":
+        await wait_for_text(client, "共 34 条")
+        await wait_for_text(client, "第 1 / 4 页")
+        await click_text(client, "下一页")
+        await wait_for_text(client, "第 2 / 4 页")
     await click_text(client, "选号工作台", ".side-nav-item")
     await wait_for_text(client, "生成智能推荐")
     await click_text(client, "随机生成")
@@ -240,6 +291,7 @@ async def run_test(websocket_url: str, url: str) -> dict:
         await client.call("Page.navigate", {"url": url})
         await wait_for_text(client, "选择彩种")
         await client.evaluate("localStorage.clear()")
+        await seed_dlt_archive(client)
         await assert_no_document_overflow(client, "场景选择页")
         await click_text(client, "运行逻辑")
         await wait_for_text(client, "保存并等待复盘")

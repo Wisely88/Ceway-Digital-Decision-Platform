@@ -2337,6 +2337,39 @@ td {
   align-self: start;
 }
 
+.review-archive-tools,
+.review-pagination {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.review-archive-tools {
+  margin: 12px 0;
+}
+
+.review-archive-tools input {
+  background: #07182a;
+  border: 1px solid rgba(83, 129, 179, 0.35);
+  border-radius: 6px;
+  color: #e8f2ff;
+  min-height: 38px;
+  padding: 8px 11px;
+  width: min(360px, 100%);
+}
+
+.review-archive-tools span,
+.review-pagination span {
+  color: #91a8c0;
+  font-size: 13px;
+}
+
+.review-pagination {
+  justify-content: center;
+  margin-top: 14px;
+}
+
 .history-list {
   display: grid;
   gap: 10px;

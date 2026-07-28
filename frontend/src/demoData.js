@@ -4,6 +4,7 @@ import { createRecordId } from "./recordIdentity.js";
 import dltPrizeUrl from "../../backend/data/dlt_prizes.json?url";
 import ssqPrizeUrl from "../../backend/data/ssq_prizes.json?url";
 import { buildBehaviorProfile } from "./behavior";
+import { archiveRecord, listArchivedRecords } from "./recordStore.js";
 
 const prizeCache = new Map();
 
@@ -547,7 +548,7 @@ export function getDemoDashboard({ budget = 20, lastPrize = 0, strategy = "balan
   });
   return Promise.resolve({
     scene: "DLT",
-    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.12.2 Stable" },
+    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.12.3 Stable" },
     disclaimer: "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
     history_count: HISTORY.length,
     latest_issue: latest.issue,
@@ -610,7 +611,7 @@ export function getDemoSsqDashboard({ budget = 20, lastPrize = 0, strategy = "ba
   });
   return Promise.resolve({
     scene: "SSQ",
-    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.12.2 Stable" },
+    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.12.3 Stable" },
     disclaimer: "策维不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
     history_count: SSQ_HISTORY.length,
     latest_issue: latest.issue,
@@ -638,11 +639,11 @@ export function getDemoSsqPlan(params) {
 }
 
 export function getDemoRecords() {
-  return Promise.resolve(JSON.parse(localStorage.getItem("ceway_demo_records") || "[]"));
+  return listArchivedRecords("DLT");
 }
 
 export function getDemoSsqRecords() {
-  return Promise.resolve(JSON.parse(localStorage.getItem("ceway_demo_ssq_records") || "[]"));
+  return listArchivedRecords("SSQ");
 }
 
 export async function getDemoBehavior(scene) {
@@ -653,8 +654,7 @@ export async function getDemoBehavior(scene) {
   return buildBehaviorProfile(records, review, snapshot);
 }
 
-export function saveDemoRecord({ budget, strategy, latestIssue, plan }) {
-  const records = JSON.parse(localStorage.getItem("ceway_demo_records") || "[]");
+export async function saveDemoRecord({ budget, strategy, latestIssue, plan }) {
   const record = {
     id: createRecordId("demo"),
     saved_at: new Date().toISOString(),
@@ -663,13 +663,11 @@ export function saveDemoRecord({ budget, strategy, latestIssue, plan }) {
     latest_issue: latestIssue,
     plan,
   };
-  const next = [record, ...records].slice(0, 30);
-  localStorage.setItem("ceway_demo_records", JSON.stringify(next));
-  return Promise.resolve({ status: "ok", record, count: next.length });
+  const result = await archiveRecord("DLT", record);
+  return { status: "ok", ...result };
 }
 
-export function saveDemoSsqRecord({ budget, strategy, latestIssue, plan }) {
-  const records = JSON.parse(localStorage.getItem("ceway_demo_ssq_records") || "[]");
+export async function saveDemoSsqRecord({ budget, strategy, latestIssue, plan }) {
   const record = {
     id: createRecordId("demo-ssq"),
     saved_at: new Date().toISOString(),
@@ -678,9 +676,8 @@ export function saveDemoSsqRecord({ budget, strategy, latestIssue, plan }) {
     latest_issue: latestIssue,
     plan,
   };
-  const next = [record, ...records].slice(0, 30);
-  localStorage.setItem("ceway_demo_ssq_records", JSON.stringify(next));
-  return Promise.resolve({ status: "ok", record, count: next.length });
+  const result = await archiveRecord("SSQ", record);
+  return { status: "ok", ...result };
 }
 
 function prizeLabel(frontHits, backHits, issue) {
@@ -758,7 +755,7 @@ function reviewDemoPlan(plan, draw, prizeIssues = {}) {
 
 export async function getDemoReview() {
   const prizeIssues = await loadPrizeIssues(dltPrizeUrl);
-  const records = JSON.parse(localStorage.getItem("ceway_demo_records") || "[]");
+  const records = await getDemoRecords();
   const items = records.map((record) => {
     const draw = nextDemoDraw(record.latest_issue);
     if (!draw) {
@@ -958,7 +955,7 @@ function nextDemoSsqDraw(issue) {
 
 export async function getDemoSsqReview() {
   const prizeIssues = await loadPrizeIssues(ssqPrizeUrl);
-  const records = JSON.parse(localStorage.getItem("ceway_demo_ssq_records") || "[]");
+  const records = await getDemoSsqRecords();
   const items = records.map((record) => {
     const draw = nextDemoSsqDraw(record.latest_issue);
     if (!draw) {

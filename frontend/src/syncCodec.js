@@ -1,5 +1,5 @@
 const PREFIX = "CEWAY1.";
-const MAX_RECORDS = 100;
+const MAX_RECORDS = 1000;
 const MAX_CODE_LENGTH = 2_000_000;
 
 function bytesToBase64(bytes) {

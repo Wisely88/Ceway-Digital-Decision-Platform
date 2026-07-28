@@ -909,7 +909,7 @@ function SceneSelect({ scenes, onEnter }) {
       <section className="scene-shell">
         <div className="scene-shell-title">
           <div>
-            <Badge tone="live">v1.12.2 完整历史版</Badge>
+            <Badge tone="live">v1.12.3 方案归档版</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
             <p>选择彩种，进入选号、保存和开奖复盘流程。</p>
           </div>
@@ -1879,9 +1879,29 @@ function ReviewPlanNumbers({ plan = {}, fallback, labels }) {
 
 function ReviewPanel({ review, onRefresh, onDelete, scoreRows = [], scene = "DLT", currentDraw }) {
   const [expandedId, setExpandedId] = useState(null);
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
   if (!review) return null;
+  const allItems = review.items || [];
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredItems = allItems.filter((item) => {
+    if (!normalizedQuery) return true;
+    const plan = item.plan || {};
+    return [
+      item.recommended_issue,
+      item.actual?.issue,
+      item.latest_issue,
+      plan.mode,
+      plan.strategy,
+      item.status_label,
+    ].some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
+  });
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageItems = filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const summary = review.summary || {};
-  const latestReviewed = (review.items || []).find((item) => item.status === "reviewed" && item.actual);
+  const latestReviewed = allItems.find((item) => item.status === "reviewed" && item.actual);
   const focusDraw = currentDraw || latestReviewed?.actual;
   const labels = planLabelsForScene(scene);
   return (
@@ -1902,8 +1922,20 @@ function ReviewPanel({ review, onRefresh, onDelete, scoreRows = [], scene = "DLT
         <span>已复盘 <b>{summary.reviewed || 0}</b></span>
         <span>累计奖金 <b>{summary.roi_complete ? `${summary.total_prize || 0} 元` : "待补齐"}</b></span>
       </div>
+      <div className="review-archive-tools">
+        <input
+          aria-label="搜索保存方案"
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setPage(1);
+          }}
+          placeholder="搜索推荐期号、模式或状态"
+          value={query}
+        />
+        <span>共 {filteredItems.length} 条</span>
+      </div>
       <div className="simple-review-list">
-        {(review.items || []).slice(0, 10).map((item) => {
+        {pageItems.map((item) => {
           const id = item.record_id || item.saved_at;
           const plan = item.plan || {};
           const pending = item.status === "pending";
@@ -1941,8 +1973,15 @@ function ReviewPanel({ review, onRefresh, onDelete, scoreRows = [], scene = "DLT
             </article>
           );
         })}
-        {(review.items || []).length === 0 && <p className="empty-text">还没有保存方案。请先到“选号工作台”生成并保存。</p>}
+        {filteredItems.length === 0 && <p className="empty-text">{allItems.length ? "没有找到符合条件的方案。" : "还没有保存方案。请先到“选号工作台”生成并保存。"}</p>}
       </div>
+      {totalPages > 1 && (
+        <div className="review-pagination">
+          <button className="ghost-button compact" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} type="button">上一页</button>
+          <span>第 {currentPage} / {totalPages} 页</span>
+          <button className="ghost-button compact" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)} type="button">下一页</button>
+        </div>
+      )}
       <p className="review-disclaimer">复盘只核对保存方案与实际开奖，不代表未来中奖概率。</p>
     </section>
   );
@@ -2793,7 +2832,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
     setError("");
     try {
       await deleteDltRecord(id);
-      removeCloudRecord("DLT", id);
+      await removeCloudRecord("DLT", id);
       notifyCloudDataChanged();
       setSavedPlans((items) => items.filter((record) => record.id !== id));
       await refreshReview();
@@ -2825,9 +2864,9 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
         latestIssue: dashboard.latest_issue,
         plan,
       });
-      mirrorCloudRecord("DLT", result.record);
+      await mirrorCloudRecord("DLT", result.record);
       notifyCloudDataChanged();
-      setSavedPlans((items) => [result.record, ...items].slice(0, 100));
+      setSavedPlans((items) => [result.record, ...items]);
       if (refresh) {
         await refreshReview();
         await refreshBehavior();
@@ -2837,13 +2876,9 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
         setNotice("方案已加入当期复盘，开奖后自动核对。");
       }
     } catch (err) {
-      mirrorCloudRecord("DLT", localRecord);
+      await mirrorCloudRecord("DLT", localRecord);
       notifyCloudDataChanged();
-      setSavedPlans((items) => {
-        const nextPlans = [localRecord, ...items].slice(0, 20);
-        localStorage.setItem("cbgo_saved_plans", JSON.stringify(nextPlans));
-        return nextPlans;
-      });
+      setSavedPlans((items) => [localRecord, ...items]);
       if (refresh) {
         await refreshReview();
         await refreshBehavior();
@@ -2881,7 +2916,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
       plan: normalizeRecordPlan(record),
     })));
     if (saved.length) {
-      saved.forEach((result) => mirrorCloudRecord("DLT", result.record));
+      await Promise.all(saved.map((result) => mirrorCloudRecord("DLT", result.record)));
       notifyCloudDataChanged();
       const refreshed = await getDltRecords();
       setSavedPlans(refreshed);
@@ -3195,9 +3230,9 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
     };
     try {
       const result = await saveSsqRecord({ budget: Number(plan.cost || 0), strategy, latestIssue, plan });
-      mirrorCloudRecord("SSQ", result.record);
+      await mirrorCloudRecord("SSQ", result.record);
       notifyCloudDataChanged();
-      setSavedPlans((items) => [result.record, ...items].slice(0, 100));
+      setSavedPlans((items) => [result.record, ...items]);
       if (refresh) {
         await refreshReview();
         await refreshBehavior();
@@ -3207,13 +3242,9 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
         setNotice("双色球方案已加入当期复盘，开奖后自动核对。");
       }
     } catch (err) {
-      mirrorCloudRecord("SSQ", localRecord);
+      await mirrorCloudRecord("SSQ", localRecord);
       notifyCloudDataChanged();
-      setSavedPlans((items) => {
-        const nextPlans = [localRecord, ...items].slice(0, 20);
-        localStorage.setItem("cbgo_ssq_plans", JSON.stringify(nextPlans));
-        return nextPlans;
-      });
+      setSavedPlans((items) => [localRecord, ...items]);
       if (refresh) {
         await refreshReview();
         await refreshBehavior();
@@ -3251,7 +3282,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
       plan: normalizeRecordPlan(record),
     })));
     if (saved.length) {
-      saved.forEach((result) => mirrorCloudRecord("SSQ", result.record));
+      await Promise.all(saved.map((result) => mirrorCloudRecord("SSQ", result.record)));
       notifyCloudDataChanged();
       const refreshed = await getSsqRecords();
       setSavedPlans(refreshed);
@@ -3264,7 +3295,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
   const deleteRecord = async (id) => {
     try {
       await deleteSsqRecord(id);
-      removeCloudRecord("SSQ", id);
+      await removeCloudRecord("SSQ", id);
       notifyCloudDataChanged();
       setSavedPlans((items) => items.filter((record) => record.id !== id));
       await refreshReview();

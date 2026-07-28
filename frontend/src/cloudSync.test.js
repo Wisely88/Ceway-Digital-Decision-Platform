@@ -53,3 +53,23 @@ test("离线备份缺少彩种记录时明确拒绝", () => {
     /缺少大乐透或双色球方案记录/,
   );
 });
+
+test("云同步最多保留每种彩票一千条记录", () => {
+  const records = Array.from({ length: 1100 }, (_, index) => ({
+    id: `record-${index}`,
+    saved_at: new Date(2026, 0, index + 1).toISOString(),
+  }));
+  assert.equal(mergeRecords(records).length, 1000);
+});
+
+test("离线备份不会截断超过一千条的本地归档", () => {
+  const records = Array.from({ length: 1100 }, (_, index) => ({
+    id: `backup-${index}`,
+    saved_at: new Date(2026, 0, index + 1).toISOString(),
+  }));
+  const normalized = normalizeBackupPayload({
+    dlt_records: records,
+    ssq_records: [],
+  });
+  assert.equal(normalized.dlt_records.length, 1100);
+});

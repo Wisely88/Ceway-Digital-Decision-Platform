@@ -15,6 +15,28 @@ import engine  # noqa: E402
 
 
 class CsvSqliteSyncTests(unittest.TestCase):
+    def test_default_record_query_returns_more_than_previous_hundred_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_db_path = db.DB_PATH
+            try:
+                db.DB_PATH = Path(temp_dir) / "ceway.sqlite3"
+                db.init_db()
+                with db.connect() as connection:
+                    connection.executemany(
+                        """
+                        insert into dlt_recommendation_records
+                        (id, saved_at, budget, strategy, latest_issue, plan_json)
+                        values (?, ?, ?, ?, ?, ?)
+                        """,
+                        [
+                            (f"record-{index}", f"2026-01-{(index % 28) + 1:02d}T00:00:{index:02d}Z", 2, "balanced", "26001", '{"mode":"single"}')
+                            for index in range(125)
+                        ],
+                    )
+                self.assertEqual(len(db.load_dlt_records_db()), 125)
+            finally:
+                db.DB_PATH = original_db_path
+
     def test_rebuilds_draw_tables_without_removing_saved_records(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
