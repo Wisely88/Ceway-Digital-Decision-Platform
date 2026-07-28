@@ -47,25 +47,43 @@ def fetch_text(url: str, timeout: int = 8, referer: str = "https://www.cwl.gov.c
         return content.decode(charset, errors="replace")
 
 
-def fetch_cwl_recent(limit: int = 50, timeout: int = 8) -> list[dict]:
+def fetch_cwl_page(page_no: int, page_size: int, issue_count: str, timeout: int = 8) -> dict:
     params = urlencode(
         {
             "name": "ssq",
-            "issueCount": str(limit),
+            "issueCount": issue_count,
             "issueStart": "",
             "issueEnd": "",
             "dayStart": "",
             "dayEnd": "",
-            "pageNo": "1",
-            "pageSize": str(limit),
+            "pageNo": str(page_no),
+            "pageSize": str(page_size),
             "week": "",
             "systemType": "PC",
         }
     )
     url = f"https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?{params}"
-    payload = json.loads(fetch_text(url, timeout=timeout))
-    items = payload.get("result") or payload.get("data") or []
-    rows = [normalize_cwl_row(item) for item in items]
+    return json.loads(fetch_text(url, timeout=timeout))
+
+
+def fetch_cwl_recent(
+    limit: int = 100,
+    timeout: int = 8,
+    all_pages: bool = False,
+    max_pages: int | None = None,
+) -> list[dict]:
+    page_no = 1
+    pages = 1
+    rows = []
+    issue_count = "" if all_pages else str(limit)
+    while page_no <= pages:
+        payload = fetch_cwl_page(page_no, limit, issue_count, timeout=timeout)
+        items = payload.get("result") or payload.get("data") or []
+        rows.extend(normalize_cwl_row(item) for item in items)
+        pages = int(payload.get("pageNum") or 1) if all_pages else 1
+        if max_pages and page_no >= max_pages:
+            break
+        page_no += 1
     rows = [row for row in rows if row]
     if not rows:
         raise ValueError("中国福彩官方接口未返回可用的双色球开奖数据")
@@ -170,14 +188,22 @@ def fill_latest_new_draw_date(
     ]
 
 
-def fetch_source(source: str) -> tuple[list[dict], str]:
+def fetch_source(
+    source: str,
+    *,
+    all_pages: bool = False,
+    max_pages: int | None = None,
+) -> tuple[list[dict], str]:
     if source == "cwl":
-        return fetch_cwl_recent(), "cwl"
+        return fetch_cwl_recent(all_pages=all_pages, max_pages=max_pages), "cwl"
     if source == "78500":
         return fetch_78500(), "78500"
     if source == "auto":
         errors = []
-        for name, fetcher in (("cwl", fetch_cwl_recent), ("78500", fetch_78500)):
+        for name, fetcher in (
+            ("cwl", lambda: fetch_cwl_recent(all_pages=all_pages, max_pages=max_pages)),
+            ("78500", fetch_78500),
+        ):
             try:
                 return fetcher(), name
             except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as exc:
@@ -197,7 +223,7 @@ def merge_rows(current_rows: list[dict], incoming_rows: list[dict]) -> list[dict
         previous = current.get(row["issue"])
         merged[row["issue"]] = {
             **row,
-            "date": previous.get("date", "") if previous and previous.get("date") else row.get("date", ""),
+            "date": row.get("date", "") or (previous.get("date", "") if previous else ""),
         }
     return sorted(merged.values(), key=lambda row: row["issue"])
 
@@ -212,7 +238,7 @@ def rows_to_csv(rows: list[dict]) -> str:
 def write_csv_file(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as file:
-        writer = csv.writer(file)
+        writer = csv.writer(file, lineterminator="\r\n")
         writer.writerow(CSV_HEADER)
         for row in sorted(rows, key=lambda item: item["issue"]):
             writer.writerow([row["issue"], row.get("date", ""), *row["front"], row["back"][0]])
@@ -223,6 +249,8 @@ def main() -> int:
     parser.add_argument("--source", choices=["auto", "cwl", "78500", "csv"], default="auto")
     parser.add_argument("--csv", type=Path, help="本地 CSV 路径，source=csv 时必填")
     parser.add_argument("--mode", choices=["append", "replace"], default="append")
+    parser.add_argument("--all", action="store_true", help="从官方接口分页补齐可用的全部历史日期")
+    parser.add_argument("--max-pages", type=int, help="调试用：限制官方接口最多抓取页数")
     parser.add_argument("--export-csv", type=Path, default=BACKEND_DIR / "data" / "ssq_history.csv")
     args = parser.parse_args()
 
@@ -233,7 +261,11 @@ def main() -> int:
                 raise ValueError("source=csv 时必须传入 --csv")
             incoming_rows = read_csv_file(args.csv)
         else:
-            incoming_rows, actual_source = fetch_source(args.source)
+            incoming_rows, actual_source = fetch_source(
+                args.source,
+                all_pages=args.all,
+                max_pages=args.max_pages,
+            )
 
         current_rows = [] if args.mode == "replace" else read_csv_file(args.export_csv)
         incoming_rows = fill_latest_new_draw_date(incoming_rows, current_rows)

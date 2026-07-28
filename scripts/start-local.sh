@@ -8,6 +8,14 @@ FRONTEND_DIR="$ROOT_DIR/frontend"
 
 mkdir -p "$LOG_DIR"
 
+sync_local_data() {
+  if [[ ! -x "$BACKEND_DIR/.venv/bin/python" ]]; then
+    echo "未找到 backend/.venv/bin/python，请先按 README 安装后端依赖。"
+    exit 1
+  fi
+  "$BACKEND_DIR/.venv/bin/python" "$ROOT_DIR/scripts/sync_sqlite_from_csv.py"
+}
+
 port_is_open() {
   lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
 }
@@ -48,6 +56,7 @@ start_frontend() {
   echo "前端已启动：http://localhost:5173"
 }
 
+sync_local_data
 start_backend
 start_frontend
 

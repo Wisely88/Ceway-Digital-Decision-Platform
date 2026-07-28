@@ -66,6 +66,32 @@ export function applyLocalState(state) {
   localStorage.setItem("ceway_demo_ssq_records", JSON.stringify(state.ssq_records || []));
 }
 
+export function normalizeBackupPayload(payload) {
+  const parsed = typeof payload === "string" ? JSON.parse(payload) : payload;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("备份文件格式无效");
+  }
+  if (!Array.isArray(parsed.dlt_records) || !Array.isArray(parsed.ssq_records)) {
+    throw new Error("备份文件缺少大乐透或双色球方案记录");
+  }
+  return {
+    version: 1,
+    dlt_records: mergeRecords(parsed.dlt_records),
+    ssq_records: mergeRecords(parsed.ssq_records),
+    updated_at: parsed.updated_at || new Date().toISOString(),
+  };
+}
+
+export function importLocalBackup(payload) {
+  const imported = normalizeBackupPayload(payload);
+  const merged = mergeSyncState(collectLocalState(), imported);
+  applyLocalState(merged);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("ceway-cloud-state-applied"));
+  }
+  return merged;
+}
+
 export function mirrorCloudRecord(scene, record) {
   const key = scene === "SSQ" ? "ceway_demo_ssq_records" : "ceway_demo_records";
   const records = readRecords([key]);

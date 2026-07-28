@@ -1,4 +1,4 @@
-# 策维（Ceway）数字决策平台 v1.12
+# 策维（Ceway）数字决策平台 v1.12.1
 
 Digital Decision Platform  
 Powered by CBGO Framework
@@ -47,6 +47,7 @@ ceway/
 - [v1.10 单用户云同步说明](docs/ceway_v1_10_cloud_sync.md)
 - [v1.11 精简选号工作台](docs/ceway_v1_11_simplified_workbench.md)
 - [v1.12 正式使用版](docs/ceway_v1_12_stable.md)
+- [v1.12.1 数据维护版](docs/ceway_v1_12_1_maintenance.md)
 - [Backlog](docs/backlog.md)
 - [数据导入说明](docs/data_import.md)
 
@@ -77,7 +78,7 @@ npm run dev
 1. 在 SQL Editor 执行 [`supabase/setup.sql`](supabase/setup.sql)。
 2. 在 Authentication > Users 新建并确认内部用户 `ceway-sync@ceway.local`，设置仅自己知道的同步密码。
 
-之后在 DLT 或 SSQ 左侧进入“云端同步”，所有自用设备输入同一个同步密码即可。公开发布密钥可以存在前端；数据访问由表级 RLS 限制。不要把 Supabase secret key 或 service role key放入仓库。
+之后在 DLT 或 SSQ 页面顶部进入“数据备份”，所有自用设备输入同一个同步密码即可。该弹窗也提供无需登录的 JSON 离线导出和恢复。公开发布密钥可以存在前端；数据访问由表级 RLS 限制。不要把 Supabase secret key 或 service role key 放入仓库。
 
 ## 验证
 
@@ -95,8 +96,8 @@ backend/.venv/bin/python scripts/mobile_smoke.py
 
 当前数据快照：
 
-- 大乐透：2897 期，最新 `26079`（2026-07-15）。
-- 双色球：3478 期，最新 `2026081`（2026-07-16）。
+- 大乐透：2902 期，最新 `26084`（2026-07-27）。
+- 双色球：3482 期，最新 `2026085`（2026-07-26）。
 - 两份数据均通过当前期号范围连续性检查。
 
 每期实际奖金快照：
@@ -112,9 +113,9 @@ macOS 定时任务按北京时间检查最新开奖：
 - 大乐透：每周一、三、六的 `22:30`、`23:30`，以及次日 `00:30`。
 - 双色球：每周二、四、日的 `22:30`、`23:30`，以及次日 `00:30`。
 
-定时任务统一从 `78500.cn` 的大乐透和双色球数据库读取最新开奖。GitHub 云端 IP 会被该站拒绝，因此由本机 LaunchAgent 在 `~/Library/Caches/Ceway-Automation` 的专用工作副本中执行抓取，验证通过后自动提交 GitHub 并重新发布 Pages。
+定时任务优先读取中国体彩网和中国福彩网官方接口；官方接口临时不可用时，才回退到 `78500.cn`。GitHub 云端 IP 可能被数据站拒绝，因此由本机 LaunchAgent 在 `~/Library/Caches/Ceway-Automation` 的专用工作副本中执行抓取，验证通过后自动提交 GitHub 并重新发布 Pages。
 
-任务只在发现新期号且数据校验通过时更新 CSV、提交主分支并重新发布 GitHub Pages。任一数据源失败、号码越界、期号重复或历史记录异常时，任务会失败并保留原数据。休市日没有新期号时不会产生提交。
+任务只在发现新期号且数据校验通过时更新 CSV、提交主分支并重新发布 GitHub Pages。校验覆盖号码范围、期号重复、日期递增和固定开奖日。任一数据源失败或历史记录异常时，任务会失败并保留原数据。休市日没有新期号时不会产生提交。本地启动时会以 CSV 重建两种彩票的开奖表，同时保留已保存方案和复盘记录。
 
 每次任务会把最终状态写入 `~/Library/Caches/Ceway-Automation/status/latest.json`。更新失败时同时发送 macOS 通知中心提醒，因此失败原因不再只存在于 LaunchAgent 日志中。
 

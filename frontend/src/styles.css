@@ -3300,6 +3300,11 @@ td {
   margin: 5px 0 0;
 }
 
+.local-backup {
+  grid-template-columns: minmax(240px, 1fr) auto;
+  margin-top: 16px;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);

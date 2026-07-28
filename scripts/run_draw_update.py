@@ -183,8 +183,8 @@ def refresh_checkout() -> None:
 
 def update_history(game: str) -> None:
     commands = {
-        "dlt": [sys.executable, "scripts/update_dlt_history.py", "--source", "78500", "--mode", "append"],
-        "ssq": [sys.executable, "scripts/update_ssq_history.py", "--source", "78500", "--mode", "append"],
+        "dlt": [sys.executable, "scripts/update_dlt_history.py", "--source", "auto", "--mode", "append"],
+        "ssq": [sys.executable, "scripts/update_ssq_history.py", "--source", "auto", "--mode", "append"],
     }
     games = ["dlt", "ssq"] if game == "all" else [game]
     for selected in games:

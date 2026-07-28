@@ -230,7 +230,7 @@ def read_csv_file(path: Path) -> list[dict]:
 def write_csv_file(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as file:
-        writer = csv.writer(file)
+        writer = csv.writer(file, lineterminator="\r\n")
         writer.writerow(CSV_HEADER)
         for row in sorted(rows, key=lambda item: item["issue"]):
             writer.writerow([row["issue"], row["date"], *row["front"], *row["back"]])
@@ -243,7 +243,7 @@ def merge_rows(current_rows: list[dict], incoming_rows: list[dict]) -> list[dict
         previous = current.get(row["issue"])
         merged[row["issue"]] = {
             **row,
-            "date": previous.get("date", "") if previous and previous.get("date") else row.get("date", ""),
+            "date": row.get("date", "") or (previous.get("date", "") if previous else ""),
         }
     return sorted(merged.values(), key=lambda row: row["issue"])
 
@@ -253,17 +253,33 @@ def dedupe_rows(rows: list[dict]) -> list[dict]:
     return list(merged.values())
 
 
-def fetch_source(source: str, limit: int, all_pages: bool, max_pages: int | None) -> list[dict]:
+def fetch_source(
+    source: str,
+    limit: int,
+    all_pages: bool,
+    max_pages: int | None,
+) -> tuple[list[dict], str]:
     if source == "sporttery":
-        return fetch_sporttery_recent(page_size=limit, all_pages=all_pages, max_pages=max_pages)
+        return fetch_sporttery_recent(page_size=limit, all_pages=all_pages, max_pages=max_pages), "sporttery"
     if source == "78500":
-        return fetch_78500_js()
+        return fetch_78500_js(), "78500"
+    if source == "auto":
+        errors = []
+        for name, fetcher in (
+            ("sporttery", lambda: fetch_sporttery_recent(page_size=limit, all_pages=all_pages, max_pages=max_pages)),
+            ("78500", fetch_78500_js),
+        ):
+            try:
+                return fetcher(), name
+            except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as exc:
+                errors.append(f"{name}: {exc}")
+        raise ValueError("大乐透官方数据源和备用数据源均更新失败；" + " | ".join(errors))
     raise ValueError(f"未知数据源：{source}")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="更新大乐透历史开奖数据到 SQLite")
-    parser.add_argument("--source", choices=["sporttery", "78500", "csv"], default="sporttery")
+    parser.add_argument("--source", choices=["auto", "sporttery", "78500", "csv"], default="auto")
     parser.add_argument("--csv", type=Path, help="本地 CSV 路径，source=csv 时必填")
     parser.add_argument("--mode", choices=["append", "replace"], default="append")
     parser.add_argument("--limit", type=int, default=100, help="官方接口最近多少期")
@@ -273,13 +289,14 @@ def main() -> int:
     args = parser.parse_args()
 
     source = args.source
+    actual_source = source
     try:
         if source == "csv":
             if not args.csv:
                 raise ValueError("source=csv 时必须传入 --csv")
             incoming_rows = read_csv_file(args.csv)
         else:
-            incoming_rows = fetch_source(source, args.limit, args.all, args.max_pages)
+            incoming_rows, actual_source = fetch_source(source, args.limit, args.all, args.max_pages)
 
         current_rows = read_csv_file(args.export_csv) if args.export_csv.exists() else []
         incoming_rows = fill_latest_new_draw_date(incoming_rows, current_rows)
@@ -291,13 +308,13 @@ def main() -> int:
         csv_text = rows_to_csv(final_rows)
         save_dlt_history(csv_text, mode="replace")
         write_csv_file(args.export_csv, final_rows)
-        save_sync_run(source, "ok", len(incoming_rows), len(final_rows), "同步完成")
+        save_sync_run(actual_source, "ok", len(incoming_rows), len(final_rows), "同步完成")
         status = data_status()
         print(
             json.dumps(
                 {
                     "status": "ok",
-                    "source": source,
+                    "source": actual_source,
                     "fetched_rows": len(incoming_rows),
                     "imported_rows": len(final_rows),
                     "latest_issue": status["latest_issue"],

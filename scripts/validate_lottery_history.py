@@ -21,6 +21,7 @@ def validate_file(
     back_count: int,
     back_max: int,
     minimum_rows: int,
+    allowed_weekdays: set[int],
 ) -> dict:
     with path.open(newline="", encoding="utf-8-sig") as file:
         rows = list(csv.DictReader(file))
@@ -36,6 +37,9 @@ def validate_file(
     if issues != sorted(issues):
         raise ValueError(f"{path.name} 期号未按升序排列")
 
+    previous_dated_issue = ""
+    previous_date = None
+    dated_section_started = False
     for row in rows:
         front = [int(row[f"f{index}"]) for index in range(1, front_count + 1)]
         back = [int(row[f"b{index}"]) for index in range(1, back_count + 1)]
@@ -43,6 +47,26 @@ def validate_file(
             raise ValueError(f"{path.name} 第 {row['issue']} 期前区号码不合法")
         if len(set(back)) != back_count or not all(1 <= number <= back_max for number in back):
             raise ValueError(f"{path.name} 第 {row['issue']} 期后区号码不合法")
+        raw_date = str(row.get("date", "")).strip()
+        if not raw_date:
+            if dated_section_started:
+                raise ValueError(f"{path.name} 第 {row['issue']} 期位于已知日期区间内但缺少开奖日期")
+            continue
+        try:
+            parsed_date = date.fromisoformat(raw_date)
+        except ValueError as exc:
+            raise ValueError(f"{path.name} 第 {row['issue']} 期开奖日期格式错误：{raw_date}") from exc
+        dated_section_started = True
+        if parsed_date > datetime.now(SHANGHAI_TZ).date():
+            raise ValueError(f"{path.name} 第 {row['issue']} 期开奖日期晚于当前日期")
+        if parsed_date.weekday() not in allowed_weekdays:
+            raise ValueError(f"{path.name} 第 {row['issue']} 期开奖日期不符合固定开奖日：{raw_date}")
+        if previous_date is not None and parsed_date <= previous_date:
+            raise ValueError(
+                f"{path.name} 第 {previous_dated_issue} 期与第 {row['issue']} 期开奖日期未严格递增"
+            )
+        previous_dated_issue = row["issue"]
+        previous_date = parsed_date
 
     latest = rows[-1]
     latest_date = str(latest.get("date", "")).strip()
@@ -70,6 +94,7 @@ def main() -> int:
             back_count=2,
             back_max=12,
             minimum_rows=2800,
+            allowed_weekdays={0, 2, 5},
         ),
         validate_file(
             DATA_DIR / "ssq_history.csv",
@@ -78,6 +103,7 @@ def main() -> int:
             back_count=1,
             back_max=16,
             minimum_rows=3400,
+            allowed_weekdays={1, 3, 6},
         ),
     ]
     print(json.dumps({"status": "ok", "datasets": results}, ensure_ascii=False, indent=2))

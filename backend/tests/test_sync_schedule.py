@@ -27,8 +27,10 @@ from scripts.update_prize_data import normalize_dlt_prize, normalize_ssq_prize, 
 from scripts.update_ssq_history import (
     expected_draw_date,
     fill_latest_new_draw_date,
+    merge_rows as merge_ssq_rows,
     normalize_cwl_row,
 )
+from scripts.validate_lottery_history import validate_file
 
 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
@@ -46,6 +48,11 @@ class DltSyncScheduleTests(unittest.TestCase):
     def test_preserves_existing_date_when_78500_has_no_date(self):
         current = [{"issue": "26077", "date": "2026-07-11", "front": [4, 14, 19, 24, 27], "back": [6, 7]}]
         incoming = [{"issue": "26077", "date": "", "front": [4, 14, 19, 24, 27], "back": [6, 7]}]
+        self.assertEqual(merge_dlt_rows(current, incoming)[0]["date"], "2026-07-11")
+
+    def test_official_dlt_date_corrects_an_inferred_date(self):
+        current = [{"issue": "26077", "date": "2026-07-13", "front": [4, 14, 19, 24, 27], "back": [6, 7]}]
+        incoming = [{"issue": "26077", "date": "2026-07-11", "front": [4, 14, 19, 24, 27], "back": [6, 7]}]
         self.assertEqual(merge_dlt_rows(current, incoming)[0]["date"], "2026-07-11")
 
     def test_uses_previous_dlt_draw_day_for_after_midnight_retry(self):
@@ -145,6 +152,11 @@ class SsqSyncScheduleTests(unittest.TestCase):
         self.assertEqual(row["front"], [1, 5, 8, 17, 24, 31])
         self.assertEqual(row["back"], [9])
 
+    def test_official_ssq_date_corrects_an_inferred_date(self):
+        current = [{"issue": "2026083", "date": "2026-07-23", "front": [7, 14, 15, 23, 28, 33], "back": [3]}]
+        incoming = [{"issue": "2026083", "date": "2026-07-21", "front": [7, 14, 15, 23, 28, 33], "back": [3]}]
+        self.assertEqual(merge_ssq_rows(current, incoming)[0]["date"], "2026-07-21")
+
     def test_uses_draw_day_for_late_evening_update(self):
         now = datetime(2026, 7, 14, 23, 30, tzinfo=SHANGHAI_TZ)
         self.assertEqual(expected_draw_date(now), "2026-07-14")
@@ -170,6 +182,46 @@ class SsqSyncScheduleTests(unittest.TestCase):
         now = datetime(2026, 7, 18, 12, 0, tzinfo=SHANGHAI_TZ)
         rows = fill_latest_new_draw_date(incoming, current, now)
         self.assertEqual(rows[0]["date"], "2026-07-16")
+
+    def test_rejects_duplicate_or_non_increasing_draw_dates(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target = Path(temp_dir) / "ssq.csv"
+            target.write_text(
+                "issue,date,f1,f2,f3,f4,f5,f6,b1\n"
+                "2026001,2026-01-01,1,2,3,4,5,6,7\n"
+                "2026002,2026-01-01,2,3,4,5,6,7,8\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "开奖日期未严格递增"):
+                validate_file(
+                    target,
+                    front_count=6,
+                    front_max=33,
+                    back_count=1,
+                    back_max=16,
+                    minimum_rows=1,
+                    allowed_weekdays={1, 3, 6},
+                )
+
+    def test_rejects_missing_date_after_dated_history_begins(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target = Path(temp_dir) / "ssq.csv"
+            target.write_text(
+                "issue,date,f1,f2,f3,f4,f5,f6,b1\n"
+                "2026001,2026-01-01,1,2,3,4,5,6,7\n"
+                "2026002,,2,3,4,5,6,7,8\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "已知日期区间内但缺少开奖日期"):
+                validate_file(
+                    target,
+                    front_count=6,
+                    front_max=33,
+                    back_count=1,
+                    back_max=16,
+                    minimum_rows=1,
+                    allowed_weekdays={1, 3, 6},
+                )
 
 
 class PrizeSyncTests(unittest.TestCase):

@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from "react";
-import { Cloud, CloudOff, LogOut, RefreshCw, ShieldCheck } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Cloud, CloudOff, Download, LogOut, RefreshCw, ShieldCheck, Upload } from "lucide-react";
 import {
   cloudClient,
+  collectLocalState,
   getCloudSession,
+  importLocalBackup,
   isAutoSyncEnabled,
   setAutoSyncEnabled,
   signInCloud,
@@ -42,6 +44,7 @@ export function CloudSyncAgent() {
 }
 
 export default function CloudSyncPanel({ scene = "DLT", onApply }) {
+  const fileInputRef = useRef(null);
   const [session, setSession] = useState(null);
   const [password, setPassword] = useState("");
   const [autoSync, setAutoSync] = useState(isAutoSyncEnabled());
@@ -103,6 +106,35 @@ export default function CloudSyncPanel({ scene = "DLT", onApply }) {
     }
   };
 
+  const exportBackup = () => {
+    const state = collectLocalState();
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `ceway-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setStatus(`本地备份已导出：大乐透 ${state.dlt_records.length} 条，双色球 ${state.ssq_records.length} 条。`);
+  };
+
+  const importBackup = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setBusy(true);
+    try {
+      const state = importLocalBackup(await file.text());
+      const records = scene === "SSQ" ? state.ssq_records : state.dlt_records;
+      if (onApply) await onApply(records);
+      setStatus(`本地备份已恢复：大乐透 ${state.dlt_records.length} 条，双色球 ${state.ssq_records.length} 条。`);
+    } catch (error) {
+      setStatus(`恢复失败：${readableError(error)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="panel wide cloud-sync-panel" id="module-cloud">
       <div className="panel-title">
@@ -136,6 +168,18 @@ export default function CloudSyncPanel({ scene = "DLT", onApply }) {
       )}
       <p className="cloud-message">{status}</p>
       {lastSync && <p className="cloud-last-sync">最后同步：{new Date(lastSync.updated_at).toLocaleString("zh-CN", { hour12: false })}</p>}
+
+      <div className="cloud-connected local-backup">
+        <div className="cloud-security">
+          <ShieldCheck size={22} />
+          <div><strong>本地离线备份</strong><span>无需登录，可将两种彩票的已选方案导出为文件，并在任意浏览器恢复。</span></div>
+        </div>
+        <div className="cloud-actions">
+          <button className="ghost-button" disabled={busy} onClick={exportBackup} type="button"><Download size={16} />导出备份</button>
+          <button className="ghost-button" disabled={busy} onClick={() => fileInputRef.current?.click()} type="button"><Upload size={16} />恢复备份</button>
+          <input ref={fileInputRef} accept="application/json,.json" hidden onChange={importBackup} type="file" />
+        </div>
+      </div>
     </section>
   );
 }

@@ -39,6 +39,21 @@ def load_scenes() -> dict:
         return json.load(file)
 
 
+def sync_history_databases_from_csv() -> dict:
+    dlt_rows = []
+    ssq_rows = []
+    if DATA_PATH.exists():
+        dlt_rows = parse_dlt_csv(DATA_PATH.read_text(encoding="utf-8-sig"))
+        replace_dlt_draws(dlt_rows)
+    if SSQ_DATA_PATH.exists():
+        ssq_rows = parse_ssq_csv(SSQ_DATA_PATH.read_text(encoding="utf-8-sig"))
+        replace_ssq_draws(ssq_rows)
+    return {
+        "dlt": {"rows": len(dlt_rows), "latest_issue": dlt_rows[-1]["issue"] if dlt_rows else None},
+        "ssq": {"rows": len(ssq_rows), "latest_issue": ssq_rows[-1]["issue"] if ssq_rows else None},
+    }
+
+
 def load_dlt_history() -> list[dict]:
     if dlt_draw_count() > 0:
         return load_dlt_draws()
