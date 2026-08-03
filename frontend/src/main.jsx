@@ -909,7 +909,7 @@ function SceneSelect({ scenes, onEnter }) {
       <section className="scene-shell">
         <div className="scene-shell-title">
           <div>
-            <Badge tone="live">v1.12.3 方案归档版</Badge>
+            <Badge tone="live">v1.12.4 后区走势版</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
             <p>选择彩种，进入选号、保存和开奖复盘流程。</p>
           </div>
@@ -1039,31 +1039,42 @@ function ModulePlaceholder({ scene, scenes, onBack }) {
   );
 }
 
-function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
+function TrendPanel({ dashboard, scoreRows, backScoreRows = [], windowSize, onWindowChange }) {
   const [activeTab, setActiveTab] = useState("hot");
-  const missingByNumber = new Map(dashboard.trends.omissions.map((item) => [item.number, item.missing]));
-  const scoreMap = new Map(scoreRows.map((item) => [item.number, item]));
-  const hotFront = dashboard.trends.hot_front.slice(0, 35).map((item) => ({
+  const [activeArea, setActiveArea] = useState("front");
+  const isBack = activeArea === "back";
+  const isSsq = dashboard.scene === "SSQ";
+  const areaLabel = isBack ? (isSsq ? "蓝球" : "后区") : (isSsq ? "红球" : "前区");
+  const areaMax = isBack ? (isSsq ? 16 : 12) : (isSsq ? 33 : 35);
+  const areaScores = isBack ? backScoreRows : scoreRows;
+  const areaOmissions = isBack ? (dashboard.trends.back_omissions || []) : dashboard.trends.omissions;
+  const areaHot = isBack ? (dashboard.trends.hot_back || []) : dashboard.trends.hot_front;
+  const areaOddEven = isBack ? (dashboard.trends.back_odd_even || []) : dashboard.trends.odd_even;
+  const areaBigSmall = isBack ? (dashboard.trends.back_big_small || []) : dashboard.trends.big_small;
+  const areaSumValues = isBack ? (dashboard.trends.back_sum_values || []) : dashboard.trends.sum_values;
+  const areaSumRange = isBack ? (dashboard.trends.back_sum_range || { min: 0, avg: 0, max: 0 }) : dashboard.trends.sum_range;
+  const missingByNumber = new Map(areaOmissions.map((item) => [item.number, item.missing]));
+  const scoreMap = new Map(areaScores.map((item) => [item.number, item]));
+  const hotRows = areaHot.slice(0, areaMax).map((item) => ({
     ...item,
     missing: missingByNumber.get(item.number) || 0,
   }));
-  const sumValues = dashboard.trends.sum_values;
-  const hottest = dashboard.trends.hot_front[0];
-  const coldest = dashboard.trends.hot_front[dashboard.trends.hot_front.length - 1];
-  const maxMissing = dashboard.trends.omissions.reduce((max, item) => item.missing > max.missing ? item : max, dashboard.trends.omissions[0]);
-  const missingRows = dashboard.trends.omissions
+  const hottest = areaHot[0] || { number: 0, count: 0 };
+  const coldest = areaHot[areaHot.length - 1] || { number: 0, count: 0 };
+  const maxMissing = areaOmissions.reduce((max, item) => item.missing > max.missing ? item : max, areaOmissions[0] || { number: 0, missing: 0 });
+  const missingRows = areaOmissions
     .map((item) => ({ ...item, score: scoreMap.get(item.number)?.total_score || 0 }))
     .sort((left, right) => right.missing - left.missing || right.score - left.score);
-  const sumRangeRows = dashboard.trends.sum_values.map((item) => ({
+  const sumRangeRows = areaSumValues.map((item) => ({
     ...item,
-    range: item.value < 75 ? "偏低" : item.value > 105 ? "偏高" : "均衡",
+    range: item.value < areaSumRange.avg ? "低于均值" : item.value > areaSumRange.avg ? "高于均值" : "等于均值",
   }));
   const trendTabs = [
     { key: "hot", label: "冷热号" },
     { key: "missing", label: "遗漏" },
     { key: "odd", label: "奇偶比" },
     { key: "size", label: "大小比" },
-    { key: "sum", label: "和值" },
+    { key: "sum", label: isBack && isSsq ? "号码走势" : "和值" },
   ];
 
   return (
@@ -1074,6 +1085,10 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
           <p>最近 {dashboard.trends.window} 期历史开奖数据</p>
         </div>
         <div className="panel-actions">
+          <div className="trend-area-toggle" aria-label="选择分析区域">
+            <button className={!isBack ? "active" : ""} onClick={() => setActiveArea("front")} type="button">{isSsq ? "红球" : "前区"}</button>
+            <button className={isBack ? "active" : ""} onClick={() => setActiveArea("back")} type="button">{isSsq ? "蓝球" : "后区"}</button>
+          </div>
           <select value={windowSize} onChange={(event) => onWindowChange(Number(event.target.value))}>
             <option value={30}>最近30期</option>
             <option value={50}>最近50期</option>
@@ -1100,26 +1115,26 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
       {activeTab === "hot" && (
         <div className="trend-layout">
           <div className="chart-box primary-chart">
-            <h3>冷热号分布（近{dashboard.trends.window}期）</h3>
+            <h3>{areaLabel}冷热号分布（近{dashboard.trends.window}期）</h3>
             <Suspense fallback={<ChartFallback />}>
-              <TrendBarChartView data={hotFront} mode="hot" scoreRows={scoreRows} />
+              <TrendBarChartView data={hotRows} mode="hot" scoreRows={areaScores} />
             </Suspense>
           </div>
 
           <div className="trend-stats">
-            <h3>当前统计（前区）</h3>
+            <h3>当前统计（{areaLabel}）</h3>
             <dl>
               <div><dt>最热号码</dt><dd>{String(hottest.number).padStart(2, "0")}（{hottest.count}次）</dd></div>
               <div><dt>最冷号码</dt><dd>{String(coldest.number).padStart(2, "0")}（{coldest.count}次）</dd></div>
               <div><dt>最大遗漏</dt><dd>{String(maxMissing.number).padStart(2, "0")}（{maxMissing.missing}期）</dd></div>
-              <div><dt>和值均值</dt><dd>{dashboard.trends.sum_range.avg}</dd></div>
+              <div><dt>{isBack && isSsq ? "号码均值" : "和值均值"}</dt><dd>{areaSumRange.avg}</dd></div>
             </dl>
           </div>
 
           <div className="chart-box sum-chart">
-            <h3>和值走势</h3>
+            <h3>{isBack && isSsq ? "蓝球号码走势" : `${areaLabel}和值走势`}</h3>
             <Suspense fallback={<ChartFallback height={170} />}>
-              <TrendLineChartView data={sumValues} compact />
+              <TrendLineChartView data={areaSumValues} compact />
             </Suspense>
           </div>
         </div>
@@ -1128,7 +1143,7 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
       {activeTab === "missing" && (
         <div className="trend-layout single">
           <div className="chart-box primary-chart">
-            <h3>遗漏分布（前区35码）</h3>
+            <h3>遗漏分布（{areaLabel}{areaMax}码）</h3>
             <Suspense fallback={<ChartFallback height={300} />}>
               <TrendBarChartView data={missingRows} mode="missing" />
             </Suspense>
@@ -1147,13 +1162,13 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
       {(activeTab === "odd" || activeTab === "size") && (
         <div className="trend-layout single">
           <div className="chart-box primary-chart">
-            <h3>{activeTab === "odd" ? "奇偶比历史分布" : "大小比历史分布"}</h3>
+            <h3>{areaLabel}{activeTab === "odd" ? "奇偶比历史分布" : "大小比历史分布"}</h3>
             <Suspense fallback={<ChartFallback height={300} />}>
-              <TrendBarChartView data={activeTab === "odd" ? dashboard.trends.odd_even : dashboard.trends.big_small} mode="ratio" />
+              <TrendBarChartView data={activeTab === "odd" ? areaOddEven : areaBigSmall} mode="ratio" />
             </Suspense>
           </div>
           <div className="trend-list">
-            {(activeTab === "odd" ? dashboard.trends.odd_even : dashboard.trends.big_small).map((item) => (
+            {(activeTab === "odd" ? areaOddEven : areaBigSmall).map((item) => (
               <div key={item.ratio}>
                 <strong>{item.ratio}</strong>
                 <span>出现 {item.count} 期</span>
@@ -1166,7 +1181,7 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
       {activeTab === "sum" && (
         <div className="trend-layout single">
           <div className="chart-box primary-chart">
-            <h3>和值走势与区间</h3>
+            <h3>{isBack && isSsq ? "蓝球号码走势与区间" : `${areaLabel}和值走势与区间`}</h3>
             <Suspense fallback={<ChartFallback height={300} />}>
               <TrendLineChartView data={sumRangeRows} showDots />
             </Suspense>
@@ -1175,7 +1190,7 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
             {sumRangeRows.slice(-10).reverse().map((item) => (
               <div key={item.issue}>
                 <strong>{item.issue}</strong>
-                <span>和值 {item.value} · {item.range}</span>
+                <span>{isBack && isSsq ? "号码" : "和值"} {item.value} · {item.range}</span>
               </div>
             ))}
           </div>
@@ -1186,7 +1201,7 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
         <div>
           <h3>奇偶比</h3>
           <div className="chips">
-            {dashboard.trends.odd_even.map((item) => (
+            {areaOddEven.map((item) => (
               <span key={item.ratio}>{item.ratio} · {item.count}</span>
             ))}
           </div>
@@ -1194,17 +1209,17 @@ function TrendPanel({ dashboard, scoreRows, windowSize, onWindowChange }) {
         <div>
           <h3>大小比</h3>
           <div className="chips">
-            {dashboard.trends.big_small.map((item) => (
+            {areaBigSmall.map((item) => (
               <span key={item.ratio}>{item.ratio} · {item.count}</span>
             ))}
           </div>
         </div>
         <div>
-          <h3>和值区间</h3>
+          <h3>{isBack && isSsq ? "号码区间" : "和值区间"}</h3>
           <div className="chips">
-            <span>min {dashboard.trends.sum_range.min}</span>
-            <span>avg {dashboard.trends.sum_range.avg}</span>
-            <span>max {dashboard.trends.sum_range.max}</span>
+            <span>min {areaSumRange.min}</span>
+            <span>avg {areaSumRange.avg}</span>
+            <span>max {areaSumRange.max}</span>
           </div>
         </div>
       </div>
@@ -3044,6 +3059,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
               <TrendPanel
                 dashboard={dashboard}
                 scoreRows={dashboard.score_table}
+                backScoreRows={dashboard.back_scoreboard}
                 windowSize={windowSize}
                 onWindowChange={(value) => {
                   setWindowSize(value);
@@ -3441,6 +3457,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
               <TrendPanel
                 dashboard={ssqView}
                 scoreRows={scoreRows}
+                backScoreRows={dashboard.back_scoreboard}
                 windowSize={windowSize}
                 onWindowChange={(value) => {
                   setWindowSize(value);

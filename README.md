@@ -1,4 +1,4 @@
-# 策维（Ceway）数字决策平台 v1.12.3
+# 策维（Ceway）数字决策平台 v1.12.4
 
 Digital Decision Platform  
 Powered by CBGO Framework
@@ -50,6 +50,7 @@ ceway/
 - [v1.12.1 数据维护版](docs/ceway_v1_12_1_maintenance.md)
 - [v1.12.2 完整历史与性能优化](docs/ceway_v1_12_2_history_performance.md)
 - [v1.12.3 方案永久归档与全量查询](docs/ceway_v1_12_3_record_archive.md)
+- [v1.12.4 后区与蓝球走势分析](docs/ceway_v1_12_4_back_trends.md)
 - [Backlog](docs/backlog.md)
 - [数据导入说明](docs/data_import.md)
 

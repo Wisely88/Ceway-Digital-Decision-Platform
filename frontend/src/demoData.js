@@ -142,13 +142,20 @@ function buildTrends(window = 100, history = HISTORY) {
   });
   const oddEven = new Map();
   const bigSmall = new Map();
+  const backOddEven = new Map();
+  const backBigSmall = new Map();
   const sums = recent.map((row) => row.front.reduce((sum, number) => sum + number, 0));
+  const backSums = recent.map((row) => row.back.reduce((sum, number) => sum + number, 0));
 
   recent.forEach((row) => {
     const odd = row.front.filter((number) => number % 2 === 1).length;
     const small = row.front.filter((number) => number <= 17).length;
+    const backOdd = row.back.filter((number) => number % 2 === 1).length;
+    const backSmall = row.back.filter((number) => number <= 6).length;
     oddEven.set(ratioLabel(odd, 5), (oddEven.get(ratioLabel(odd, 5)) || 0) + 1);
     bigSmall.set(ratioLabel(small, 5), (bigSmall.get(ratioLabel(small, 5)) || 0) + 1);
+    backOddEven.set(ratioLabel(backOdd, 2), (backOddEven.get(ratioLabel(backOdd, 2)) || 0) + 1);
+    backBigSmall.set(ratioLabel(backSmall, 2), (backBigSmall.get(ratioLabel(backSmall, 2)) || 0) + 1);
   });
 
   return {
@@ -160,11 +167,19 @@ function buildTrends(window = 100, history = HISTORY) {
     back_omissions: backOmissions,
     odd_even: Array.from(oddEven, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
     big_small: Array.from(bigSmall, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
+    back_odd_even: Array.from(backOddEven, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
+    back_big_small: Array.from(backBigSmall, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
     sum_values: recent.slice(-30).map((row) => ({ issue: row.issue, value: row.front.reduce((sum, number) => sum + number, 0) })),
+    back_sum_values: recent.slice(-30).map((row) => ({ issue: row.issue, value: row.back.reduce((sum, number) => sum + number, 0) })),
     sum_range: {
       min: Math.min(...sums),
       max: Math.max(...sums),
       avg: Math.round((sums.reduce((sum, value) => sum + value, 0) / sums.length) * 100) / 100,
+    },
+    back_sum_range: {
+      min: Math.min(...backSums),
+      max: Math.max(...backSums),
+      avg: Math.round((backSums.reduce((sum, value) => sum + value, 0) / backSums.length) * 100) / 100,
     },
   };
 }
@@ -257,12 +272,19 @@ function buildSsqTrends(window = 100, history = SSQ_HISTORY) {
   });
   const oddEven = new Map();
   const bigSmall = new Map();
+  const backOddEven = new Map();
+  const backBigSmall = new Map();
   const sums = recent.map((row) => row.front.reduce((sum, number) => sum + number, 0));
+  const backSums = recent.map((row) => row.back.reduce((sum, number) => sum + number, 0));
   recent.forEach((row) => {
     const odd = row.front.filter((number) => number % 2 === 1).length;
     const small = row.front.filter((number) => number <= 16).length;
+    const backOdd = row.back.filter((number) => number % 2 === 1).length;
+    const backSmall = row.back.filter((number) => number <= 8).length;
     oddEven.set(ratioLabel(odd, 6), (oddEven.get(ratioLabel(odd, 6)) || 0) + 1);
     bigSmall.set(ratioLabel(small, 6), (bigSmall.get(ratioLabel(small, 6)) || 0) + 1);
+    backOddEven.set(ratioLabel(backOdd, 1), (backOddEven.get(ratioLabel(backOdd, 1)) || 0) + 1);
+    backBigSmall.set(ratioLabel(backSmall, 1), (backBigSmall.get(ratioLabel(backSmall, 1)) || 0) + 1);
   });
   return {
     window: recent.length,
@@ -273,11 +295,19 @@ function buildSsqTrends(window = 100, history = SSQ_HISTORY) {
     back_omissions: backOmissions,
     odd_even: Array.from(oddEven, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
     big_small: Array.from(bigSmall, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
+    back_odd_even: Array.from(backOddEven, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
+    back_big_small: Array.from(backBigSmall, ([ratio, count]) => ({ ratio, count })).sort((a, b) => a.ratio.localeCompare(b.ratio)),
     sum_values: recent.slice(-30).map((row) => ({ issue: row.issue, value: row.front.reduce((sum, number) => sum + number, 0) })),
+    back_sum_values: recent.slice(-30).map((row) => ({ issue: row.issue, value: row.back.reduce((sum, number) => sum + number, 0) })),
     sum_range: {
       min: Math.min(...sums),
       max: Math.max(...sums),
       avg: Math.round((sums.reduce((sum, value) => sum + value, 0) / Math.max(1, sums.length)) * 100) / 100,
+    },
+    back_sum_range: {
+      min: Math.min(...backSums),
+      max: Math.max(...backSums),
+      avg: Math.round((backSums.reduce((sum, value) => sum + value, 0) / Math.max(1, backSums.length)) * 100) / 100,
     },
   };
 }
@@ -548,7 +578,7 @@ export function getDemoDashboard({ budget = 20, lastPrize = 0, strategy = "balan
   });
   return Promise.resolve({
     scene: "DLT",
-    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.12.3 Stable" },
+    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.12.4 Stable" },
     disclaimer: "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
     history_count: HISTORY.length,
     latest_issue: latest.issue,
@@ -611,7 +641,7 @@ export function getDemoSsqDashboard({ budget = 20, lastPrize = 0, strategy = "ba
   });
   return Promise.resolve({
     scene: "SSQ",
-    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.12.3 Stable" },
+    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.12.4 Stable" },
     disclaimer: "策维不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
     history_count: SSQ_HISTORY.length,
     latest_issue: latest.issue,

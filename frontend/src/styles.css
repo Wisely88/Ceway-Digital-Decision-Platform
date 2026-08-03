@@ -1161,6 +1161,31 @@ select {
   min-width: 128px;
 }
 
+.trend-area-toggle {
+  border: 1px solid rgba(83, 129, 179, 0.35);
+  border-radius: 6px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(64px, 1fr));
+  overflow: hidden;
+}
+
+.trend-area-toggle button {
+  background: rgba(7, 18, 32, 0.72);
+  border: 0;
+  color: #a9bdd2;
+  min-height: 34px;
+  padding: 6px 12px;
+}
+
+.trend-area-toggle button + button {
+  border-left: 1px solid rgba(83, 129, 179, 0.35);
+}
+
+.trend-area-toggle button.active {
+  background: #0d63d1;
+  color: #ffffff;
+}
+
 .ghost-button.compact {
   min-height: 34px;
   padding: 7px 10px;

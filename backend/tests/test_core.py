@@ -74,6 +74,10 @@ class BackScoreTests(unittest.TestCase):
         rows = score_back_numbers(trends)
 
         self.assertEqual(len(trends["back_omissions"]), 12)
+        self.assertEqual(sum(row["count"] for row in trends["back_odd_even"]), 3)
+        self.assertEqual(sum(row["count"] for row in trends["back_big_small"]), 3)
+        self.assertEqual(trends["back_sum_values"][-1], {"issue": "26003", "value": 7})
+        self.assertEqual(trends["back_sum_range"], {"min": 3, "max": 7, "avg": 5.0})
         self.assertEqual(len(rows), 12)
         self.assertTrue(all("heat_score" in row and "missing_score" in row and "balance_score" in row for row in rows))
         self.assertEqual(rows, sorted(rows, key=lambda row: (-row["total_score"], row["number"])))
@@ -87,6 +91,13 @@ class BackScoreTests(unittest.TestCase):
         rows = score_ssq_back_numbers(trends)
 
         self.assertEqual(len(trends["back_omissions"]), 16)
+        self.assertEqual(sum(row["count"] for row in trends["back_odd_even"]), 2)
+        self.assertEqual(sum(row["count"] for row in trends["back_big_small"]), 2)
+        self.assertEqual(trends["back_sum_values"], [
+            {"issue": "2026001", "value": 1},
+            {"issue": "2026002", "value": 2},
+        ])
+        self.assertEqual(trends["back_sum_range"], {"min": 1, "max": 2, "avg": 1.5})
         self.assertEqual(len(rows), 16)
         self.assertTrue(all(row["total_score"] == row["score"] for row in rows))
 

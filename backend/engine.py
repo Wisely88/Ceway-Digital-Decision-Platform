@@ -175,14 +175,23 @@ def calculate_trends(history: list[dict], window: int = 100) -> dict:
 
     odd_even = Counter()
     big_small = Counter()
+    back_odd_even = Counter()
+    back_big_small = Counter()
     sum_values = []
-    for row in history:
+    back_sum_values = []
+    for row in recent:
         front = row["front"]
+        back = row["back"]
         odd_count = sum(1 for number in front if number % 2 == 1)
         small_count = sum(1 for number in front if number <= 17)
+        back_odd_count = sum(1 for number in back if number % 2 == 1)
+        back_small_count = sum(1 for number in back if number <= 6)
         odd_even[ratio_label(odd_count, 5)] += 1
         big_small[ratio_label(small_count, 5)] += 1
+        back_odd_even[ratio_label(back_odd_count, 2)] += 1
+        back_big_small[ratio_label(back_small_count, 2)] += 1
         sum_values.append(sum(front))
+        back_sum_values.append(sum(back))
 
     hot_front = [
         {"number": number, "count": front_counts[number]}
@@ -202,13 +211,23 @@ def calculate_trends(history: list[dict], window: int = 100) -> dict:
         "back_omissions": [{"number": number, "missing": back_omissions[number]} for number in back_numbers],
         "odd_even": [{"ratio": key, "count": odd_even[key]} for key in sorted(odd_even)],
         "big_small": [{"ratio": key, "count": big_small[key]} for key in sorted(big_small)],
+        "back_odd_even": [{"ratio": key, "count": back_odd_even[key]} for key in sorted(back_odd_even)],
+        "back_big_small": [{"ratio": key, "count": back_big_small[key]} for key in sorted(back_big_small)],
         "sum_values": [
-            {"issue": row["issue"], "value": sum(row["front"])} for row in history[-30:]
+            {"issue": row["issue"], "value": sum(row["front"])} for row in recent[-30:]
+        ],
+        "back_sum_values": [
+            {"issue": row["issue"], "value": sum(row["back"])} for row in recent[-30:]
         ],
         "sum_range": {
             "min": min(sum_values) if sum_values else 0,
             "max": max(sum_values) if sum_values else 0,
             "avg": round(sum(sum_values) / len(sum_values), 2) if sum_values else 0,
+        },
+        "back_sum_range": {
+            "min": min(back_sum_values) if back_sum_values else 0,
+            "max": max(back_sum_values) if back_sum_values else 0,
+            "avg": round(sum(back_sum_values) / len(back_sum_values), 2) if back_sum_values else 0,
         },
     }
 
@@ -323,14 +342,23 @@ def calculate_ssq_trends(history: list[dict], window: int = 100) -> dict:
 
     odd_even = Counter()
     big_small = Counter()
+    back_odd_even = Counter()
+    back_big_small = Counter()
     sum_values = []
-    for row in history:
+    back_sum_values = []
+    for row in recent:
         front = row["front"]
+        back = row["back"]
         odd_count = sum(1 for number in front if number % 2 == 1)
         small_count = sum(1 for number in front if number <= 16)
+        back_odd_count = sum(1 for number in back if number % 2 == 1)
+        back_small_count = sum(1 for number in back if number <= 8)
         odd_even[ratio_label(odd_count, 6)] += 1
         big_small[ratio_label(small_count, 6)] += 1
+        back_odd_even[ratio_label(back_odd_count, 1)] += 1
+        back_big_small[ratio_label(back_small_count, 1)] += 1
         sum_values.append(sum(front))
+        back_sum_values.append(sum(back))
 
     hot_front = [
         {"number": number, "count": front_counts[number]}
@@ -350,12 +378,22 @@ def calculate_ssq_trends(history: list[dict], window: int = 100) -> dict:
         "back_omissions": [{"number": number, "missing": back_omissions[number]} for number in back_numbers],
         "odd_even": [{"ratio": key, "count": odd_even[key]} for key in sorted(odd_even)],
         "big_small": [{"ratio": key, "count": big_small[key]} for key in sorted(big_small)],
+        "back_odd_even": [{"ratio": key, "count": back_odd_even[key]} for key in sorted(back_odd_even)],
+        "back_big_small": [{"ratio": key, "count": back_big_small[key]} for key in sorted(back_big_small)],
         "sum_values": [
-            {"issue": row["issue"], "value": sum(row["front"])} for row in history[-30:]
+            {"issue": row["issue"], "value": sum(row["front"])} for row in recent[-30:]
+        ],
+        "back_sum_values": [
+            {"issue": row["issue"], "value": sum(row["back"])} for row in recent[-30:]
         ],
         "sum_range": {
             "min": min(sum_values) if sum_values else 0,
             "max": max(sum_values) if sum_values else 0,
             "avg": round(sum(sum_values) / len(sum_values), 2) if sum_values else 0,
+        },
+        "back_sum_range": {
+            "min": min(back_sum_values) if back_sum_values else 0,
+            "max": max(back_sum_values) if back_sum_values else 0,
+            "avg": round(sum(back_sum_values) / len(back_sum_values), 2) if back_sum_values else 0,
         },
     }

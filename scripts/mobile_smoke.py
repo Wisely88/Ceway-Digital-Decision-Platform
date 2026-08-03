@@ -272,6 +272,15 @@ async def run_scene_flow(client: CdpClient, scene_name: str) -> dict:
     await wait_for_text(client, "已加入当期复盘")
     await wait_for_text(client, "当期复盘")
     await assert_no_document_overflow(client, f"{scene_name}复盘页")
+    await click_text(client, "历史数据", ".side-nav-item")
+    await wait_for_text(client, "走势分析")
+    area_label = "后区" if scene_name == "大乐透" else "蓝球"
+    await click_text(client, area_label, ".trend-area-toggle button")
+    await wait_for_text(client, f"{area_label}冷热号分布")
+    await click_text(client, "遗漏", ".trend-tabs button")
+    area_size = 12 if scene_name == "大乐透" else 16
+    await wait_for_text(client, f"遗漏分布（{area_label}{area_size}码）")
+    await assert_no_document_overflow(client, f"{scene_name}{area_label}走势页")
     result = await client.evaluate(
         "({title: document.querySelector('.workspace-topbar h1')?.textContent.trim(), width: innerWidth})"
     )
