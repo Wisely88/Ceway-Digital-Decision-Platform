@@ -342,7 +342,7 @@ def fill_latest_new_draw_date(
                 candidate += timedelta(days=1)
             inferred_dates[row["issue"]] = candidate.isoformat()
             previous_date = candidate
-    if draw_date and len(new_rows) == 1:
+    if draw_date and len(new_rows) == 1 and new_rows[0]["issue"] not in inferred_dates:
         inferred_dates[new_rows[0]["issue"]] = draw_date
     return [
         {**row, "date": row.get("date") or inferred_dates.get(row["issue"], "")}

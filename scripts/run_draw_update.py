@@ -174,7 +174,11 @@ def refresh_checkout() -> None:
     if data_changed():
         log("检测到上次未完成的数据更新，先继续本地恢复流程")
         return
-    run_with_retry(["git", "fetch", "origin", "main"], timeout=120)
+    try:
+        run_with_retry(["git", "fetch", "origin", "main"], timeout=120)
+    except RuntimeError as exc:
+        log(f"GitHub 暂时不可用，继续抓取并保留本地开奖数据：{exc}")
+        return
     run(["git", "merge", "--ff-only", "origin/main"])
     ahead = run(["git", "rev-list", "--count", "origin/main..HEAD"]).stdout.strip()
     if ahead and int(ahead) > 0:
