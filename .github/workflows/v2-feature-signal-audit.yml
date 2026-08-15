@@ -21,8 +21,11 @@ on:
         default: "50,100,200"
 
 concurrency:
-  group: ceway-v2-feature-signal-audit-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Feature audit is lightweight and diagnostic. Keep each frozen commit's run
+  # independent so unrelated research commits cannot cancel a nearly-finished
+  # report. The script itself never reads the reserved exclude=150 holdout.
+  group: ceway-v2-feature-signal-audit-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   audit:
@@ -55,6 +58,6 @@ jobs:
       - name: Upload feature audit report
         uses: actions/upload-artifact@v4
         with:
-          name: ceway-v2-feature-signal-audit
+          name: ceway-v2-feature-signal-audit-${{ github.sha }}
           path: artifacts/ceway_v2_feature_signal_audit.json
           if-no-files-found: error
