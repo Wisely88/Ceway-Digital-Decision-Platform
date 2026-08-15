@@ -5,7 +5,9 @@ on:
     branches: [main]
     paths:
       - "backend/generator_v2.py"
+      - "backend/random_control_v2.py"
       - "backend/tests/test_generator_v2.py"
+      - "backend/tests/test_random_control_v2.py"
       - "scripts/run_v2_generator_ablation.py"
       - ".github/workflows/v2-generator-ablation.yml"
   workflow_dispatch:
@@ -41,9 +43,9 @@ jobs:
       - name: Install backend dependencies
         run: python -m pip install -r backend/requirements.txt
 
-      - name: Run generator unit tests
+      - name: Run generator and random-control unit tests
         working-directory: backend
-        run: python -m unittest tests.test_generator_v2 -v
+        run: python -m unittest tests.test_generator_v2 tests.test_random_control_v2 -v
 
       - name: Run coverage-generator A/B
         env:
