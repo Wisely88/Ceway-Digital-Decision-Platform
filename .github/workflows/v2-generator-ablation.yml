@@ -25,6 +25,10 @@ on:
         required: false
         default: "3"
 
+concurrency:
+  group: ceway-v2-generator-ablation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ablation:
     runs-on: ubuntu-latest
