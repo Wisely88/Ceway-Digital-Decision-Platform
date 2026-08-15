@@ -9,7 +9,7 @@ Powered by CBGO Framework
 
 策维不预测开奖结果，不承诺提高中奖概率。历史评分和回测只能描述历史匹配，不能证明未来收益。
 
-> 开发说明：`agent/ceway-v2-research-engine` 分支正在开发 CEWAY-FWD-V2 研究/验证层，包括 history cutoff、防未来数据、组合级历史碰撞、结构匹配随机基线、Bootstrap、冻结 SHA 完整性验证与覆盖感知组合器。V2 尚未合并到生产 `main`；详见 `docs/ceway_v2_research_engine.md`。
+> 开发说明：`agent/ceway-v2-research-engine` 分支正在开发 CEWAY-FWD-V2 研究/验证层，包括 history cutoff、防未来数据、组合级历史碰撞、结构匹配随机基线、Bootstrap、冻结 SHA 完整性验证与覆盖感知组合器。第一轮真实历史验证已确认 v1.12.4 组合器存在明显的多注覆盖集中问题；实验修复仍在 A/B 和独立 holdout 验证中。V2 尚未合并到生产 `main`；详见 `docs/ceway_v2_research_engine.md`。
 
 ## 目录
 
