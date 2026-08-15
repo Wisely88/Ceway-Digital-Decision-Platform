@@ -1,6 +1,6 @@
 # CEWAY-FWD-V2 Research Engine
 
-状态：开发分支 Phase 1–2 已完成，Phase 3 冻结持久化底座开发中  
+状态：Phase 1–3 已完成，Phase 4 真实全历史基准验证进行中  
 分支：`agent/ceway-v2-research-engine`  
 生产基线：`main` / Ceway v1.12.4
 
@@ -63,42 +63,15 @@ V2 不再用完全无约束随机票作为主要对照，而是逐票匹配 CEWA
 
 `diversity_summary(...)`
 
-当前提供：
-
-- Jaccard similarity；
-- symmetric-difference distance。
-
-用于避免有限预算内的多注组合高度重复、有效覆盖不足。
+当前提供 Jaccard similarity 与 symmetric-difference distance，用于避免有限预算内的多注组合高度重复、有效覆盖不足。
 
 ### Bootstrap
 
-`bootstrap_mean_ci(...)`
-
-用于计算 CEWAY 相对结构匹配随机基线的 uplift 95% Bootstrap CI。
-
-### 冻结 manifest
-
-`build_freeze_manifest(...)`
-
-冻结记录至少包含：
-
-- game；
-- target_issue；
-- history_cutoff_issue；
-- algorithm_version；
-- parameters；
-- 完整展开 tickets；
-- budget；
-- seed；
-- SHA-256。
-
-任何号码或参数变化都必须产生不同 SHA-256。
+`bootstrap_mean_ci(...)` 用于计算 CEWAY 相对结构匹配随机基线的 uplift 95% Bootstrap CI。
 
 ## Phase 2：V2 Rolling Backtest（已完成）
 
 实现位置：`backend/backtest.py`
-
-现有 v1.12.4 的滚动回测入口已在开发分支升级为 V2 验证链，同时保留原 API 形态。
 
 每个历史预测点现在执行：
 
@@ -121,51 +94,95 @@ V2 不再用完全无约束随机票作为主要对照，而是逐票匹配 CEWA
 
 `positive_candidate` 不是自动 Promote，更不等于证明彩票可预测。
 
-## Phase 3：冻结持久化与完整性（底座已加入）
+## Phase 3：冻结持久化与开奖后完整性验证（已完成）
 
-实现位置：`backend/freeze_v2.py`
+实现位置：`backend/freeze_v2.py`、`backend/engine.py`、`backend/review.py`
 
-已加入：
+正式保存 DLT / SSQ 方案时，`save_dlt_record(...)` 与 `save_ssq_record(...)` 会在写入 SQLite 之前自动冻结：
 
-- `attach_plan_v2_metadata(...)`：给正式方案生成 freeze manifest、SHA、cutoff、碰撞审计与多样性指标；
-- `verify_freeze_manifest(...)`：验证 manifest 自身 SHA；
-- `verify_plan_freeze(...)`：同时验证当前票面是否仍与冻结票面一致；
-- `ensure_plan_v2_metadata(...)`：已有合法冻结则保留，已有非法冻结则拒绝重新覆盖，避免把篡改后的方案“重新洗白”。
+- game；
+- target_issue；
+- history_cutoff_issue；
+- algorithm_version；
+- parameters；
+- 完整展开 tickets；
+- budget；
+- seed（如有）；
+- SHA-256；
+- 组合级历史碰撞审计；
+- 前后区组合多样性。
 
-现有记录结构把完整 `plan` 存入 SQLite `plan_json`；前端 IndexedDB、Supabase `ceway_sync_state.payload` 和 JSON 备份也都保存完整 record 对象。因此 V2 元数据可以嵌入 plan 后沿现有归档/云同步链传播，无需第一阶段修改 Supabase 表结构。
+冻结信息嵌入 `plan.v2_research`。现有 SQLite `plan_json`、浏览器 IndexedDB、Supabase `ceway_sync_state.payload` 与 JSON 备份都保存完整 record 对象，因此无需第一阶段修改 Supabase 表结构即可自然携带 V2 冻结信息。
 
-下一步是把 `ensure_plan_v2_metadata(...)` 接到正式方案保存入口，并在开奖复盘结果中展示 `freeze_integrity`。
+开奖复盘时：
+
+- `verify_freeze_manifest(...)` 重算 manifest SHA；
+- `verify_plan_freeze(...)` 同时把当前方案展开成完整票，与冻结票面逐票比较；
+- 新 V2 记录返回 `freeze_integrity.status = valid / invalid`；
+- 历史老记录没有 V2 元数据时返回 `legacy`，不影响原有复盘；
+- 已存在但非法的 V2 manifest 不允许通过重新冻结覆盖，避免把开奖后的改票“洗白”。
+
+## Phase 4：真实历史多窗口 × 多 Seed 基准（进行中）
+
+实现位置：
+
+- `scripts/run_v2_benchmark.py`
+- `.github/workflows/v2-real-history-benchmark.yml`
+
+默认基准：
+
+- DLT + SSQ；
+- 每个配置 50 个 walk-forward 预测点；
+- 历史窗口 50 / 100 / 200；
+- 每个预测点 3 个结构匹配随机 seed；
+- 20 元预算；
+- balanced 策略。
+
+基准报告输出每个窗口的 uplift、95% CI、win/loss/tie rate，并给每种彩票生成研究门禁：
+
+- `PROMOTE_CANDIDATE`：所有测试窗口的 best-hit uplift 95% CI 下界都高于 0；
+- `REJECT`：所有窗口均为 negative；
+- `HOLD`：其余情况，包括不同窗口结论不稳定。
+
+这个门禁只决定“参数是否值得进入下一轮研究”，不会自动修改生产推荐参数。
 
 ## CI / 验证
 
-开发分支新增：`.github/workflows/v2-research-tests.yml`
+开发分支新增 `.github/workflows/v2-research-tests.yml`。PR 修改 backend 时，会在 GitHub Actions 使用 Python 3.12 自动执行全部后端 unittest。
 
-PR 修改 backend 时会在 GitHub Actions 使用 Python 3.12 自动执行全部后端 unittest。
+截至 Phase 3，云端测试已经覆盖：
 
-第一轮 V2 CI 已通过现有生产测试与 V2 原语测试；第二轮进一步加入 DLT / SSQ V2 滚动回测集成测试后也通过。冻结完整性测试随后加入 CI。
+- 原 v1.12.4 保存、复盘、奖金、数据同步、开奖自动更新逻辑；
+- V2 理论碰撞、Conditional Random、多样性、Bootstrap；
+- DLT / SSQ V2 rolling backtest 集成；
+- 冻结 SHA 稳定性；
+- 修改票面后的完整性失败；
+- 非法 manifest 拒绝重新冻结；
+- API 保存后自动冻结；
+- 待开奖与已开奖复盘均验证 freeze integrity。
 
 ## 与 v1.12.4 的关系
 
 现有生产模块仍然是：
 
-- `backend/engine.py`：Statistics Engine；
+- `backend/engine.py`：Statistics Engine 与方案保存入口；
 - `backend/scorer.py`：Score Engine；
 - `backend/generator.py`：Combination Engine；
 - `backend/capital.py`：Capital Engine；
 - `backend/backtest.py`：滚动历史回测；
 - `backend/review.py`：开奖复盘。
 
-V2 在开发分支逐层接管验证能力，但当前不改变线上 `main`、GitHub Pages、Supabase 表结构和开奖自动更新链。
+V2 在开发分支逐层接管研究、验证和审计能力，但当前不改变线上 `main`、GitHub Pages、Supabase 表结构和开奖自动更新链。
 
 ## 后续门禁
 
 在 V2 替换正式推荐链之前，还需要：
 
-1. 冻结 metadata 接入方案保存与复盘完整性验证；
-2. 用真实完整 DLT / SSQ 历史跑多窗口 × 多 seed 回测；
-3. 加入 worst-window 与参数敏感性；
-4. 建立 Promote / Hold / Reject 参数晋升规则；
-5. 通过后端、前端与移动端验收后再考虑合并到 `main`。
+1. 完成真实全历史多窗口 × 多 seed 第一轮报告；
+2. 增加更长的 100 / 200 / 500 点 walk-forward 稳定性测试；
+3. 加入 worst-window、参数敏感性与跨时间段验证；
+4. 根据真实报告决定 Promote / Hold / Reject；
+5. 通过前端与移动端验收后，才考虑合并到 `main`。
 
 ## 生产发布原则
 
