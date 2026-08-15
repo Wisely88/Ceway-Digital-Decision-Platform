@@ -13,32 +13,31 @@ from research_v2 import (
 )
 
 
+def _zone_values(
+    pool_size: int,
+    zones: tuple[tuple[int, int], ...],
+) -> list[tuple[int, ...]] | None:
+    values_by_zone: list[tuple[int, ...]] = []
+    covered: list[int] = []
+    for low, high in zones:
+        values = tuple(number for number in range(max(1, low), min(pool_size, high) + 1))
+        values_by_zone.append(values)
+        covered.extend(values)
+    # Require a true partition of the game pool. If zones overlap or leave gaps,
+    # use the generic sampler so the proposal distribution stays correct.
+    if sorted(covered) != list(range(1, pool_size + 1)):
+        return None
+    return values_by_zone
+
+
 def _zone_constrained_candidates(
     pool_size: int,
     pick_size: int,
     constraints: TicketConstraints,
 ):
-    """Yield candidates from the declared zone quotas before other filters.
-
-    constraints_like_ticket() produces one exact zone-count tuple. Enumerating
-    each zone independently avoids scanning the full N-choose-k space for rare
-    shapes such as SSQ 0:1:5.
-    """
-    if not constraints.zones or not constraints.allowed_zone_counts:
-        yield from combinations(range(1, pool_size + 1), pick_size)
-        return
-
-    covered = set()
-    zone_values = []
-    for low, high in constraints.zones:
-        values = tuple(number for number in range(max(1, low), min(pool_size, high) + 1))
-        zone_values.append(values)
-        covered.update(values)
-
-    # The current CEWAY zones cover the whole game pool. If a future caller
-    # uses partial/overlapping zones, fall back to full enumeration rather than
-    # silently changing the sample space.
-    if covered != set(range(1, pool_size + 1)):
+    """Yield candidates from declared zone quotas before other filters."""
+    zone_values = _zone_values(pool_size, constraints.zones)
+    if zone_values is None or not constraints.allowed_zone_counts:
         yield from combinations(range(1, pool_size + 1), pick_size)
         return
 
@@ -58,6 +57,46 @@ def _zone_constrained_candidates(
             merged = tuple(sorted(number for piece in pieces for number in piece))
             if len(merged) == pick_size:
                 yield merged
+
+
+def _zone_rejection_ticket(
+    pool_size: int,
+    pick_size: int,
+    constraints: TicketConstraints,
+    *,
+    seed: str | int,
+    attempts: int,
+) -> tuple[int, ...] | None:
+    """Sample uniformly inside one exact zone-count pattern, then filter.
+
+    constraints_like_ticket() always produces one exact zone pattern. Drawing
+    uniformly from each zone's combinations makes the Cartesian-product
+    proposal uniform over that structural subspace, so rejection on odd/even,
+    sum and consecutive constraints remains unbiased inside the matched shape.
+    """
+    if len(constraints.allowed_zone_counts) != 1:
+        return None
+    zone_values = _zone_values(pool_size, constraints.zones)
+    if zone_values is None:
+        return None
+    counts = constraints.allowed_zone_counts[0]
+    if len(counts) != len(zone_values) or sum(counts) != pick_size:
+        return None
+    if any(count < 0 or count > len(values) for values, count in zip(zone_values, counts)):
+        return None
+
+    rng = random.Random(str(seed))
+    for _ in range(max(1, attempts)):
+        ticket = tuple(
+            sorted(
+                number
+                for values, count in zip(zone_values, counts)
+                for number in rng.sample(values, count)
+            )
+        )
+        if passes_constraints(ticket, constraints):
+            return ticket
+    return None
 
 
 def _enumerated_random_ticket(
@@ -88,8 +127,20 @@ def robust_conditional_random_ticket(
     constraints: TicketConstraints,
     *,
     seed: str | int,
-    rejection_attempts: int = 5_000,
+    rejection_attempts: int = 2_000,
 ) -> tuple[int, ...]:
+    # Fast path: sample directly inside the exact zone-allocation subspace.
+    structured = _zone_rejection_ticket(
+        pool_size,
+        pick_size,
+        constraints,
+        seed=f"{seed}-zone",
+        attempts=rejection_attempts,
+    )
+    if structured is not None:
+        return structured
+
+    # Generic path for callers without an exact partitioned zone shape.
     try:
         return conditional_random_tickets(
             pool_size,
@@ -100,6 +151,9 @@ def robust_conditional_random_ticket(
             max_attempts=rejection_attempts,
         )[0]
     except RuntimeError:
+        # Deterministic exact fallback guarantees a valid draw whenever the
+        # constraint set is non-empty, while preserving uniform reservoir
+        # sampling over the valid enumerated candidate set.
         return _enumerated_random_ticket(
             pool_size,
             pick_size,
@@ -162,7 +216,7 @@ def robust_structure_matched_random_plan(
                 "front_display": [f"{number:02d}" for number in front],
                 "back_display": [f"{number:02d}" for number in back],
                 "score": 0,
-                "explanation": ["V2 条件随机基线：结构匹配；窄结构使用分区枚举均匀兜底。"],
+                "explanation": ["V2 条件随机基线：先在匹配分区内均匀抽样，极窄结构再用穷举均匀兜底。"],
             }
         )
 
