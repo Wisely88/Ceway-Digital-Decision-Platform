@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT_DIR))
 sys.path.insert(0, str(BACKEND_DIR))
 
 from engine import load_dlt_history, load_ssq_history  # noqa: E402
-from scripts.run_v21_exposure_ablation import run_game  # noqa: E402
+from scripts.run_v2_generator_exposure_ablation import run_game  # noqa: E402
 
 
 FRESH_HOLDOUT_EXCLUDED_RECENT_POINTS = 100
