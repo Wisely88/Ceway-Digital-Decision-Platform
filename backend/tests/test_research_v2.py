@@ -16,12 +16,17 @@ from research_v2 import (  # noqa: E402
     bootstrap_mean_ci,
     build_freeze_manifest,
     collision_profile,
+    combination_collision_audit,
     conditional_random_tickets,
     diversity_summary,
+    expand_plan_tickets,
     history_through_issue,
     joint_collision_profile,
+    odd_count,
     passes_constraints,
+    structure_matched_random_plan,
     theoretical_collision_distribution,
+    zone_counts,
 )
 
 
@@ -61,6 +66,24 @@ class ResearchV2Tests(unittest.TestCase):
         self.assertEqual(profile[(2, 1)], 1)
         self.assertEqual(profile[(3, 1)], 1)
 
+    def test_combination_collision_audit_counts_all_ticket_draw_pairs(self) -> None:
+        tickets = [
+            {"front": [1, 2, 3, 4, 5], "back": [1, 2]},
+            {"front": [6, 7, 8, 9, 10], "back": [3, 4]},
+        ]
+        history = [
+            {"front": [1, 2, 10, 11, 12], "back": [1, 9]},
+            {"front": [3, 4, 5, 20, 21], "back": [2, 8]},
+            {"front": [6, 7, 8, 30, 31], "back": [3, 4]},
+        ]
+        audit = combination_collision_audit(tickets, history, DLT)
+        self.assertEqual(audit["ticket_count"], 2)
+        self.assertEqual(audit["history_count"], 3)
+        self.assertEqual(audit["pair_count"], 6)
+        self.assertEqual(sum(audit["front"]["observed"].values()), 6)
+        self.assertEqual(sum(audit["back"]["observed"].values()), 6)
+        self.assertEqual(sum(audit["joint_observed"].values()), 6)
+
     def test_conditional_random_respects_structure(self) -> None:
         constraints = TicketConstraints(
             zones=((1, 11), (12, 22), (23, 33)),
@@ -80,6 +103,51 @@ class ResearchV2Tests(unittest.TestCase):
         self.assertEqual(len(tickets), 20)
         self.assertTrue(all(passes_constraints(ticket, constraints) for ticket in tickets))
 
+    def test_expand_dantuo_plan_to_complete_tickets(self) -> None:
+        plan = {
+            "mode": "dantuo",
+            "front_dan": [1, 2],
+            "front_tuo": [3, 4, 5, 6],
+            "back": [1, 2, 3],
+        }
+        tickets = expand_plan_tickets(plan, DLT)
+        self.assertEqual(len(tickets), 12)
+        self.assertTrue(all(len(ticket["front"]) == 5 for ticket in tickets))
+        self.assertTrue(all(len(ticket["back"]) == 2 for ticket in tickets))
+
+    def test_structure_matched_random_plan_matches_reference_shape(self) -> None:
+        reference = {
+            "mode": "single",
+            "items": [
+                {"front": [3, 8, 14, 24, 31], "back": [2, 9]},
+                {"front": [5, 11, 17, 22, 34], "back": [5, 12]},
+            ],
+        }
+        baseline = structure_matched_random_plan(
+            reference,
+            DLT,
+            seed="shape-test",
+            main_zones=((1, 12), (13, 24), (25, 35)),
+            bonus_zones=((1, 6), (7, 12)),
+            main_sum_tolerance=5,
+            bonus_sum_tolerance=2,
+        )
+        self.assertEqual(baseline["baseline_type"], "conditional_random_v2")
+        self.assertEqual(baseline["tickets"], 2)
+        for source, generated in zip(reference["items"], baseline["items"]):
+            self.assertEqual(
+                zone_counts(source["front"], ((1, 12), (13, 24), (25, 35))),
+                zone_counts(generated["front"], ((1, 12), (13, 24), (25, 35))),
+            )
+            self.assertEqual(odd_count(source["front"]), odd_count(generated["front"]))
+            self.assertLessEqual(abs(sum(source["front"]) - sum(generated["front"])), 5)
+            self.assertEqual(
+                zone_counts(source["back"], ((1, 6), (7, 12))),
+                zone_counts(generated["back"], ((1, 6), (7, 12))),
+            )
+            self.assertEqual(odd_count(source["back"]), odd_count(generated["back"]))
+            self.assertLessEqual(abs(sum(source["back"]) - sum(generated["back"])), 2)
+
     def test_diversity_summary_reports_pair_count(self) -> None:
         tickets = [(1, 2, 3, 4, 5, 6), (1, 2, 7, 8, 9, 10), (11, 12, 13, 14, 15, 16)]
         summary = diversity_summary(tickets)
@@ -96,7 +164,7 @@ class ResearchV2Tests(unittest.TestCase):
             game="ssq",
             target_issue="2026094",
             history_cutoff_issue="2026093",
-            algorithm_version="CEWAY-FWD-V2.0-dev1",
+            algorithm_version="CEWAY-FWD-V2.0-dev2",
             parameters={"budget": 40, "strategy": "balanced"},
             budget=40,
             seed="2026094",
