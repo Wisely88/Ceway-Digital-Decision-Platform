@@ -9,6 +9,7 @@ from pathlib import Path
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
 
+from backtest import build_dlt_backtest, build_ssq_backtest  # noqa: E402
 from research_v2 import (  # noqa: E402
     DLT,
     SSQ,
@@ -28,6 +29,38 @@ from research_v2 import (  # noqa: E402
     theoretical_collision_distribution,
     zone_counts,
 )
+
+
+def synthetic_dlt_history(count: int = 40) -> list[dict]:
+    rows = []
+    for index in range(count):
+        front = sorted(((index + step * 6) % 35) + 1 for step in range(5))
+        back = sorted([((index + 1) % 12) + 1, ((index + 7) % 12) + 1])
+        rows.append(
+            {
+                "issue": f"26{index + 1:03d}",
+                "date": "2026-01-01",
+                "front": front,
+                "back": back,
+            }
+        )
+    return rows
+
+
+def synthetic_ssq_history(count: int = 40) -> list[dict]:
+    rows = []
+    for index in range(count):
+        front = sorted(((index + step * 5) % 33) + 1 for step in range(6))
+        back = [((index * 3) % 16) + 1]
+        rows.append(
+            {
+                "issue": f"2026{index + 1:03d}",
+                "date": "2026-01-01",
+                "front": front,
+                "back": back,
+            }
+        )
+    return rows
 
 
 class ResearchV2Tests(unittest.TestCase):
@@ -184,6 +217,50 @@ class ResearchV2Tests(unittest.TestCase):
         self.assertEqual(first["sha256"], second["sha256"])
         self.assertNotEqual(first["sha256"], changed["sha256"])
         self.assertEqual(first["schema_version"], "ceway.freeze.v2")
+
+    def test_dlt_v2_backtest_runs_cutoff_conditional_baseline_and_bootstrap(self) -> None:
+        result = build_dlt_backtest(
+            synthetic_dlt_history(),
+            budget=10,
+            strategy="balanced",
+            periods=3,
+            window=30,
+            baseline_seeds=2,
+        )
+        self.assertEqual(result["config"]["algorithm_version"], "CEWAY-FWD-V2.0-dev2")
+        self.assertEqual(result["config"]["baseline_type"], "conditional_random_v2")
+        self.assertEqual(result["v2_validation"]["periods"], 3)
+        self.assertEqual(len(result["items"]), 3)
+        self.assertEqual(len(result["baseline_items"]), 3)
+        for item in result["items"]:
+            self.assertEqual(item["source_issue"], item["history_cutoff_issue"])
+            self.assertLess(int(item["history_cutoff_issue"]), int(item["actual_issue"]))
+            self.assertEqual(len(item["research"]["freeze_sha256"]), 64)
+            self.assertGreater(item["research"]["collision_audit"]["pair_count"], 0)
+        self.assertIsNotNone(result["v2_validation"]["best_hit_uplift"])
+        self.assertIsNotNone(result["v2_validation"]["record_hit_uplift"])
+
+    def test_ssq_v2_backtest_runs_cutoff_conditional_baseline_and_bootstrap(self) -> None:
+        result = build_ssq_backtest(
+            synthetic_ssq_history(),
+            budget=10,
+            strategy="balanced",
+            periods=3,
+            window=30,
+            baseline_seeds=2,
+        )
+        self.assertEqual(result["config"]["algorithm_version"], "CEWAY-FWD-V2.0-dev2")
+        self.assertEqual(result["config"]["baseline_type"], "conditional_random_v2")
+        self.assertEqual(result["v2_validation"]["periods"], 3)
+        self.assertEqual(len(result["items"]), 3)
+        self.assertEqual(len(result["baseline_items"]), 3)
+        for item in result["items"]:
+            self.assertEqual(item["source_issue"], item["history_cutoff_issue"])
+            self.assertLess(int(item["history_cutoff_issue"]), int(item["actual_issue"]))
+            self.assertEqual(len(item["research"]["freeze_sha256"]), 64)
+            self.assertGreater(item["research"]["collision_audit"]["pair_count"], 0)
+        self.assertIsNotNone(result["v2_validation"]["best_hit_uplift"])
+        self.assertIsNotNone(result["v2_validation"]["record_hit_uplift"])
 
 
 if __name__ == "__main__":
