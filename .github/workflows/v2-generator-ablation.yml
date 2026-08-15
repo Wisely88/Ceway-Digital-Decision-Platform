@@ -1,15 +1,6 @@
-name: CEWAY V2 Generator Ablation
+name: CEWAY V2 Generator Ablation (V1 Archived)
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "backend/generator_v2.py"
-      - "backend/random_control_v2.py"
-      - "backend/tests/test_generator_v2.py"
-      - "backend/tests/test_random_control_v2.py"
-      - "scripts/run_v2_generator_ablation.py"
-      - ".github/workflows/v2-generator-ablation.yml"
   workflow_dispatch:
     inputs:
       periods:
@@ -26,7 +17,7 @@ on:
         default: "3"
 
 concurrency:
-  group: ceway-v2-generator-ablation-${{ github.event.pull_request.number || github.ref }}
+  group: ceway-v2-generator-ablation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -51,7 +42,7 @@ jobs:
         working-directory: backend
         run: python -m unittest tests.test_generator_v2 tests.test_random_control_v2 -v
 
-      - name: Run coverage-generator A/B
+      - name: Run archived coverage-generator A/B
         env:
           PERIODS: ${{ inputs.periods || '50' }}
           WINDOWS: ${{ inputs.windows || '50,100,200' }}
