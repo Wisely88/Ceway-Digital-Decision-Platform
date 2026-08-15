@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import mean
@@ -24,7 +23,10 @@ CONSUMED_BLOCKS = (
     ("v21_fresh_holdout", 100),
 )
 FEATURES = ("heat_score", "missing_score", "balance_score", "total_score")
-UNTOUCHED_NEXT_BLOCK_EXCLUDED_RECENT_POINTS = 150
+# exclude=150 is allocated to the separately frozen V2.2 multi-window consensus
+# holdout. Any scorer redesigned after this feature audit must move one full
+# 50-outcome block farther back to avoid reusing that evidence.
+NEXT_SCORER_HOLDOUT_EXCLUDED_RECENT_POINTS = 200
 
 
 def feature_auc(rows: list[dict], winners: list[int], pool_size: int, feature: str) -> float:
@@ -103,17 +105,11 @@ def audit_block(
     end_source = len(history) - 2
     start_source = end_source - periods + 1
     values: dict[str, dict[str, list[float]]] = {
-        zone: {
-            feature: []
-            for feature in FEATURES
-        }
+        zone: {feature: [] for feature in FEATURES}
         for zone in ("front", "back")
     }
     top_values: dict[str, dict[str, list[float]]] = {
-        zone: {
-            feature: []
-            for feature in FEATURES
-        }
+        zone: {feature: [] for feature in FEATURES}
         for zone in ("front", "back")
     }
     outcomes: list[str] = []
@@ -223,8 +219,9 @@ def build_recommendation(classifications: dict) -> dict:
         "promising_candidates": promising,
         "neutral_or_unstable": neutral,
         "next_rule": (
-            "Do not tune against the untouched exclude=150 block. Build any V2.2 scorer only from this consumed-data audit, "
-            "freeze its formula/version, then evaluate exactly once on the next untouched 50-outcome block."
+            "Do not tune against exclude=150 or exclude=200. The exclude=150 block is allocated to the frozen V2.2 "
+            "consensus holdout. Build any scorer redesign only from consumed feature-audit evidence, freeze its formula/version, "
+            "then evaluate exactly once on the reserved exclude=200 50-outcome block."
         ),
     }
 
@@ -273,7 +270,7 @@ def main() -> int:
     recommendation = build_recommendation(classifications)
 
     report = {
-        "schema_version": "ceway.v2.feature-signal-audit.1",
+        "schema_version": "ceway.v2.feature-signal-audit.2",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "purpose": "Decompose the current 40/30/30 scorer into feature-level historical ordering signal.",
         "features": list(FEATURES),
@@ -282,17 +279,24 @@ def main() -> int:
             "windows": windows,
             "consumed_blocks": [name for name, _ in CONSUMED_BLOCKS],
         },
-        "untouched_next_holdout": {
-            "excluded_recent_points": UNTOUCHED_NEXT_BLOCK_EXCLUDED_RECENT_POINTS,
-            "periods": 50,
-            "status": "RESERVED_NOT_READ_BY_THIS_AUDIT",
+        "holdout_allocation": {
+            "exclude_150": {
+                "status": "ALLOCATED_TO_FROZEN_V22_CONSENSUS_HOLDOUT",
+                "read_by_this_audit": False,
+            },
+            "exclude_200": {
+                "status": "RESERVED_FOR_FUTURE_SCORER_REDESIGN_HOLDOUT",
+                "periods": 50,
+                "read_by_this_audit": False,
+            },
         },
         "rows": rows,
         "classifications": classifications,
         "recommendation": recommendation,
         "guardrail": (
             "Classifications summarize correlated historical cells and are architecture diagnostics, not proof of prediction. "
-            "The exclude=150 block remains untouched for a frozen V2.2 candidate."
+            "This audit reads only exclude=0/50/100 blocks. Exclude=150 is owned by the frozen V2.2 consensus path; "
+            "exclude=200 remains reserved for a future frozen scorer candidate."
         ),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
