@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from itertools import combinations
+from itertools import combinations, product
 
 from research_v2 import (
     GameSpec,
@@ -13,6 +13,53 @@ from research_v2 import (
 )
 
 
+def _zone_constrained_candidates(
+    pool_size: int,
+    pick_size: int,
+    constraints: TicketConstraints,
+):
+    """Yield candidates from the declared zone quotas before other filters.
+
+    constraints_like_ticket() produces one exact zone-count tuple. Enumerating
+    each zone independently avoids scanning the full N-choose-k space for rare
+    shapes such as SSQ 0:1:5.
+    """
+    if not constraints.zones or not constraints.allowed_zone_counts:
+        yield from combinations(range(1, pool_size + 1), pick_size)
+        return
+
+    covered = set()
+    zone_values = []
+    for low, high in constraints.zones:
+        values = tuple(number for number in range(max(1, low), min(pool_size, high) + 1))
+        zone_values.append(values)
+        covered.update(values)
+
+    # The current CEWAY zones cover the whole game pool. If a future caller
+    # uses partial/overlapping zones, fall back to full enumeration rather than
+    # silently changing the sample space.
+    if covered != set(range(1, pool_size + 1)):
+        yield from combinations(range(1, pool_size + 1), pick_size)
+        return
+
+    for counts in constraints.allowed_zone_counts:
+        if len(counts) != len(zone_values) or sum(counts) != pick_size:
+            continue
+        per_zone = []
+        valid_pattern = True
+        for values, count in zip(zone_values, counts):
+            if count < 0 or count > len(values):
+                valid_pattern = False
+                break
+            per_zone.append(combinations(values, count))
+        if not valid_pattern:
+            continue
+        for pieces in product(*per_zone):
+            merged = tuple(sorted(number for piece in pieces for number in piece))
+            if len(merged) == pick_size:
+                yield merged
+
+
 def _enumerated_random_ticket(
     pool_size: int,
     pick_size: int,
@@ -20,15 +67,11 @@ def _enumerated_random_ticket(
     *,
     seed: str | int,
 ) -> tuple[int, ...]:
-    """Uniformly sample one valid ticket by reservoir sampling over valid combos.
-
-    This is a deterministic fallback for narrow constraint sets where rejection
-    sampling can miss a perfectly valid structure even after many attempts.
-    """
+    """Uniformly sample one valid ticket by reservoir sampling over valid combos."""
     rng = random.Random(str(seed))
     selected: tuple[int, ...] | None = None
     valid_count = 0
-    for candidate in combinations(range(1, pool_size + 1), pick_size):
+    for candidate in _zone_constrained_candidates(pool_size, pick_size, constraints):
         if not passes_constraints(candidate, constraints):
             continue
         valid_count += 1
@@ -45,7 +88,7 @@ def robust_conditional_random_ticket(
     constraints: TicketConstraints,
     *,
     seed: str | int,
-    rejection_attempts: int = 20_000,
+    rejection_attempts: int = 5_000,
 ) -> tuple[int, ...]:
     try:
         return conditional_random_tickets(
@@ -119,7 +162,7 @@ def robust_structure_matched_random_plan(
                 "front_display": [f"{number:02d}" for number in front],
                 "back_display": [f"{number:02d}" for number in back],
                 "score": 0,
-                "explanation": ["V2 条件随机基线：结构匹配；拒绝采样失败时使用穷举均匀兜底。"],
+                "explanation": ["V2 条件随机基线：结构匹配；窄结构使用分区枚举均匀兜底。"],
             }
         )
 
