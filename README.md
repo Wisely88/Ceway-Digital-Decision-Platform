@@ -9,7 +9,7 @@ Powered by CBGO Framework
 
 策维不预测开奖结果，不承诺提高中奖概率。历史评分和回测只能描述历史匹配，不能证明未来收益。
 
-> V2 开发说明：`agent/ceway-v2-research-engine` 分支正在开发 CEWAY-FWD-V2 研究/验证层。V2 尚未合并到生产 `main`；开发状态与真实历史验证结果见 `docs/ceway_v2_research_engine.md`。
+> V2 开发说明：`agent/ceway-v2-research-engine` 分支正在开发 CEWAY-FWD-V2 研究/验证层；尚未合并到生产 `main`。详见 [`docs/ceway_v2_research_engine.md`](docs/ceway_v2_research_engine.md)。
 
 ## 目录
 
