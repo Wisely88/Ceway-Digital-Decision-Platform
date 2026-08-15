@@ -19,6 +19,7 @@ from generator_v2 import (  # noqa: E402
     generate_dlt_coverage_single,
     generate_ssq_coverage_single,
 )
+from random_control_v2 import robust_structure_matched_random_plan  # noqa: E402
 from research_v2 import (  # noqa: E402
     DLT,
     SSQ,
@@ -26,7 +27,6 @@ from research_v2 import (  # noqa: E402
     diversity_summary,
     expand_plan_tickets,
     history_through_issue,
-    structure_matched_random_plan,
 )
 from review import review_plan, review_ssq_plan  # noqa: E402
 from scorer import score_back_numbers, score_front_numbers, score_ssq_back_numbers, score_ssq_front_numbers  # noqa: E402
@@ -143,7 +143,7 @@ def run_game(
         random_reviews = []
         random_plans = []
         for seed_index in range(max(1, baseline_seeds)):
-            random_plan = structure_matched_random_plan(
+            random_plan = robust_structure_matched_random_plan(
                 candidate_plan,
                 spec,
                 seed=f"generator-ablation-{game}-{source_issue}-{window}-{seed_index}",
