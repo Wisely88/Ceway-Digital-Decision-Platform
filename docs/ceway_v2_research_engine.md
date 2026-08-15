@@ -1,6 +1,6 @@
 # CEWAY-FWD-V2 Research Engine
 
-状态：Phase 1–3 已完成，Phase 4 真实全历史基准验证进行中  
+状态：Phase 1–3 已完成；Phase 4 真实历史验证已定位组合覆盖缺陷；Phase 4.2 覆盖感知组合器 A/B 中  
 分支：`agent/ceway-v2-research-engine`  
 生产基线：`main` / Ceway v1.12.4
 
@@ -122,35 +122,94 @@ V2 不再用完全无约束随机票作为主要对照，而是逐票匹配 CEWA
 - 历史老记录没有 V2 元数据时返回 `legacy`，不影响原有复盘；
 - 已存在但非法的 V2 manifest 不允许通过重新冻结覆盖，避免把开奖后的改票“洗白”。
 
-## Phase 4：真实历史多窗口 × 多 Seed 基准（进行中）
+## Phase 4：真实历史多窗口 × 多 Seed 基准（第一轮完成）
 
 实现位置：
 
 - `scripts/run_v2_benchmark.py`
+- `scripts/run_v2_diagnostics.py`
 - `.github/workflows/v2-real-history-benchmark.yml`
 
-默认基准：
+第一轮真实数据：
 
-- DLT + SSQ；
-- 每个配置 50 个 walk-forward 预测点；
-- 历史窗口 50 / 100 / 200；
+- DLT：2909 期，截止 `26091`；
+- SSQ：3490 期，截止 `2026093`；
+- 每个配置最近 50 个 walk-forward 点；
+- 评分历史窗口 50 / 100 / 200；
 - 每个预测点 3 个结构匹配随机 seed；
 - 20 元预算；
 - balanced 策略。
 
-基准报告输出每个窗口的 uplift、95% CI、win/loss/tie rate，并给每种彩票生成研究门禁：
+### 第一轮总门禁
 
-- `PROMOTE_CANDIDATE`：所有测试窗口的 best-hit uplift 95% CI 下界都高于 0；
-- `REJECT`：所有窗口均为 negative；
-- `HOLD`：其余情况，包括不同窗口结论不稳定。
+当前 v1.12.4 核心评分 + 组合生成逻辑，在三个窗口的 best-of-budget 指标上均显著低于结构匹配随机：
 
-这个门禁只决定“参数是否值得进入下一轮研究”，不会自动修改生产推荐参数。
+- DLT：`REJECT`，三个窗口 best-hit uplift 均为负，窗口均值约 -0.82；
+- SSQ：`REJECT`，三个窗口 best-hit uplift 均为负，窗口均值约 -1.05。
+
+这不是 V2 自身失败，而是 V2 验证层成功识别出当前生产候选算法没有通过随机对照门禁。
+
+### 拆因诊断：主要缺陷是 coverage concentration
+
+为了避免把“号码评分质量”和“组合覆盖质量”混为一谈，第二轮在完全相同历史点上拆开测：
+
+1. 每张 CEWAY 票的平均命中数 vs 与其结构匹配的随机票；
+2. 整个预算组合的 best-hit；
+3. 多注前区平均 Jaccard。
+
+结果六个配置全部诊断为 `coverage_concentration`：
+
+#### DLT
+
+- 单票平均命中 uplift：
+  - window 50：+0.0987，95% CI [-0.1013, +0.3180]
+  - window 100：-0.0473，95% CI [-0.2153, +0.1273]
+  - window 200：-0.0340，95% CI [-0.1953, +0.1333]
+- 三个 CI 全部跨 0：当前评分器没有显示稳定正优势，但也没有证据说明它显著劣于结构匹配随机。
+- CEWAY 前区平均 Jaccard 恒定约 0.5873；随机对照约 0.1118–0.1442。
+- best-hit uplift 约 -0.75 至 -0.95，95% CI 均完全低于 0。
+
+#### SSQ
+
+- 单票平均命中 uplift：
+  - window 50：-0.0267，95% CI [-0.2333, +0.1827]
+  - window 100：-0.0227，95% CI [-0.2067, +0.1780]
+  - window 200：-0.1000，95% CI [-0.3107, +0.1233]
+- 三个 CI 同样全部跨 0。
+- CEWAY 红球平均 Jaccard 恒定约 0.6429；随机对照约 0.1582–0.1631。
+- best-hit uplift 约 -1.00 至 -1.07，95% CI 均完全低于 0。
+
+因此当前优先级不是调热号/遗漏权重，也不是立刻引入 LSTM/Transformer，而是先修 Combination Engine 的组合集中问题。
+
+## Phase 4.2：Coverage-aware Combination Engine（A/B 中）
+
+实验实现：`backend/generator_v2.py`
+
+旧生成器通过对排序号码做逐位 rotate，再取前 5 / 6 个号码；这种做法使有限预算内的多注高度共享核心号码。V2 实验组合器保持 `scorer.py` 输出完全不变，只改变“高分号码如何组装成多注”。
+
+当前实验策略：
+
+- 在高分候选带中枚举完整前区组合；
+- 保留组合评分质量；
+- 对与已选票的最大 Jaccard / 重叠数施加惩罚；
+- 奖励新号码覆盖和低使用次数；
+- DLT 后区不再因号码标签与前区相同而人为排除，因为前后区是独立号码空间；
+- SSQ 蓝球在高分候选带中轮换，避免所有注固定同一个蓝球；
+- 生产 `backend/generator.py` 暂不替换。
+
+A/B 脚本：`scripts/run_v2_generator_ablation.py`
+
+同一历史点同时比较：
+
+1. v1.12.4 legacy generator；
+2. V2 coverage-aware generator；
+3. 基于 V2 方案逐票生成的结构匹配随机 baseline。
+
+开发样本仍使用最近 50 个点，只用于验证“组合器修复是否有效”，即使结果为正也不能直接上线；后续必须使用不重叠历史区间做 holdout。
 
 ## CI / 验证
 
-开发分支新增 `.github/workflows/v2-research-tests.yml`。PR 修改 backend 时，会在 GitHub Actions 使用 Python 3.12 自动执行全部后端 unittest。
-
-截至 Phase 3，云端测试已经覆盖：
+开发分支 CI 使用 Python 3.12 自动执行全部后端 unittest。现有测试覆盖：
 
 - 原 v1.12.4 保存、复盘、奖金、数据同步、开奖自动更新逻辑；
 - V2 理论碰撞、Conditional Random、多样性、Bootstrap；
@@ -159,30 +218,8 @@ V2 不再用完全无约束随机票作为主要对照，而是逐票匹配 CEWA
 - 修改票面后的完整性失败；
 - 非法 manifest 拒绝重新冻结；
 - API 保存后自动冻结；
-- 待开奖与已开奖复盘均验证 freeze integrity。
-
-## 与 v1.12.4 的关系
-
-现有生产模块仍然是：
-
-- `backend/engine.py`：Statistics Engine 与方案保存入口；
-- `backend/scorer.py`：Score Engine；
-- `backend/generator.py`：Combination Engine；
-- `backend/capital.py`：Capital Engine；
-- `backend/backtest.py`：滚动历史回测；
-- `backend/review.py`：开奖复盘。
-
-V2 在开发分支逐层接管研究、验证和审计能力，但当前不改变线上 `main`、GitHub Pages、Supabase 表结构和开奖自动更新链。
-
-## 后续门禁
-
-在 V2 替换正式推荐链之前，还需要：
-
-1. 完成真实全历史多窗口 × 多 seed 第一轮报告；
-2. 增加更长的 100 / 200 / 500 点 walk-forward 稳定性测试；
-3. 加入 worst-window、参数敏感性与跨时间段验证；
-4. 根据真实报告决定 Promote / Hold / Reject；
-5. 通过前端与移动端验收后，才考虑合并到 `main`。
+- 待开奖与已开奖复盘均验证 freeze integrity；
+- coverage-aware generator 的组合多样性必须优于 legacy generator。
 
 ## 生产发布原则
 
@@ -190,8 +227,9 @@ V2 在开发分支逐层接管研究、验证和审计能力，但当前不改�
 - GitHub Pages `gh-pages` 继续提供线上界面；
 - Supabase 云同步结构当前不变；
 - 自动开奖数据更新链不变；
-- V2 开发分支未通过测试和回测门禁之前，不替换线上推荐器；
-- 不以单期命中结果作为参数升级依据。
+- V2 开发分支未通过测试、开发 A/B 与独立 holdout 门禁之前，不替换线上推荐器；
+- 不以单期命中结果作为参数升级依据；
+- 不把开发诊断区间的改进直接当作样本外优势。
 
 ## 免责声明
 
