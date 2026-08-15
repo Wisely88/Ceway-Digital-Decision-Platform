@@ -1,0 +1,60 @@
+name: CEWAY V2 Feature Signal Audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/scorer.py"
+      - "backend/engine.py"
+      - "backend/research_v2.py"
+      - "scripts/run_v2_feature_signal_audit.py"
+      - ".github/workflows/v2-feature-signal-audit.yml"
+  workflow_dispatch:
+    inputs:
+      periods:
+        description: "Prediction points per consumed block"
+        required: false
+        default: "50"
+      windows:
+        description: "Comma-separated scoring windows"
+        required: false
+        default: "50,100,200"
+
+concurrency:
+  group: ceway-v2-feature-signal-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Run feature signal audit
+        env:
+          PERIODS: ${{ inputs.periods || '50' }}
+          WINDOWS: ${{ inputs.windows || '50,100,200' }}
+        run: |
+          python scripts/run_v2_feature_signal_audit.py \
+            --periods "$PERIODS" \
+            --windows "$WINDOWS" \
+            --output artifacts/ceway_v2_feature_signal_audit.json
+
+      - name: Upload feature audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ceway-v2-feature-signal-audit
+          path: artifacts/ceway_v2_feature_signal_audit.json
+          if-no-files-found: error
