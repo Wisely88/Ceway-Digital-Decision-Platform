@@ -1,4 +1,4 @@
-name: CEWAY V2.1 Exposure Holdout
+name: CEWAY V2.1 Fresh Exposure Holdout
 
 on:
   pull_request:
@@ -12,13 +12,13 @@ on:
   workflow_dispatch:
     inputs:
       periods:
-        description: "Holdout prediction points per configuration"
+        description: "Fresh holdout prediction points per configuration"
         required: false
         default: "50"
-      development_periods:
-        description: "Recent development points to exclude"
+      excluded_recent_points:
+        description: "Exclude recent dev50 + already-consumed V1 holdout50"
         required: false
-        default: "50"
+        default: "100"
       windows:
         description: "Comma-separated history windows"
         required: false
@@ -29,7 +29,7 @@ on:
         default: "3"
 
 concurrency:
-  group: ceway-v21-exposure-holdout-${{ github.event.pull_request.number || github.ref }}
+  group: ceway-v21-fresh-exposure-holdout-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -50,25 +50,29 @@ jobs:
       - name: Install backend dependencies
         run: python -m pip install -r backend/requirements.txt
 
-      - name: Run V2.1 non-overlapping historical holdout
+      - name: Verify generator and matched-random controls
+        working-directory: backend
+        run: python -m unittest tests.test_generator_v2 tests.test_random_control_v2 -v
+
+      - name: Run V2.1 fresh historical holdout
         env:
           PERIODS: ${{ inputs.periods || '50' }}
-          DEVELOPMENT_PERIODS: ${{ inputs.development_periods || '50' }}
+          EXCLUDED_RECENT_POINTS: ${{ inputs.excluded_recent_points || '100' }}
           WINDOWS: ${{ inputs.windows || '50,100,200' }}
           BASELINE_SEEDS: ${{ inputs.baseline_seeds || '3' }}
         run: |
           python scripts/run_v21_exposure_holdout.py \
             --periods "$PERIODS" \
-            --development-periods "$DEVELOPMENT_PERIODS" \
+            --excluded-recent-points "$EXCLUDED_RECENT_POINTS" \
             --windows "$WINDOWS" \
             --baseline-seeds "$BASELINE_SEEDS" \
             --budget 20 \
             --strategy balanced \
             --output artifacts/ceway_v21_exposure_holdout.json
 
-      - name: Upload V2.1 holdout report
+      - name: Upload V2.1 fresh holdout report
         uses: actions/upload-artifact@v4
         with:
-          name: ceway-v21-exposure-holdout
+          name: ceway-v21-fresh-exposure-holdout
           path: artifacts/ceway_v21_exposure_holdout.json
           if-no-files-found: error
