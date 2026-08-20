@@ -1,0 +1,64 @@
+{
+  "schema_version": "ceway.research-evidence-ledger.v2.1",
+  "status": "ACTIVE_PROSPECTIVE_VALIDATION",
+  "production_enabled": false,
+  "policy": {
+    "frozen_objects_are_immutable": true,
+    "historical_blocks_are_single_use_for_promotion_evidence": true,
+    "prospective_reviews_must_replay_frozen_tickets_without_regeneration": true,
+    "one_future_draw_is_evidence_not_proof": true,
+    "next_untouched_historical_block_min_excluded_recent_points": 250
+  },
+  "prospective_tracks": {
+    "DLT": {
+      "track_role": "predictive_candidate_forward_shadow",
+      "candidate_version": "fixed-window-100-exposure-v2.4",
+      "target_issue": "26092",
+      "history_cutoff_issue": "26091",
+      "freeze_sha256": "fc040de750c72dbd9b4734915e6ba0445e29fb38956b300c2e25949e0e5daf23",
+      "frozen_registry": "research/forward/dlt/26092-v24.json",
+      "reviewer": "scripts/review_dlt_forward_shadow.py",
+      "review_workflow": ".github/workflows/v24-dlt-forward-review.yml",
+      "current_expected_status": "PENDING_UNTIL_TARGET_DRAW",
+      "claim_scope": "Candidate passed fresh historical gate and may be evaluated prospectively; no production or certainty claim."
+    },
+    "SSQ": {
+      "track_role": "coverage_only_forward_shadow",
+      "candidate_version": "feature-pruned-shrink-v2.3+score-exposure-balanced-v2.1",
+      "target_issue": "2026094",
+      "history_cutoff_issue": "2026093",
+      "freeze_sha256": "e1579a38d10c25278060ac5bcf2ef7a8e9b2441fd391b8a35e64ed2137ebc1c7",
+      "frozen_registry": "research/shadow/ssq/2026094-v23-coverage-shadow.json",
+      "matched_random_controls": "research/shadow/ssq/2026094-v23-matched-random-controls.json",
+      "reviewer": "scripts/review_v23_ssq_shadow.py",
+      "review_workflow": ".github/workflows/v23-ssq-shadow-review.yml",
+      "control_count": 3,
+      "predictive_ranking_claim": false,
+      "current_expected_status": "PENDING_UNTIL_TARGET_DRAW",
+      "claim_scope": "Coverage-engineering shadow only; compare against pre-registered structure-matched random controls."
+    }
+  },
+  "consumed_historical_evidence": {
+    "recent_outcome_blocks": {
+      "minimum_consumed_recent_outcome_count": 200,
+      "reason": "development, V1 holdout, V2.1 holdout, V2.4 exclude-150 validation, and feature-pruned exclude-200 validation have inspected these outcome blocks."
+    },
+    "exclude_150_fresh_block": {
+      "consumed": true,
+      "DLT_outcomes": {"first_issue": "25042", "last_issue": "25091", "count": 50},
+      "SSQ_outcomes": {"first_issue": "2025045", "last_issue": "2025094", "count": 50},
+      "consumer": "fixed-window-100-exposure-v2.4"
+    },
+    "exclude_200_fresh_block": {
+      "consumed": true,
+      "DLT_outcomes": {"first_issue": "24144", "last_issue": "25041", "count": 50},
+      "SSQ_outcomes": {"first_issue": "2024146", "last_issue": "2025044", "count": 50},
+      "consumer": "feature-pruned-shrink-v2.3"
+    }
+  },
+  "next_actions": {
+    "DLT": "Do not alter the frozen candidate. When issue 26092 appears in history, run immutable review and append evidence.",
+    "SSQ": "Do not claim predictive ranking signal. When issue 2026094 appears, compare frozen coverage-only shadow against all three frozen matched-random controls.",
+    "historical_research": "Any new 50-outcome promotion holdout must be older than all consumed blocks and use at least excluded_recent_points=250 unless a stricter boundary is recorded first."
+  }
+}

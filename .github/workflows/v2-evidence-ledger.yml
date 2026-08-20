@@ -1,0 +1,38 @@
+name: CEWAY V2 Evidence Ledger
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "research/evidence-ledger-v2.json"
+      - "research/forward/dlt/26092-v24.json"
+      - "research/shadow/ssq/2026094-v23-coverage-shadow.json"
+      - "research/shadow/ssq/2026094-v23-matched-random-controls.json"
+      - "scripts/validate_evidence_ledger_v2.py"
+      - ".github/workflows/v2-evidence-ledger.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ceway-v2-evidence-ledger-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-ledger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Validate frozen evidence ledger
+        run: python scripts/validate_evidence_ledger_v2.py
