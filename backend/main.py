@@ -45,10 +45,16 @@ from generator import generate_plans, generate_ssq_plans, normalize_strategy
 from review import build_review, build_ssq_review, review_ssq_plan
 from prizes import load_prize_snapshot
 from scorer import score_back_numbers, score_front_numbers, score_ssq_back_numbers, score_ssq_front_numbers
+from dlt_lab_api import router as dlt_lab_router
+from ssq_lab_api import router as ssq_lab_router
+from ceway_runtime import RuntimeUnavailable, get_runtime_recommendation
+from predictor_v9 import DLT, SSQ, freeze_prediction, generate_prediction_v9
 
 
-app = FastAPI(title="Ceway v1.12.4 Stable API")
+app = FastAPI(title="Ceway v1.12.5 Stable API")
 ROOT_DIR = Path(__file__).resolve().parents[1]
+app.include_router(dlt_lab_router)
+app.include_router(ssq_lab_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -84,6 +90,50 @@ def next_issue_label(issue: str | None) -> str | None:
     return f"{int(issue) + 1:0{len(issue)}d}"
 
 
+def build_v9_plan(history: list[dict], spec, *, game: str, budget: int, cutoff_issue: str | None, seed: str) -> tuple[dict, dict]:
+    """Adapt the isolated V9 research output to the production plan contract."""
+    frozen = freeze_prediction(
+        generate_prediction_v9(
+            history,
+            spec,
+            budget=budget,
+            seed=seed,
+            history_cutoff_issue=cutoff_issue,
+        )
+    )
+    items = frozen["items"]
+    plan = {
+        "mode": "single",
+        "strategy": "balanced",
+        "source": "v9_prediction",
+        "prediction_source": "CEWAY-PRED-V9.0",
+        "algorithm_version": frozen["algorithm_version"],
+        "history_cutoff_issue": frozen["history_cutoff_issue"],
+        "recommended_issue": frozen["recommended_issue"],
+        "freeze_manifest": frozen["freeze_manifest"],
+        "research_guard": frozen["research_guard"],
+        "portfolio": frozen["portfolio"],
+        "cost": frozen["budget"],
+        "budget": budget,
+        "tickets": frozen["tickets"],
+        "total_bets": frozen["tickets"],
+        "unit_price": 2,
+        "multiplier": 1,
+        "items": items,
+        "score": round(sum(item.get("score", 0) for item in items), 4),
+        "reason": "V9 多窗口收缩评分、动量/稳定性与预算组合分散优化；仅作历史研究与组合辅助，不代表未来中奖概率。",
+        "score_basis": "CEWAY-PRED-V9.0：20/50/100/200 窗口、Beta-Binomial 收缩、近期衰减、动量、稳定性与组合多样性。",
+    }
+    plan["budget_analysis"] = {
+        "budget": budget,
+        "cost": plan["cost"],
+        "unused": max(0, budget - plan["cost"]),
+        "utilization": round(plan["cost"] / max(1, budget) * 100, 1),
+    }
+    score_payload = frozen["score_table"]
+    return plan, score_payload
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -107,6 +157,26 @@ def scenes() -> list[dict]:
     ]
 
 
+@app.get("/runtime/{game}/recommendation")
+def runtime_recommendation(
+    game: str,
+    refresh: bool = Query(default=False),
+    min_cost: int = Query(default=18, ge=2, le=100),
+    max_cost: int = Query(default=24, ge=2, le=200),
+) -> dict:
+    try:
+        return get_runtime_recommendation(
+            game,
+            refresh=refresh,
+            min_cost=min_cost,
+            max_cost=max_cost,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 def build_dlt_payload(
     budget: int,
     last_prize: float,
@@ -121,16 +191,15 @@ def build_dlt_payload(
     selected_strategy = normalize_strategy(strategy, mode)
     history = load_dlt_history()
     trends = calculate_trends(history, window=window)
-    score_table = score_front_numbers(trends)
-    back_scores = score_back_numbers(trends)
-    plans = generate_plans(
-        budget=budget,
-        strategy=selected_strategy,
-        score_table=score_table,
-        back_scores=back_scores,
-        mode=mode,
-        variant=variant,
+    latest_row = history[-1] if history else None
+    based_on_issue = latest_row["issue"] if latest_row else None
+    v9_plan, v9_scores = build_v9_plan(
+        history, DLT, game="DLT", budget=budget,
+        cutoff_issue=based_on_issue, seed=f"ceway-v9-dlt-{variant}",
     )
+    plans = [v9_plan]
+    score_table = v9_scores["front"]
+    back_scores = v9_scores["back"]
     capital = capital_state(
         last_prize=last_prize,
         principal=principal,
@@ -138,8 +207,6 @@ def build_dlt_payload(
         level_units=level_units,
     )
     top_numbers = [item["number"] for item in score_table[:5]]
-    latest_row = history[-1] if history else None
-    based_on_issue = latest_row["issue"] if latest_row else None
     recommended_issue = next_issue_label(based_on_issue)
     for plan in plans:
         plan["scene"] = "DLT"
@@ -153,7 +220,7 @@ def build_dlt_payload(
             "rule": "大乐透：前区 35 选 5，后区 12 选 2。胆拖费用 = C(拖码数, 5 - 胆码数) × C(后区号码数, 2) × 2 元。",
         }
         plan["based_on_issue"] = based_on_issue
-        plan["recommended_issue"] = recommended_issue
+        plan["recommended_issue"] = recommended_issue or plan.get("recommended_issue")
         plan["recommendation_label"] = (
             f"基于第 {based_on_issue} 期开奖数据，生成第 {recommended_issue} 期推荐方案。"
             if based_on_issue and recommended_issue
@@ -169,7 +236,9 @@ def build_dlt_payload(
             "subtitle": "Digital Decision Platform",
             "framework": "Powered by CBGO Framework",
             "baseline": "v1.2 MVP",
-            "version": "v1.12.4 Stable",
+        "version": "v1.12.5 Stable",
+        "prediction_engine": "CEWAY-PRED-V9.0",
+        "prediction_mode": "research-integrated",
         },
         "disclaimer": "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
         "history_count": len(history),
@@ -187,6 +256,8 @@ def build_dlt_payload(
             "last_sync": storage_status.get("last_sync"),
         },
         "top_numbers": top_numbers,
+        "prediction_engine": "CEWAY-PRED-V9.0",
+        "prediction_guard": "历史研究与组合辅助，不代表未来中奖概率。",
         "budget": budget,
         "strategy": selected_strategy,
         "window": trends["window"],
@@ -427,16 +498,15 @@ def build_ssq_payload(
     selected_strategy = normalize_strategy(strategy, mode)
     history = load_ssq_history()
     trends = calculate_ssq_trends(history, window=window)
-    score_table = score_ssq_front_numbers(trends)
-    back_scores = score_ssq_back_numbers(trends)
-    plans = generate_ssq_plans(
-        budget=budget,
-        strategy=selected_strategy,
-        score_table=score_table,
-        back_scores=back_scores,
-        mode=mode,
-        variant=variant,
+    latest_row = history[-1] if history else None
+    based_on_issue = latest_row["issue"] if latest_row else None
+    v9_plan, v9_scores = build_v9_plan(
+        history, SSQ, game="SSQ", budget=budget,
+        cutoff_issue=based_on_issue, seed=f"ceway-v9-ssq-{variant}",
     )
+    plans = [v9_plan]
+    score_table = v9_scores["front"]
+    back_scores = v9_scores["back"]
     capital = capital_state(
         last_prize=last_prize,
         principal=principal,
@@ -444,8 +514,6 @@ def build_ssq_payload(
         level_units=level_units,
     )
     top_numbers = [item["number"] for item in score_table[:6]]
-    latest_row = history[-1] if history else None
-    based_on_issue = latest_row["issue"] if latest_row else None
     recommended_issue = next_issue_label(based_on_issue)
     for plan in plans:
         plan["scene"] = "SSQ"
@@ -459,7 +527,7 @@ def build_ssq_payload(
             "rule": "双色球：红球 33 选 6，蓝球 16 选 1。胆拖费用 = C(拖码数, 6 - 胆码数) × 蓝球个数 × 2 元。",
         }
         plan["based_on_issue"] = based_on_issue
-        plan["recommended_issue"] = recommended_issue
+        plan["recommended_issue"] = recommended_issue or plan.get("recommended_issue")
         plan["recommendation_label"] = (
             f"基于第 {based_on_issue} 期开奖数据，生成第 {recommended_issue} 期推荐方案。"
             if based_on_issue and recommended_issue
@@ -475,7 +543,9 @@ def build_ssq_payload(
             "subtitle": "Digital Decision Platform",
             "framework": "Powered by CBGO Framework",
             "baseline": "v1.2 MVP",
-            "version": "v1.12.4 Stable",
+        "version": "v1.12.5 Stable",
+        "prediction_engine": "CEWAY-PRED-V9.0",
+        "prediction_mode": "research-integrated",
         },
         "disclaimer": "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
         "history_count": len(history),
@@ -486,6 +556,8 @@ def build_ssq_payload(
         "scoreboard": score_table,
         "back_scoreboard": back_scores,
         "top_front": top_numbers,
+        "prediction_engine": "CEWAY-PRED-V9.0",
+        "prediction_guard": "历史研究与组合辅助，不代表未来中奖概率。",
         "capital": capital,
         "storage": storage_status,
     }

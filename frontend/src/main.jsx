@@ -14,6 +14,7 @@ import {
   GitCompare,
   FileStack,
   FileUp,
+  FlaskConical,
   Gauge,
   History,
   Home,
@@ -59,9 +60,11 @@ import {
 import { createRecordId } from "./recordIdentity.js";
 import { buildDecisionBrief, cumulativeSpending, recentPrizeWinnings, recentSpending } from "./decision";
 import { evaluatePackage, packageCatalog, PACKAGE_SOURCES } from "./packageEvaluator";
+import { fitCombinedPlanInputs } from "./planBudget";
 import { selectScoredCombination } from "./suggestionRotation";
 import { decodeSyncBundle, encodeSyncBundle } from "./syncCodec";
 import { mirrorCloudRecord, notifyCloudDataChanged, removeCloudRecord } from "./cloudSync";
+import RuntimeRecommendation from "./RuntimeRecommendation";
 import "./styles.css";
 
 const BUILD_TIME = typeof __CEWAY_BUILD_TIME__ === "string" ? __CEWAY_BUILD_TIME__ : "";
@@ -70,6 +73,8 @@ const TrendLineChartView = lazy(() => import("./Charts").then((module) => ({ def
 const CapitalSpendChartView = lazy(() => import("./Charts").then((module) => ({ default: module.CapitalSpendChart })));
 const CloudSyncPanelView = lazy(() => import("./CloudSyncPanel"));
 const CloudSyncAgentView = lazy(() => import("./CloudSyncPanel").then((module) => ({ default: module.CloudSyncAgent })));
+const DltLab = lazy(() => import("./DltLab"));
+const SsqLab = lazy(() => import("./SsqLab"));
 
 function ChartFallback({ height = 250 }) {
   return <div className="chart-loading" style={{ minHeight: height }}>正在加载图表...</div>;
@@ -490,7 +495,9 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
       play_name: rules.playName,
       play_labels: labels,
       mode: "single",
-      source: "rule_suggestion",
+      source: "v9_prediction",
+      prediction_source: "CEWAY-PRED-V9.0",
+      algorithm_version: "CEWAY-PRED-V9.0",
       strategy: "manual_workbench",
       based_on_issue: latestIssue,
       recommended_issue: recommendedIssue,
@@ -504,7 +511,7 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
       items,
       reason: `按历史评分与结构筛选生成 ${items.length} 注单式 × ${multiplier} 倍，${appended ? "已追加投注，" : ""}费用 ${cost} 元。`,
       explanation: aiCommentaryForPlan({ mode: "single" }, labels),
-      score_basis: `${labels.front}和${labels.back}均先按热度0.4 + 遗漏0.3 + 历史结构平衡0.3评分，再从高分候选带生成变体。`,
+      score_basis: "号码来自 CEWAY-PRED-V9.0：20/50/100/200 窗口收缩评分、近期衰减、动量、稳定性与组合分散约束。",
       budget_analysis: {
         budget: Number(budget || 0),
         cost,
@@ -523,15 +530,15 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
     const items = expandCompoundItems(frontPool, backPool, rules);
     const cost = items.length * unitPrice;
     return {
-      scene, play_name: rules.playName, play_labels: labels, mode: "compound", source: "rule_suggestion",
+      scene, play_name: rules.playName, play_labels: labels, mode: "compound", source: "v9_prediction", prediction_source: "CEWAY-PRED-V9.0", algorithm_version: "CEWAY-PRED-V9.0",
       strategy: "manual_workbench", based_on_issue: latestIssue, recommended_issue: recommendedIssue,
       recommendation_label: `基于第 ${latestIssue || "-"} 期开奖数据，生成第 ${recommendedIssue || "下一"} 期历史结构复式方案。`,
       appended: scene === "DLT" && appended, unit_price: unitPrice, front_pool: frontPool, back_pool: backPool,
       front_pool_display: displayNumbers(frontPool), back_pool_display: displayNumbers(backPool),
       cost, tickets: items.length, items,
       reason: `复式选择 ${frontPool.length} 个${labels.front}、${backPool.length} 个${labels.back}，展开 ${items.length} 注。`,
-      explanation: ["号码先按冷热、遗漏、奇偶、大小与和值结构评分，再展开复式组合。"],
-      score_basis: "历史指标仅用于筛选和分散组合，不改变每个号码的随机开奖概率。",
+      explanation: ["号码先按 V9 多窗口收缩评分，再展开预算内复式组合。"],
+      score_basis: "号码来自 CEWAY-PRED-V9.0：20/50/100/200 窗口收缩评分、近期衰减、动量、稳定性与组合分散约束。",
       budget_analysis: { budget: Number(budget || 0), cost, unused: Math.max(0, Number(budget || 0) - cost), utilization: Number(budget || 0) ? Math.round((cost / Number(budget || 0)) * 10000) / 100 : 0, explanation: cost <= Number(budget || 0) ? "复式方案在当前预算内。" : "复式展开后超过预算，请减少号码池数量。" },
     };
   }
@@ -558,7 +565,9 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
     play_name: rules.playName,
     play_labels: labels,
     mode: "dantuo",
-    source: "rule_suggestion",
+    source: "v9_prediction",
+    prediction_source: "CEWAY-PRED-V9.0",
+    algorithm_version: "CEWAY-PRED-V9.0",
     strategy: "manual_workbench",
     appended: scene === "DLT" && appended,
     unit_price: unitPrice,
@@ -575,7 +584,7 @@ function buildAiBettingPlan({ scene, scoreRows, backScoreRows, budget, mode, tic
     tickets,
     reason: `按用户指定的 ${frontDan.length} 胆 ${frontTuo.length} 拖生成，费用 ${cost} 元。`,
     explanation: aiCommentaryForPlan({ mode: "dantuo" }, labels),
-    score_basis: `${labels.front}和${labels.back}均先按热度0.4 + 遗漏0.3 + 历史结构平衡0.3评分；${scene === "DLT" ? "再执行前区胆码与后区去重、后区非连号约束；" : ""}${labels.back}${back.map((number) => `${formatNumber(number)}(${backScoreMap.get(number)?.total_score ?? backScoreMap.get(number)?.score ?? 0}分)`).join("、")}。`,
+    score_basis: `号码来自 CEWAY-PRED-V9.0：20/50/100/200 窗口收缩评分、近期衰减、动量与稳定性；${scene === "DLT" ? "再执行前区胆码与后区去重、后区非连号约束；" : ""}${labels.back}${back.map((number) => `${formatNumber(number)}(${backScoreMap.get(number)?.total_score ?? backScoreMap.get(number)?.score ?? 0}分)`).join("、")}。`,
     budget_analysis: {
       budget: Number(budget || 0),
       cost,
@@ -804,7 +813,9 @@ function scoreSortLabel(sortKey) {
 }
 
 const MODULE_NAV_ITEMS = [
+  { key: "today", label: "今日推荐", icon: Sparkles },
   { key: "data", label: "选号工作台", icon: FileStack },
+  { key: "lab", label: "号码实验室", icon: FlaskConical },
   { key: "review", label: "当期复盘", icon: GitCompare },
   { key: "trends", label: "历史数据", icon: TrendingUp },
 ];
@@ -814,9 +825,9 @@ const MODULE_TITLES = MODULE_NAV_ITEMS.reduce((items, item) => ({
   [item.key]: item.label,
 }), {});
 
-function initialModuleFromUrl() {
+function initialModuleFromUrl(scene = "DLT") {
   const requested = new URLSearchParams(window.location.search).get("module");
-  return MODULE_NAV_ITEMS.some((item) => item.key === requested) ? requested : "data";
+  return MODULE_NAV_ITEMS.some((item) => item.key === requested) ? requested : "today";
 }
 
 function updateModuleUrl(module) {
@@ -849,7 +860,7 @@ function AppSidebar({ scenes, active = "DLT", activeModule = "overview", onModul
               type="button"
             >
               <Icon size={18} />
-              <span>{item.label}</span>
+              <span>{item.key === "lab" ? `${active === "SSQ" ? "双色球" : "大乐透"}实验室` : item.label}</span>
             </button>
           );
         })}
@@ -909,7 +920,7 @@ function SceneSelect({ scenes, onEnter }) {
       <section className="scene-shell">
         <div className="scene-shell-title">
           <div>
-            <Badge tone="live">v1.12.4 后区走势版</Badge>
+            <Badge tone="live">v1.12.5 预算闭环版</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
             <p>选择彩种，进入选号、保存和开奖复盘流程。</p>
           </div>
@@ -1317,13 +1328,14 @@ function ScoreTable({ rows, selectedNumbers = [] }) {
 function DecisionBrief({ brief }) {
   if (!brief) return null;
   const RiskIcon = brief.risk_tone === "safe" ? CircleCheck : AlertTriangle;
+  const riskLabel = brief.risk_enabled === false ? "提醒已关闭" : `${brief.risk_level}风险`;
 
   return (
     <section className={`decision-brief risk-${brief.risk_tone}`} aria-label="本期决策体检">
       <div className="decision-brief-head">
         <div>
           <span>本期决策体检</span>
-          <strong>{brief.risk_level}风险</strong>
+          <strong>{riskLabel}</strong>
         </div>
         <RiskIcon size={20} />
       </div>
@@ -1394,7 +1406,7 @@ function CapitalPanel({
           <p>看清支出、资金暴露和加码行为；未中奖不追投</p>
         </div>
         <Badge tone={brief?.risk_tone === "safe" ? "live" : "default"}>
-          {brief ? `${brief.risk_level}风险` : "等待方案"}
+          {brief ? (brief.risk_enabled === false ? "提醒已关闭" : `${brief.risk_level}风险`) : "等待方案"}
         </Badge>
       </div>
 
@@ -1592,7 +1604,7 @@ function PlanCard({ plan, onSave, onRemove }) {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   if (!plan) return null;
-  const saveBlocked = false;
+  const brief = plan.decision_brief;
 
   const labels = {
     front: "前区",
@@ -1625,6 +1637,7 @@ function PlanCard({ plan, onSave, onRemove }) {
 
   const save = async () => {
     if (!onSave || saving) return;
+    if (brief?.risk_tone === "stop" && !window.confirm(`${brief.action}\n\n仍要保存这个方案用于复盘吗？`)) return;
     setSaving(true);
     try {
       await onSave(plan);
@@ -1641,6 +1654,7 @@ function PlanCard({ plan, onSave, onRemove }) {
         </Badge>
         <strong>{plan.cost} 元 · {plan.tickets} 注{plan.mode === "single" ? ` × ${Number(plan.multiplier || 1)} 倍` : ""}</strong>
       </div>
+      {plan.prediction_source && <div className="plan-prediction-source">智能推荐引擎：{plan.prediction_source}</div>}
       {plan.appended && <Badge tone="live">大乐透追加投注 · 每注3元</Badge>}
       {plan.mode === "single" && Number(plan.multiplier || 1) > 1 && <Badge>单式倍投 · {plan.multiplier} 倍</Badge>}
       <div className="plan-issue">
@@ -1648,9 +1662,6 @@ function PlanCard({ plan, onSave, onRemove }) {
         <strong>{plan.recommended_issue ? `第 ${plan.recommended_issue} 期` : "下一期开奖"}</strong>
         <p>{plan.recommendation_label || "基于当前最新开奖数据生成下一期开奖推荐方案。"}</p>
       </div>
-      <p className="plan-rule">{labels.rule}</p>
-      {plan.reason && <p className="plan-reason">{plan.reason}</p>}
-      {plan.score_basis && <p className="plan-score-basis">{plan.score_basis}</p>}
       {plan.mode === "package" ? (
         <PackagePlanBreakdown labels={labels} plan={plan} />
       ) : plan.mode === "dantuo" ? (
@@ -1683,10 +1694,33 @@ function PlanCard({ plan, onSave, onRemove }) {
           ))}
         </div>
       )}
-      {plan.mode === "dantuo" && plan.explanation?.length > 0 && (
-        <div className="number-explanations">
-          {plan.explanation.map((item) => <span key={item}>{item}</span>)}
-        </div>
+      <details className="plan-method-details">
+        <summary>查看生成依据</summary>
+        <p className="plan-rule">{labels.rule}</p>
+        {plan.reason && <p className="plan-reason">{plan.reason}</p>}
+        {plan.score_basis && <p className="plan-score-basis">{plan.score_basis}</p>}
+        {plan.explanation?.length > 0 && (
+          <div className="number-explanations">
+            {plan.explanation.map((item) => <span key={item}>{item}</span>)}
+          </div>
+        )}
+      </details>
+      {brief && (
+        <details className={`plan-decision-summary risk-${brief.risk_tone}`}>
+          <summary>
+            <span>决策说明</span>
+            <strong>{brief.risk_enabled === false ? "提醒已关闭" : `${brief.risk_level}风险`} · 支出 {brief.cost}/{brief.budget} 元</strong>
+          </summary>
+          <div className="plan-decision-body">
+            <p>{brief.action}</p>
+            <dl>
+              <div><dt>覆盖方式</dt><dd>{brief.coverage_label}</dd></div>
+              <div><dt>近30日净投入</dt><dd>{brief.projected_period_net_spend}/{brief.period_cap} 元</dd></div>
+              <div><dt>本金占用</dt><dd>{brief.principal_exposure}%</dd></div>
+            </dl>
+            <ul>{brief.signals.slice(0, 3).map((signal) => <li key={signal}>{signal}</li>)}</ul>
+          </div>
+        </details>
       )}
       <div className="plan-actions">
         <button className="icon-button text-button" onClick={copy} type="button">
@@ -1694,9 +1728,9 @@ function PlanCard({ plan, onSave, onRemove }) {
           {copied ? "已复制" : "复制方案"}
         </button>
         {onSave && (
-          <button className="icon-button text-button" disabled={saving || saveBlocked} onClick={save} title={saveBlocked ? "请先按风险提示降低预算或停止连续加码" : "保存后等待开奖复盘"} type="button">
+          <button className="icon-button text-button" disabled={saving} onClick={save} title="保存后等待开奖复盘" type="button">
             <Save size={16} />
-            {saving ? "保存中..." : saveBlocked ? "风险过高，暂不保存" : "保存方案"}
+            {saving ? "保存中..." : "保存方案"}
           </button>
         )}
         {onRemove && <button className="ghost-button compact" onClick={onRemove} type="button">移除</button>}
@@ -2270,6 +2304,7 @@ function PackageEvaluator({ scene, budget, dashboard, onGenerated, decisionConte
           <span>当前口径</span>
           <strong>{source.label}</strong>
           <p>{source.region}。{source.activity}</p>
+          <p className="package-source-meta">规则日期 {source.referenceDate} · {source.status}</p>
         </div>
         <a href={source.sourceUrl} rel="noreferrer" target="_blank">查看官方规则</a>
       </div>
@@ -2347,6 +2382,8 @@ function BettingPlanPanel({
   decisionContext,
   periodCap,
   onPeriodCapChange,
+  budgetRiskEnabled,
+  onBudgetRiskEnabledChange,
 }) {
   const rules = sceneRules(scene);
   const labels = planLabelsForScene(scene);
@@ -2367,6 +2404,18 @@ function BettingPlanPanel({
   const variantStorageKey = `ceway_${scene.toLowerCase()}_suggestion_variant`;
   const [variant, setVariant] = useState(() => Number(sessionStorage.getItem(variantStorageKey) || 0));
   const [appended, setAppended] = useState(false);
+  const unitPrice = scene === "DLT" && appended ? 3 : 2;
+  const combinedFit = useMemo(() => fitCombinedPlanInputs({
+    rules,
+    budget,
+    unitPrice,
+    ticketCount,
+    singleMultiplier,
+    danCount,
+    tuoCount,
+    compoundFrontCount,
+    backCount,
+  }), [rules.frontPick, rules.backPick, rules.frontMax, rules.backMax, budget, unitPrice, ticketCount, singleMultiplier, danCount, tuoCount, compoundFrontCount, backCount]);
 
   const addGeneratedPlans = (plans) => {
     onGenerated(plans.length ? { ...plans[0], comparison_plans: plans } : null);
@@ -2407,39 +2456,50 @@ function BettingPlanPanel({
 
   const createAiPlan = () => {
     try {
+      if (mode === "all" && !combinedFit.fits) {
+        setMessage(`三种玩法同时生成至少需要 ${combinedFit.minimumCost} 元，请提高本期上限或改为单独生成。`);
+        return;
+      }
+      if (mode !== "all" && estimatedCost > budget) {
+        setMessage(`当前${planModeLabel(mode)}结构超出本期上限 ${estimatedCost - budget} 元，请减少号码、注数或倍数。`);
+        return;
+      }
       const nextVariant = variant + 1;
       const requestedModes = mode === "all" ? ["dantuo", "compound", "single"] : [mode];
       const optionSpecs = requestedModes.map((optionMode, offset) => ({ optionLabel: `${planModeLabel(optionMode)}推荐`, optionMode, offset }));
-      const comparisonPlans = optionSpecs.map(({ optionLabel, optionMode, offset }) => {
+      const rawPlans = optionSpecs.map(({ optionLabel, optionMode, offset }) => {
+        const fitted = mode === "all" ? combinedFit : null;
         const plan = buildAiBettingPlan({
           scene,
           scoreRows,
           backScoreRows,
           budget,
           mode: optionMode,
-          ticketCount,
-          singleMultiplier: optionMode === "single" ? singleMultiplier : 1,
-          danCount,
-          tuoCount: optionMode === "compound" ? compoundFrontCount : tuoCount,
-          backCount,
+          ticketCount: optionMode === "single" ? (fitted?.ticketCount || ticketCount) : ticketCount,
+          singleMultiplier: optionMode === "single" ? (fitted?.singleMultiplier || singleMultiplier) : 1,
+          danCount: fitted?.danCount || danCount,
+          tuoCount: optionMode === "compound" ? (fitted?.compoundFrontCount || compoundFrontCount) : (fitted?.tuoCount || tuoCount),
+          backCount: fitted?.backCount || backCount,
           latestIssue: dashboard.latest_issue,
           recommendedIssue: dashboard.recommended_issue,
           variant: nextVariant + offset,
           appended,
         });
-        return {
-          ...plan,
-          option_label: optionLabel,
-          generation_variant: nextVariant + offset,
-          decision_brief: buildDecisionBrief({ plan, budget, ...decisionContext }),
-        };
+        return { ...plan, option_label: optionLabel, generation_variant: nextVariant + offset };
       });
+      const batchCost = rawPlans.reduce((sum, plan) => sum + Number(plan.cost || 0), 0);
+      const comparisonPlans = rawPlans.map((plan) => ({
+        ...plan,
+        batch_budget: budget,
+        batch_cost: batchCost,
+        decision_brief: buildDecisionBrief({ plan, budget, ...decisionContext }),
+      }));
       const plan = comparisonPlans[0];
       const followingVariant = nextVariant + Math.max(1, optionSpecs.length);
       setVariant(followingVariant);
       sessionStorage.setItem(variantStorageKey, String(followingVariant));
       addGeneratedPlans(comparisonPlans);
-      setMessage(`第 ${nextVariant} 批智能推荐已生成，已加入本期号码组合。`);
+      setMessage(`第 ${nextVariant} 批智能推荐已生成，合计 ${batchCost} 元${mode === "all" && combinedFit.adjusted ? "，结构已按本期上限自动调整" : ""}。`);
       revealGenerated();
     } catch (err) {
       setMessage(err.message);
@@ -2448,13 +2508,24 @@ function BettingPlanPanel({
 
   const createRandomPlan = () => {
     try {
+      if (mode === "all" && !combinedFit.fits) {
+        setMessage(`三种玩法同时生成至少需要 ${combinedFit.minimumCost} 元，请提高本期上限或改为单独生成。`);
+        return;
+      }
+      if (mode !== "all" && estimatedCost > budget) {
+        setMessage(`当前${planModeLabel(mode)}结构超出本期上限 ${estimatedCost - budget} 元，请减少号码、注数或倍数。`);
+        return;
+      }
       const requestedModes = mode === "all" ? ["dantuo", "compound", "single"] : [mode];
-      const comparisonPlans = requestedModes.map((optionMode, index) => {
-        const plan = buildRandomBettingPlan({ scene, mode: optionMode, ticketCount, singleMultiplier: optionMode === "single" ? singleMultiplier : 1, danCount, tuoCount: optionMode === "compound" ? compoundFrontCount : tuoCount, backCount, latestIssue: dashboard.latest_issue, recommendedIssue: dashboard.recommended_issue, appended });
-        return { ...plan, option_label: `${planModeLabel(optionMode)}随机`, generation_variant: Date.now() + index, decision_brief: buildDecisionBrief({ plan, budget, ...decisionContext }) };
+      const rawPlans = requestedModes.map((optionMode, index) => {
+        const fitted = mode === "all" ? combinedFit : null;
+        const plan = buildRandomBettingPlan({ scene, mode: optionMode, ticketCount: optionMode === "single" ? (fitted?.ticketCount || ticketCount) : ticketCount, singleMultiplier: optionMode === "single" ? (fitted?.singleMultiplier || singleMultiplier) : 1, danCount: fitted?.danCount || danCount, tuoCount: optionMode === "compound" ? (fitted?.compoundFrontCount || compoundFrontCount) : (fitted?.tuoCount || tuoCount), backCount: fitted?.backCount || backCount, latestIssue: dashboard.latest_issue, recommendedIssue: dashboard.recommended_issue, appended });
+        return { ...plan, option_label: `${planModeLabel(optionMode)}随机`, generation_variant: Date.now() + index };
       });
+      const batchCost = rawPlans.reduce((sum, plan) => sum + Number(plan.cost || 0), 0);
+      const comparisonPlans = rawPlans.map((plan) => ({ ...plan, batch_budget: budget, batch_cost: batchCost, decision_brief: buildDecisionBrief({ plan, budget, ...decisionContext }) }));
       addGeneratedPlans(comparisonPlans);
-      setMessage("纯随机号码已生成，未使用冷热、遗漏或评分数据。");
+      setMessage(`纯随机号码已生成，合计 ${batchCost} 元；未使用冷热、遗漏或评分数据。`);
       revealGenerated();
     } catch (err) {
       setMessage(err.message);
@@ -2495,8 +2566,14 @@ function BettingPlanPanel({
   };
 
   const saveAllGenerated = async () => {
-    const plans = generated?.comparison_plans || [];
+    const plans = (generated?.comparison_plans || []).map((plan) => ({
+      ...plan,
+      decision_brief: buildDecisionBrief({ plan, budget, ...decisionContext }),
+    }));
     if (!onSaveAll || plans.length < 2 || savingAll) return;
+    const totalCost = plans.reduce((sum, plan) => sum + Number(plan.cost || 0), 0);
+    const hasStopRisk = plans.some((plan) => plan.decision_brief?.risk_tone === "stop");
+    if (budgetRiskEnabled && (totalCost > budget || hasStopRisk) && !window.confirm(`本批方案合计 ${totalCost} 元，当前存在高风险提醒。仍要全部保存用于复盘吗？`)) return;
     setSavingAll(true);
     try {
       await onSaveAll(plans);
@@ -2511,7 +2588,12 @@ function BettingPlanPanel({
   const safeSingleMultiplier = Math.max(1, Math.min(99, Math.floor(Number(singleMultiplier || 1))));
   const estimatedTickets = mode === "all" ? dantuoTickets + compoundTickets + singleTickets : mode === "dantuo" ? dantuoTickets : mode === "compound" ? compoundTickets : singleTickets;
   const estimatedPaidTickets = mode === "all" ? dantuoTickets + compoundTickets + singleTickets * safeSingleMultiplier : mode === "single" ? singleTickets * safeSingleMultiplier : estimatedTickets;
-  const estimatedCost = Math.max(0, estimatedPaidTickets * (scene === "DLT" && appended ? 3 : 2));
+  const estimatedCost = mode === "all" && combinedFit.fits ? combinedFit.cost : Math.max(0, estimatedPaidTickets * unitPrice);
+  const generationOverBudget = mode !== "all" && estimatedCost > budget;
+  const currentPlans = generated?.comparison_plans || (generated ? [generated] : []);
+  const generatedCost = currentPlans.reduce((sum, plan) => sum + Number(plan.cost || 0), 0);
+  const generatedTickets = currentPlans.reduce((sum, plan) => sum + Number(plan.tickets || 0), 0);
+  const batchBrief = currentPlans.length ? buildDecisionBrief({ plan: { mode: currentPlans.length > 1 ? "batch" : currentPlans[0].mode, cost: generatedCost, tickets: generatedTickets }, budget, ...decisionContext }) : null;
 
   return (
     <section className="panel wide betting-panel" id="module-data">
@@ -2544,7 +2626,23 @@ function BettingPlanPanel({
 
       <div className={`betting-workspace ${flow}-workspace`}>
         {flow !== "package" && <div className="betting-controls">
+          <div className={`budget-risk-toolbar ${budgetRiskEnabled ? "is-on" : "is-off"}`}>
+            <label className="budget-risk-toggle">
+              <input checked={budgetRiskEnabled} type="checkbox" onChange={(event) => onBudgetRiskEnabledChange(event.target.checked)} />
+              <span>预算风险提醒</span>
+              <strong>{budgetRiskEnabled ? "已开启" : "已关闭"}</strong>
+            </label>
+            <label className="budget-risk-limit">
+              近30日额度
+              <input min="2" step="10" type="number" value={periodCap} onChange={(event) => onPeriodCapChange(Math.max(2, Number(event.target.value) || 2))} />
+            </label>
+            <p>{budgetRiskEnabled ? "计入奖金抵扣后，超过额度会提醒，但不会阻止保存。" : "关闭后不再判断预算风险；本期支出上限仍控制生成费用。"}</p>
+          </div>
           <div className="field-grid compact-fields">
+            <label>
+              本期支出上限
+              <input min="2" step="2" type="number" value={budget} onChange={(event) => onBudgetChange(Math.max(2, Number(event.target.value) || 2))} />
+            </label>
             <label>
               玩法
               <select value={mode} onChange={(event) => setMode(event.target.value)}>
@@ -2595,10 +2693,10 @@ function BettingPlanPanel({
 
           {flow === "smart" || flow === "random" ? (
             <div className="betting-estimate">
-              <div><span>号码组合</span><strong>{estimatedTickets || 0} 注</strong></div>
+              <div><span>号码组合</span><strong>{mode === "all" && combinedFit.fits ? combinedFit.tickets : estimatedTickets || 0} 注</strong></div>
               <div><span>预计费用</span><strong>{estimatedCost || 0} 元</strong></div>
-              <div><span>计费注数</span><strong>{estimatedPaidTickets || 0} 注</strong></div>
-              <button className="primary-button strong" onClick={flow === "smart" ? createAiPlan : createRandomPlan} type="button">
+              <div><span>预算状态</span><strong>{mode === "all" && !combinedFit.fits ? `至少 ${combinedFit.minimumCost} 元` : generationOverBudget ? `超出 ${estimatedCost - budget} 元` : `${Math.max(0, budget - estimatedCost)} 元余量`}</strong></div>
+              <button className="primary-button strong" disabled={(mode === "all" && !combinedFit.fits) || generationOverBudget} onClick={flow === "smart" ? createAiPlan : createRandomPlan} type="button">
                 <Play size={16} />
                 {flow === "smart" ? "生成智能推荐" : "生成随机号码"}
               </button>
@@ -2672,6 +2770,14 @@ function BettingPlanPanel({
 
       {generated && (
         <div className="betting-result" id="generated-plan-result">
+          {batchBrief && (
+            <div className={`batch-decision-bar risk-${batchBrief.risk_tone}`}>
+              <div><span>本批合计</span><strong>{generatedCost} / {budget} 元</strong></div>
+              <div><span>总覆盖</span><strong>{generatedTickets} 注</strong></div>
+              <div><span>风险结论</span><strong>{batchBrief.risk_enabled === false ? "提醒已关闭" : `${batchBrief.risk_level}风险`}</strong></div>
+              <p>{batchBrief.action}</p>
+            </div>
+          )}
           <div className="section-kicker">
             <div className="section-kicker-copy">
               <span>当前生成结果</span>
@@ -2684,17 +2790,65 @@ function BettingPlanPanel({
               </button>
             )}
           </div>
-          <div className={generated.comparison_plans?.length ? "plan-comparison-grid" : ""}>
+          <div className={(generated.comparison_plans?.length || 0) > 1 ? "plan-comparison-grid" : ""}>
             {(generated.comparison_plans || [generated]).map((plan, index) => (
               <PlanCard
                 key={`${plan.option_label || "manual"}-${plan.generation_variant || 0}`}
-                plan={plan}
+                plan={{ ...plan, decision_brief: buildDecisionBrief({ plan, budget, ...decisionContext }) }}
                 onSave={onSave}
                 onRemove={() => removeGeneratedPlan(index)}
               />
             ))}
           </div>
         </div>
+      )}
+    </section>
+  );
+}
+
+function HistoryWorkspace({
+  dashboard,
+  scoreRows,
+  backScoreRows,
+  windowSize,
+  onWindowChange,
+  dataStorage,
+  draws,
+  onSearchDraws,
+  onPageDraws,
+  onSync,
+  backtest,
+  onRefreshBacktest,
+  strategy,
+  onStrategyChange,
+  behavior,
+  onRefreshBehavior,
+}) {
+  const [view, setView] = useState("trends");
+
+  return (
+    <section className="history-workspace">
+      <div className="history-view-tabs" role="tablist" aria-label="历史数据视图">
+        <button aria-selected={view === "trends"} className={view === "trends" ? "active" : ""} onClick={() => setView("trends")} role="tab" type="button"><TrendingUp size={16} />走势与评分</button>
+        <button aria-selected={view === "draws"} className={view === "draws" ? "active" : ""} onClick={() => setView("draws")} role="tab" type="button"><Database size={16} />开奖记录</button>
+        <button aria-selected={view === "validation"} className={view === "validation" ? "active" : ""} onClick={() => setView("validation")} role="tab" type="button"><GitCompare size={16} />策略验证</button>
+      </div>
+
+      {view === "trends" && (
+        <>
+          <TrendPanel dashboard={dashboard} scoreRows={scoreRows} backScoreRows={backScoreRows} windowSize={windowSize} onWindowChange={onWindowChange} />
+          <details className="history-detail-panel">
+            <summary>查看号码综合评分与入选依据</summary>
+            <ScoreTable rows={scoreRows} />
+          </details>
+        </>
+      )}
+      {view === "draws" && <DataManagementPanel status={dataStorage} draws={draws} onSearchDraws={onSearchDraws} onPageDraws={onPageDraws} onSync={onSync} />}
+      {view === "validation" && (
+        <>
+          <BacktestPanel backtest={backtest} onRefresh={onRefreshBacktest} strategy={strategy} onStrategyChange={onStrategyChange} />
+          <BehaviorPanel behavior={behavior} onRefresh={onRefreshBehavior} />
+        </>
       )}
     </section>
   );
@@ -2709,7 +2863,8 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
   const [balance, setBalance] = useState("");
   const [levelUnits, setLevelUnits] = useState(1);
   const [periodCap, setPeriodCap] = useState(() => Number(localStorage.getItem("ceway_dlt_period_cap") || 200));
-  const [activeModule, setActiveModule] = useState(initialModuleFromUrl);
+  const [budgetRiskEnabled, setBudgetRiskEnabled] = useState(() => localStorage.getItem("ceway_dlt_budget_risk_enabled") !== "false");
+  const [activeModule, setActiveModule] = useState(() => initialModuleFromUrl("DLT"));
   const [dashboard, setDashboard] = useState(null);
   const [generated, setGenerated] = useState(null);
   const [savedPlans, setSavedPlans] = useState([]);
@@ -2727,6 +2882,10 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
   useEffect(() => {
     localStorage.setItem("ceway_dlt_period_cap", String(periodCap));
   }, [periodCap]);
+
+  useEffect(() => {
+    localStorage.setItem("ceway_dlt_budget_risk_enabled", String(budgetRiskEnabled));
+  }, [budgetRiskEnabled]);
 
   const changeModule = (module) => {
     setActiveModule(module);
@@ -2757,34 +2916,39 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
   };
 
   useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  useEffect(() => {
     const restoreCloudState = () => {
-      getDltRecords().then(setSavedPlans).catch(() => {});
-      getDltReview().then(setReview).catch(() => {});
-      getDltBehavior().then(setBehavior).catch(() => {});
+      if (activeModule === "data" || activeModule === "review") {
+        getDltRecords().then(setSavedPlans).catch(() => {});
+        getDltReview().then(setReview).catch(() => {});
+      }
+      if (activeModule === "trends") getDltBehavior().then(setBehavior).catch(() => {});
     };
     window.addEventListener("ceway-cloud-state-applied", restoreCloudState);
-    loadDashboard();
-    getDltRecords()
-      .then((records) => setSavedPlans(records))
-      .catch(() => {
-        const stored = JSON.parse(localStorage.getItem("cbgo_saved_plans") || "[]");
-        setSavedPlans(stored);
-      });
-    getDltReview()
-      .then(setReview)
-      .catch(() => setReview({
+    return () => window.removeEventListener("ceway-cloud-state-applied", restoreCloudState);
+  }, [activeModule]);
+
+  useEffect(() => {
+    if (activeModule === "data" || activeModule === "review") {
+      getDltRecords()
+        .then(setSavedPlans)
+        .catch(() => setSavedPlans(JSON.parse(localStorage.getItem("cbgo_saved_plans") || "[]")));
+      getDltReview().then(setReview).catch(() => setReview({
         summary: { reviewed: 0, pending: 0, total_cost: 0, record_hit_rate: 0, best_hit: "-", best_prize_label: "-" },
         items: [],
         disclaimer: "复盘数据暂不可用，已跳过异常记录。",
       }));
-    getDltBehavior().then(setBehavior).catch(() => setBehavior(null));
-    getDltBacktest({ budget, strategy, periods: 100, window: windowSize })
-      .then(setBacktest)
-      .catch(() => setBacktest(null));
-    getDltDataStatus().then(setDataStorage).catch(() => setDataStorage(null));
-    getDltDraws({ limit: 12 }).then(setDraws).catch(() => setDraws({ items: [], total: 0, limit: 12, offset: 0, issue: "" }));
-    return () => window.removeEventListener("ceway-cloud-state-applied", restoreCloudState);
-  }, []);
+    }
+    if (activeModule === "trends") {
+      getDltBehavior().then(setBehavior).catch(() => setBehavior(null));
+      getDltBacktest({ budget, strategy, periods: 100, window: windowSize }).then(setBacktest).catch(() => setBacktest(null));
+      getDltDataStatus().then(setDataStorage).catch(() => setDataStorage(null));
+      getDltDraws({ limit: 12 }).then(setDraws).catch(() => setDraws({ items: [], total: 0, limit: 12, offset: 0, issue: "" }));
+    }
+  }, [activeModule]);
 
   const refreshDataStorage = async ({ offset = 0, issue = drawIssue } = {}) => {
     const [status, drawPayload] = await Promise.all([
@@ -2991,7 +3155,11 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
           <div>
             <Badge tone="live">大乐透 DLT</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
-            <p>Powered by CBGO Framework · DLT Module　当前期号：{dashboard.latest_issue}　数据截至：{dashboard.data_status?.latest_date || "-"}　<span className="status-dot" />运行状态：正常</p>
+            <p>
+              Powered by CBGO Framework · DLT Module　
+              {activeModule === "today" ? "正式推荐数据见下方" : <>当前期号：{dashboard.latest_issue}　数据截至：{dashboard.data_status?.latest_date || "-"}</>}　
+              <span className="status-dot" />运行状态：正常
+            </p>
           </div>
           <div className="topbar-actions">
             <button className="ghost-button" onClick={() => setShowCloudSync(true)} type="button">
@@ -3002,7 +3170,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
               <ArrowLeft size={16} />
               返回场景页
             </button>
-            <Badge><Database size={13} /> {dashboard.history_count} 期历史记录</Badge>
+            <Badge><Database size={13} /> {activeModule === "today" ? "正式推荐后台" : `${dashboard.history_count} 期历史记录`}</Badge>
             {!isPublishedSnapshot && (
               <label className="upload-button">
                 <FileUp size={16} />
@@ -3020,6 +3188,7 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
         {notice && <p className="notice">{notice}</p>}
 
         <section className="module-stage" aria-label={MODULE_TITLES[activeModule]}>
+          {activeModule === "today" && <RuntimeRecommendation scene="DLT" />}
           {activeModule === "overview" && (
             <>
               <section className="stats" id="module-overview">
@@ -3042,31 +3211,39 @@ function Dashboard({ scenes, onBack, onSceneSelect }) {
               onBudgetChange={setBudget}
               periodCap={periodCap}
               onPeriodCapChange={setPeriodCap}
+              budgetRiskEnabled={budgetRiskEnabled}
+              onBudgetRiskEnabledChange={setBudgetRiskEnabled}
               generated={generated}
               onGenerated={setGenerated}
               onSave={savePlan}
               onSaveAll={saveAllPlans}
-              decisionContext={{ principal, periodCap, records: savedPlans, reviewItems: review?.items || [], backtest, capital: dashboard.capital_state }}
+              decisionContext={{ principal, periodCap, budgetRiskEnabled, records: savedPlans, reviewItems: review?.items || [], backtest, capital: dashboard.capital_state }}
             />
           )}
 
           {activeModule === "review" && (
             <ReviewPanel review={review} onRefresh={refreshReview} onDelete={deleteRecord} scoreRows={dashboard.score_table} scene="DLT" currentDraw={(Array.isArray(draws) ? draws : draws?.items)?.[0]} />
           )}
+          {activeModule === "lab" && <Suspense fallback={<div className="chart-loading">正在加载大乐透实验室...</div>}><DltLab latestIssue={dashboard.latest_issue} /></Suspense>}
           {activeModule === "trends" && (
-            <>
-              <DataManagementPanel status={dataStorage} draws={draws} onSearchDraws={(issue) => refreshDataStorage({ offset: 0, issue })} onPageDraws={(offset, issue) => refreshDataStorage({ offset, issue })} onSync={syncHistory} />
-              <TrendPanel
-                dashboard={dashboard}
-                scoreRows={dashboard.score_table}
-                backScoreRows={dashboard.back_scoreboard}
-                windowSize={windowSize}
-                onWindowChange={(value) => {
-                  setWindowSize(value);
-                  loadDashboard({ window: value });
-                }}
-              />
-            </>
+            <HistoryWorkspace
+              dashboard={dashboard}
+              scoreRows={dashboard.score_table}
+              backScoreRows={dashboard.back_scoreboard}
+              windowSize={windowSize}
+              onWindowChange={(value) => { setWindowSize(value); loadDashboard({ window: value }); }}
+              dataStorage={dataStorage}
+              draws={draws}
+              onSearchDraws={(issue) => refreshDataStorage({ offset: 0, issue })}
+              onPageDraws={(offset, issue) => refreshDataStorage({ offset, issue })}
+              onSync={syncHistory}
+              backtest={backtest}
+              onRefreshBacktest={refreshBacktest}
+              strategy={strategy}
+              onStrategyChange={setStrategy}
+              behavior={behavior}
+              onRefreshBehavior={refreshBehavior}
+            />
           )}
         </section>
 
@@ -3099,7 +3276,8 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
   const [balance, setBalance] = useState("");
   const [levelUnits, setLevelUnits] = useState(1);
   const [periodCap, setPeriodCap] = useState(() => Number(localStorage.getItem("ceway_ssq_period_cap") || 200));
-  const [activeModule, setActiveModule] = useState(initialModuleFromUrl);
+  const [budgetRiskEnabled, setBudgetRiskEnabled] = useState(() => localStorage.getItem("ceway_ssq_budget_risk_enabled") !== "false");
+  const [activeModule, setActiveModule] = useState(() => initialModuleFromUrl("SSQ"));
   const [dashboard, setDashboard] = useState(null);
   const [generated, setGenerated] = useState(null);
   const [behavior, setBehavior] = useState(null);
@@ -3117,6 +3295,10 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
   useEffect(() => {
     localStorage.setItem("ceway_ssq_period_cap", String(periodCap));
   }, [periodCap]);
+
+  useEffect(() => {
+    localStorage.setItem("ceway_ssq_budget_risk_enabled", String(budgetRiskEnabled));
+  }, [budgetRiskEnabled]);
 
   const changeModule = (module) => {
     setActiveModule(module);
@@ -3147,34 +3329,39 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
   };
 
   useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  useEffect(() => {
     const restoreCloudState = () => {
-      getSsqRecords().then(setSavedPlans).catch(() => {});
-      getSsqReview().then(setReview).catch(() => {});
-      getSsqBehavior().then(setBehavior).catch(() => {});
+      if (activeModule === "data" || activeModule === "review") {
+        getSsqRecords().then(setSavedPlans).catch(() => {});
+        getSsqReview().then(setReview).catch(() => {});
+      }
+      if (activeModule === "trends") getSsqBehavior().then(setBehavior).catch(() => {});
     };
     window.addEventListener("ceway-cloud-state-applied", restoreCloudState);
-    loadDashboard();
-    getSsqRecords()
-      .then((records) => setSavedPlans(records))
-      .catch(() => {
-        const stored = JSON.parse(localStorage.getItem("cbgo_ssq_plans") || "[]");
-        setSavedPlans(stored);
-      });
-    getSsqReview()
-      .then(setReview)
-      .catch(() => setReview({
+    return () => window.removeEventListener("ceway-cloud-state-applied", restoreCloudState);
+  }, [activeModule]);
+
+  useEffect(() => {
+    if (activeModule === "data" || activeModule === "review") {
+      getSsqRecords()
+        .then(setSavedPlans)
+        .catch(() => setSavedPlans(JSON.parse(localStorage.getItem("cbgo_ssq_plans") || "[]")));
+      getSsqReview().then(setReview).catch(() => setReview({
         summary: { reviewed: 0, pending: 0, total_cost: 0, record_hit_rate: 0, best_hit: "-", best_prize_label: "-" },
         items: [],
         disclaimer: "SSQ 复盘数据暂不可用。",
       }));
-    getSsqBehavior().then(setBehavior).catch(() => setBehavior(null));
-    getSsqBacktest({ budget, strategy, periods: 100, window: windowSize })
-      .then(setBacktest)
-      .catch(() => setBacktest(null));
-    getSsqDataStatus().then(setDataStorage).catch(() => setDataStorage(null));
-    getSsqDraws({ limit: 12 }).then(setDraws).catch(() => setDraws({ items: [], total: 0, limit: 12, offset: 0, issue: "" }));
-    return () => window.removeEventListener("ceway-cloud-state-applied", restoreCloudState);
-  }, []);
+    }
+    if (activeModule === "trends") {
+      getSsqBehavior().then(setBehavior).catch(() => setBehavior(null));
+      getSsqBacktest({ budget, strategy, periods: 100, window: windowSize }).then(setBacktest).catch(() => setBacktest(null));
+      getSsqDataStatus().then(setDataStorage).catch(() => setDataStorage(null));
+      getSsqDraws({ limit: 12 }).then(setDraws).catch(() => setDraws({ items: [], total: 0, limit: 12, offset: 0, issue: "" }));
+    }
+  }, [activeModule]);
 
   const refreshDataStorage = async ({ offset = 0, issue = drawIssue } = {}) => {
     const [status, drawPayload] = await Promise.all([
@@ -3389,7 +3576,11 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
           <div>
             <Badge tone="live">双色球 SSQ</Badge>
             <h1>策维（Ceway）数字决策平台</h1>
-            <p>Powered by CBGO Framework · SSQ Module　当前期号：{dashboard.latest_issue}　数据截至：{dashboard.storage?.latest_date || "-"}　推荐期号：{dashboard.recommended_issue || "下一期"}　<span className="status-dot" />运行状态：正常</p>
+            <p>
+              Powered by CBGO Framework · SSQ Module　
+              {activeModule === "today" ? "正式推荐数据见下方" : <>当前期号：{dashboard.latest_issue}　数据截至：{dashboard.storage?.latest_date || "-"}　推荐期号：{dashboard.recommended_issue || "下一期"}</>}　
+              <span className="status-dot" />运行状态：正常
+            </p>
           </div>
           <div className="topbar-actions">
             <button className="ghost-button" onClick={() => setShowCloudSync(true)} type="button">
@@ -3400,7 +3591,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
               <ArrowLeft size={16} />
               返回场景页
             </button>
-            <Badge><Database size={13} /> {dashboard.history_count} 期历史记录</Badge>
+            <Badge><Database size={13} /> {activeModule === "today" ? "正式推荐后台" : `${dashboard.history_count} 期历史记录`}</Badge>
             {!isPublishedSnapshot && (
               <label className="upload-button">
                 <FileUp size={16} />
@@ -3418,6 +3609,7 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
         {notice && <p className="notice">{notice}</p>}
 
         <section className="module-stage" aria-label={MODULE_TITLES[activeModule]}>
+          {activeModule === "today" && <RuntimeRecommendation scene="SSQ" />}
           {activeModule === "overview" && (
             <>
               <section className="stats" id="module-overview">
@@ -3440,31 +3632,39 @@ function SsqDashboard({ scenes, onBack, onSceneSelect }) {
               onBudgetChange={setBudget}
               periodCap={periodCap}
               onPeriodCapChange={setPeriodCap}
+              budgetRiskEnabled={budgetRiskEnabled}
+              onBudgetRiskEnabledChange={setBudgetRiskEnabled}
               generated={generated}
               onGenerated={setGenerated}
               onSave={savePlan}
               onSaveAll={saveAllPlans}
-              decisionContext={{ principal, periodCap, records: savedPlans, reviewItems: review?.items || [], backtest, capital: dashboard.capital }}
+              decisionContext={{ principal, periodCap, budgetRiskEnabled, records: savedPlans, reviewItems: review?.items || [], backtest, capital: dashboard.capital }}
             />
           )}
 
           {activeModule === "review" && (
             <ReviewPanel review={review} onRefresh={refreshReview} onDelete={deleteRecord} scoreRows={scoreRows} scene="SSQ" currentDraw={(Array.isArray(draws) ? draws : draws?.items)?.[0]} />
           )}
+          {activeModule === "lab" && <Suspense fallback={<div className="chart-loading">正在加载双色球实验室...</div>}><SsqLab latestIssue={dashboard.latest_issue} /></Suspense>}
           {activeModule === "trends" && (
-            <>
-              <DataManagementPanel status={dataStorage} draws={draws} onSearchDraws={(issue) => refreshDataStorage({ offset: 0, issue })} onPageDraws={(offset, issue) => refreshDataStorage({ offset, issue })} onSync={syncHistory} />
-              <TrendPanel
-                dashboard={ssqView}
-                scoreRows={scoreRows}
-                backScoreRows={dashboard.back_scoreboard}
-                windowSize={windowSize}
-                onWindowChange={(value) => {
-                  setWindowSize(value);
-                  loadDashboard({ window: value });
-                }}
-              />
-            </>
+            <HistoryWorkspace
+              dashboard={ssqView}
+              scoreRows={scoreRows}
+              backScoreRows={dashboard.back_scoreboard}
+              windowSize={windowSize}
+              onWindowChange={(value) => { setWindowSize(value); loadDashboard({ window: value }); }}
+              dataStorage={dataStorage}
+              draws={draws}
+              onSearchDraws={(issue) => refreshDataStorage({ offset: 0, issue })}
+              onPageDraws={(offset, issue) => refreshDataStorage({ offset, issue })}
+              onSync={syncHistory}
+              backtest={backtest}
+              onRefreshBacktest={refreshBacktest}
+              strategy={strategy}
+              onStrategyChange={setStrategy}
+              behavior={behavior}
+              onRefreshBehavior={refreshBehavior}
+            />
           )}
         </section>
 
@@ -3492,7 +3692,7 @@ function App() {
   const [scenes, setScenes] = useState([]);
   const [view, setView] = useState(() => new URLSearchParams(window.location.search).get("scene") || "scenes");
 
-  const navigate = (nextView, module = "overview") => {
+  const navigate = (nextView, module = "today") => {
     const url = new URL(window.location.href);
     if (nextView === "scenes") {
       url.searchParams.delete("scene");
