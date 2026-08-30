@@ -1,0 +1,43 @@
+name: CEWAY V2.5 Multi-Regime Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/multiregime_v25.py"
+      - "backend/tests/test_multiregime_v25.py"
+      - "scripts/run_v25_multiregime_stress.py"
+      - ".github/workflows/v25-multiregime-validation.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Run V2.5 unit tests
+        working-directory: backend
+        run: python -m unittest tests.test_multiregime_v25 -v
+
+      - name: Run V2.5 retrospective stress
+        run: python scripts/run_v25_multiregime_stress.py --periods 60 --excluded-recent 200 --baseline-seeds 3 --budget 20
+
+      - name: Upload V2.5 report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ceway-v25-multiregime-stress
+          path: artifacts/ceway_v25_multiregime_stress.json
+          if-no-files-found: error
