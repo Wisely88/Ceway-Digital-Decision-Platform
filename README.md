@@ -3,32 +3,196 @@
 Digital Decision Platform  
 Powered by CBGO Framework
 
-> 当前 `main` 为正式生产基线。研究能力统一位于 `agent/ceway-v2-research-engine`，不在研究门禁通过前替换生产推荐逻辑。
+当前 `main` 仍为“正式使用版” v1.12.4，已支持大乐透 DLT 与双色球 SSQ 的智能推荐、纯随机生成、套餐模拟、自选号码、方案保存、单用户云同步和当期开奖复盘。
 
-## 当前生产能力
+产品主线：选号只是入口，决策解释和风险控制才是核心。系统会说明本期实际支出、组合覆盖、投注倍率、资金暴露、近 30 日投入、连续加码迹象和历史回测表现。
 
-- 大乐透 / 双色球历史数据维护与走势分析；
-- 智能推荐、随机生成、套餐模拟与自选；
-- 保存方案、开奖复盘与方案永久归档；
-- 单用户云同步；
-- GitHub Pages 前端发布；
-- 自动开奖数据更新。
+策维不预测开奖结果，不承诺提高中奖概率。历史评分和回测只能描述历史匹配，不能证明未来收益。
 
-策维不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。
+> V2 开发说明：`agent/ceway-v2-research-engine` 分支正在开发 CEWAY-FWD-V2 研究/验证层；尚未合并到生产 `main`。详见 [`docs/ceway_v2_research_engine.md`](docs/ceway_v2_research_engine.md)。
 
-## Research
+## 目录
 
-统一研究线：`agent/ceway-v2-research-engine`
+```text
+ceway/
+├── frontend/
+├── backend/
+├── config/
+├── dataset/
+├── engine/
+└── docs/
+```
 
-当前研究候选为 **CEWAY V2.5 Multi-Regime Exposure**：把号码状态拆为独立 Evidence / Scarcity / Neutral-Coverage 轴，以固定 50% / 30% / 20% 曝光预算生成组合，同时保留 cutoff、防未来数据泄漏、组合级历史碰撞、结构匹配随机、Bootstrap CI、Jaccard / pair-reuse / exposure concentration 等审计层。
+## 本地启动
 
-V2.5 已完成 60 点 × DLT/SSQ、排除最近 200 期、3 个结构匹配随机 seed 的回顾性压力验证：
+推荐一键启动：
 
-- DLT：相对 V9 best-hit uplift +0.3667，95% CI [+0.1500, +0.5667]；相对随机 +0.0722，CI [-0.1111, +0.2500]。
-- SSQ：相对 V2.4 best-hit uplift +0.3167，95% CI [+0.0833, +0.5500]；相对随机 +0.1556，CI [-0.0222, +0.3389]。
-- DLT / SSQ 组合平均 Jaccard 分别降至 0.0512 / 0.0646，均低于对应结构匹配随机对照。
+```bash
+./scripts/start-local.sh
+```
 
-因此当前研究决策为 **HOLD_RETROSPECTIVE**：V2.5 已改善同质化并优于部分既有候选，但尚未证明对结构匹配随机存在稳定样本外优势，`production_enabled=false`，不得据此进入生产。
+启动后打开：
 
-详细研究说明：`docs/ceway_v2_research_engine.md`  
-固化证据：`research/v25/multiregime-retrospective-stress.json`
+- 前端页面：`http://localhost:5173`
+- 后端接口文档：`http://127.0.0.1:8000/docs`
+
+如果页面打不开，通常是前端服务没有运行；重新执行上面的脚本即可。
+
+开发依据：
+
+- [v1.2 Baseline 开发方案](docs/ceway_v1_2_baseline.md)
+- [v1.3 开发计划](docs/ceway_v1_3_plan.md)
+- [v1.6 决策风控说明](docs/ceway_v1_6_decision_risk.md)
+- [v1.7 套餐评估说明](docs/ceway_v1_7_package_evaluation.md)
+- [v1.8 验证闭环说明](docs/ceway_v1_8_validation_loop.md)
+- [v1.9 行为风控说明](docs/ceway_v1_9_behavior_risk.md)
+- [v1.10 单用户云同步说明](docs/ceway_v1_10_cloud_sync.md)
+- [v1.11 精简选号工作台](docs/ceway_v1_11_simplified_workbench.md)
+- [v1.12 正式使用版](docs/ceway_v1_12_stable.md)
+- [v1.12.1 数据维护版](docs/ceway_v1_12_1_maintenance.md)
+- [v1.12.2 完整历史与性能优化](docs/ceway_v1_12_2_history_performance.md)
+- [v1.12.3 方案永久归档与全量查询](docs/ceway_v1_12_3_record_archive.md)
+- [v1.12.4 后区与蓝球走势分析](docs/ceway_v1_12_4_back_trends.md)
+- [CEWAY-FWD-V2 研究引擎](docs/ceway_v2_research_engine.md)
+- [Backlog](docs/backlog.md)
+- [数据导入说明](docs/data_import.md)
+
+手动启动后端：
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+手动启动前端：
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+前端默认读取 `http://localhost:8000`。
+
+## 单用户云同步
+
+云同步不提供公开注册。首次启用时，在 Supabase 控制台完成两步初始化：
+
+1. 在 SQL Editor 执行 [`supabase/setup.sql`](supabase/setup.sql)。
+2. 在 Authentication > Users 新建并确认内部用户 `ceway-sync@ceway.local`，设置仅自己知道的同步密码。
+
+之后在 DLT 或 SSQ 页面顶部进入“数据备份”，所有自用设备输入同一个同步密码即可。该弹窗也提供无需登录的 JSON 离线导出和恢复。公开发布密钥可以存在前端；数据访问由表级 RLS 限制。不要把 Supabase secret key 或 service role key 放入仓库。
+
+## 验证
+
+```bash
+cd frontend
+npm test
+npm run build:pages
+
+cd ..
+backend/.venv/bin/python -m unittest discover -s backend/tests -v
+
+# 先启动静态演示前端，再执行 390x844 的 DLT/SSQ 手机主流程验收
+backend/.venv/bin/python scripts/mobile_smoke.py
+```
+
+当前数据快照（README 的生产快照说明保持 v1.12.4 发布时记录；自动更新后的实时期数以仓库数据文件与 API 为准）：
+
+- 大乐透：2902 期，最新 `26084`（2026-07-27）。
+- 双色球：3482 期，最新 `2026085`（2026-07-26）。
+- 两份数据均通过当前期号范围连续性检查；双色球从首期开始没有空开奖日期。
+
+每期实际奖金快照：
+
+- 大乐透：2897 期。
+- 双色球：2039 期。
+- 复盘页只在奖级金额数据完整时显示净收益与 ROI；不完整时明确标记待补，避免用估算值冒充实际奖金。
+
+## 开奖日自动更新
+
+macOS 定时任务按北京时间检查最新开奖：
+
+- 大乐透：每周一、三、六的 `22:30`、`23:30`，以及次日 `00:30`。
+- 双色球：每周二、四、日的 `22:30`、`23:30`，以及次日 `00:30`。
+
+定时任务优先读取中国体彩网和中国福彩网官方接口；官方接口临时不可用时，才回退到 `78500.cn`。GitHub 云端 IP 可能被数据站拒绝，因此由本机 LaunchAgent 在 `~/Library/Caches/Ceway-Automation` 的专用工作副本中执行抓取，验证通过后自动提交 GitHub 并重新发布 Pages。
+
+任务只在发现新期号且数据校验通过时更新 CSV、提交主分支并重新发布 GitHub Pages。校验覆盖号码范围、期号重复、日期递增和固定开奖日。任一数据源失败或历史记录异常时，任务会失败并保留原数据。休市日没有新期号时不会产生提交。本地启动时会以 CSV 重建两种彩票的开奖表，同时保留已保存方案和复盘记录。
+
+每次任务会把最终状态写入 `~/Library/Caches/Ceway-Automation/status/latest.json`。更新失败时同时发送 macOS 通知中心提醒，因此失败原因不再只存在于 LaunchAgent 日志中。
+
+电脑需要开机且已连网。关机期间错过检查时间时，下一个开奖日检查会通过期号去重自动补齐。
+
+手动验证全部场景：
+
+```bash
+python3 scripts/run_draw_update.py --game all
+```
+
+## 同时公网展示 ClawScore 与策维
+
+最优方案是只开一个本地统一入口，再用一个 ngrok 地址暴露：
+
+```text
+/clawscore  -> ClawScore
+/ceway/     -> 策维
+/api        -> ClawScore API
+/ceway-api  -> 策维 API
+```
+
+前置条件：
+
+- ClawScore 已在 `127.0.0.1:4321` 运行。
+- 策维后端已在 `127.0.0.1:8000` 运行。
+
+启动统一入口：
+
+```bash
+./scripts/start-public-gateway.sh
+```
+
+本地验证：
+
+```text
+http://127.0.0.1:8788/clawscore
+http://127.0.0.1:8788/ceway/
+```
+
+同一局域网内其他设备访问时，使用 Mac 的局域网 IP：
+
+```bash
+ipconfig getifaddr en1
+```
+
+例如 Mac IP 为 `192.168.31.34`：
+
+```text
+http://192.168.31.34:8788/clawscore
+http://192.168.31.34:8788/ceway/
+```
+
+如果手机和 Mac 不在同一网段，例如一个是 `192.168.31.x`、另一个是 `192.168.2.x`，需要把副路由改成 AP/桥接模式，或继续使用 ngrok/Tailscale。
+
+启动公网地址：
+
+```bash
+ngrok http 8788
+```
+
+## V2.5 Multi-Regime Exposure 研究状态
+
+统一 Research 线当前新增 **CEWAY V2.5 Multi-Regime Exposure** 候选：将号码状态拆成独立 Evidence / Scarcity / Neutral-Coverage 三个角色，以预注册的 50% / 30% / 20% 槽位曝光生成组合。Scarcity 使用最近 3/7/20 期低频、gap 与长短窗 divergence，仅作为覆盖状态，不解释为更高中奖概率。
+
+60 点 × DLT/SSQ、排除最近 200 期、3 个结构匹配随机 seed 的回顾性压力验证结果：
+
+- DLT：V2.5 相对 V9 best-hit uplift `+0.3667`，95% CI `[+0.1500, +0.5667]`；相对结构匹配随机 `+0.0722`，CI `[-0.1111, +0.2500]`。
+- SSQ：V2.5 相对 V2.4 best-hit uplift `+0.3167`，95% CI `[+0.0833, +0.5500]`；相对结构匹配随机 `+0.1556`，CI `[-0.0222, +0.3389]`。
+- 组合前区/红球平均 Jaccard 分别为 `0.0512` / `0.0646`，均低于对应结构匹配随机对照，说明同质化明显下降。
+
+当前结论固定为 `HOLD_RETROSPECTIVE`：改善已经出现，但随机对照 CI 仍跨 0，因此 `production_enabled=false`，不进入生产，也不根据本次开奖结果继续微调权重追求显著性。
+
+固化证据：[`research/v25/multiregime-retrospective-stress.json`](research/v25/multiregime-retrospective-stress.json)。
