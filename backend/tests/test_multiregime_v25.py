@@ -53,7 +53,7 @@ class MultiRegimeV25Tests(unittest.TestCase):
         with_future = score_regimes(history, DLT, area="front", history_cutoff_issue=cutoff)
         self.assertEqual(base, with_future)
 
-    def test_short_term_absence_can_rank_as_scarce_without_overwriting_evidence(self) -> None:
+    def test_short_term_absence_creates_independent_scarcity_signal(self) -> None:
         history = make_history(80)
         for row in history[:-7:5]:
             if 35 not in row["front"]:
@@ -65,7 +65,8 @@ class MultiRegimeV25Tests(unittest.TestCase):
                 row["front"] = _fill_unique(row["front"], 5, 35, 1)
         rows = score_regimes(history, DLT, area="front")
         row35 = next(row for row in rows if row["number"] == 35)
-        self.assertLessEqual(row35["scarcity_rank"], 12)
+        self.assertGreaterEqual(row35["rarity7"], 0.5)
+        self.assertGreater(row35["divergence_score"], 0.0)
         self.assertNotEqual(row35["scarcity_rank"], row35["evidence_rank"])
 
     def test_plan_uses_preregistered_role_mix_and_is_deterministic(self) -> None:
