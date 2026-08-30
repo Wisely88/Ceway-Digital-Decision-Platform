@@ -10,6 +10,7 @@ on:
       - "backend/tests/test_pushplus_v25.py"
       - "scripts/run_v25_multiregime_stress.py"
       - "scripts/push_v25_prediction.py"
+      - "scripts/run_draw_update.py"
       - ".github/workflows/v25-multiregime-validation.yml"
   workflow_dispatch:
 
@@ -34,6 +35,9 @@ jobs:
       - name: Run V2.5 unit tests
         working-directory: backend
         run: python -m unittest tests.test_multiregime_v25 tests.test_pushplus_v25 -v
+
+      - name: Syntax-check updater integration
+        run: python -m py_compile scripts/run_draw_update.py scripts/push_v25_prediction.py backend/pushplus_v25.py
 
       - name: Dry-run current DLT PushPlus content
         run: python scripts/push_v25_prediction.py --game DLT
