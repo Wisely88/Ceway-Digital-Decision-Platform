@@ -5,8 +5,11 @@ on:
     branches: [main]
     paths:
       - "backend/multiregime_v25.py"
+      - "backend/pushplus_v25.py"
       - "backend/tests/test_multiregime_v25.py"
+      - "backend/tests/test_pushplus_v25.py"
       - "scripts/run_v25_multiregime_stress.py"
+      - "scripts/push_v25_prediction.py"
       - ".github/workflows/v25-multiregime-validation.yml"
   workflow_dispatch:
 
@@ -30,7 +33,13 @@ jobs:
 
       - name: Run V2.5 unit tests
         working-directory: backend
-        run: python -m unittest tests.test_multiregime_v25 -v
+        run: python -m unittest tests.test_multiregime_v25 tests.test_pushplus_v25 -v
+
+      - name: Dry-run current DLT PushPlus content
+        run: python scripts/push_v25_prediction.py --game DLT
+
+      - name: Dry-run current SSQ PushPlus content
+        run: python scripts/push_v25_prediction.py --game SSQ
 
       - name: Run V2.5 retrospective stress
         run: python scripts/run_v25_multiregime_stress.py --periods 60 --excluded-recent 200 --baseline-seeds 3 --budget 20
