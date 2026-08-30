@@ -5,27 +5,31 @@ import unittest
 from multiregime_v25 import DLT, ROLE_WEIGHTS, generate_multiregime_plan, score_regimes
 
 
+def _fill_unique(values: list[int], target: int, pool: int, start: int) -> list[int]:
+    result = list(dict.fromkeys(values))
+    candidate = start
+    while len(result) < target:
+        number = ((candidate - 1) % pool) + 1
+        if number not in result:
+            result.append(number)
+        candidate += 1
+    return sorted(result)
+
+
 def make_history(count: int = 80) -> list[dict]:
     rows = []
     for index in range(1, count + 1):
-        front = sorted({
+        front = _fill_unique([
             ((index * 3 + 0) % 35) + 1,
             ((index * 5 + 7) % 35) + 1,
             ((index * 7 + 11) % 35) + 1,
             ((index * 9 + 17) % 35) + 1,
             ((index * 11 + 23) % 35) + 1,
-        })
-        while len(front) < 5:
-            candidate = ((index + len(front) * 13) % 35) + 1
-            if candidate not in front:
-                front.append(candidate)
-                front.sort()
-        back = sorted({((index * 2) % 12) + 1, ((index * 5 + 3) % 12) + 1})
-        while len(back) < 2:
-            candidate = ((index + 7) % 12) + 1
-            if candidate not in back:
-                back.append(candidate)
-                back.sort()
+        ], 5, 35, index)
+        back = _fill_unique([
+            ((index * 2) % 12) + 1,
+            ((index * 5 + 3) % 12) + 1,
+        ], 2, 12, index + 7)
         rows.append({"issue": f"26{index:03d}", "front": front, "back": back})
     return rows
 
@@ -51,25 +55,14 @@ class MultiRegimeV25Tests(unittest.TestCase):
 
     def test_short_term_absence_can_rank_as_scarce_without_overwriting_evidence(self) -> None:
         history = make_history(80)
-        # Force number 35 to have long-window presence but no presence in the last 7 draws.
         for row in history[:-7:5]:
             if 35 not in row["front"]:
                 row["front"][-1] = 35
-                row["front"] = sorted(set(row["front"]))
-                while len(row["front"]) < 5:
-                    for candidate in range(1, 36):
-                        if candidate not in row["front"]:
-                            row["front"].append(candidate)
-                            break
-                row["front"].sort()
+                row["front"] = _fill_unique(row["front"], 5, 35, 1)
         for row in history[-7:]:
             if 35 in row["front"]:
                 row["front"].remove(35)
-                for candidate in range(1, 36):
-                    if candidate not in row["front"]:
-                        row["front"].append(candidate)
-                        break
-                row["front"].sort()
+                row["front"] = _fill_unique(row["front"], 5, 35, 1)
         rows = score_regimes(history, DLT, area="front")
         row35 = next(row for row in rows if row["number"] == 35)
         self.assertLessEqual(row35["scarcity_rank"], 12)
