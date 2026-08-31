@@ -20,8 +20,8 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - name: Install dependencies
         run: python -m pip install -r backend/requirements.txt
-      - name: Syntax-check V2.7 and review CLI
-        run: python -m py_compile backend/multiregime_v27.py backend/pushplus_v27.py scripts/push_v27_prediction.py scripts/review_v27_scarcity.py
+      - name: Syntax-check V2.7 and review/freeze CLIs
+        run: python -m py_compile backend/multiregime_v27.py backend/pushplus_v27.py scripts/push_v27_prediction.py scripts/review_v27_scarcity.py scripts/freeze_v27_prediction.py
       - name: Run V2.7 unit tests
         run: python -m unittest tests.test_multiregime_v27 tests.test_pushplus_v27 -v
         working-directory: backend
@@ -29,3 +29,14 @@ jobs:
         run: python scripts/push_v27_prediction.py --game DLT
       - name: Dry-run SSQ V2.7 with full scarcity ranking
         run: python scripts/push_v27_prediction.py --game SSQ
+      - name: Export current V2.7 full-ranking freezes
+        run: |
+          mkdir -p /tmp/v27-freezes
+          python scripts/freeze_v27_prediction.py --game DLT --output /tmp/v27-freezes/dlt-v27.json
+          python scripts/freeze_v27_prediction.py --game SSQ --output /tmp/v27-freezes/ssq-v27.json
+      - name: Upload V2.7 full-ranking freezes
+        uses: actions/upload-artifact@v4
+        with:
+          name: v27-current-full-ranking-freezes
+          path: /tmp/v27-freezes/*.json
+          if-no-files-found: error
