@@ -1,0 +1,72 @@
+{
+  "schema_version": "ceway.v2.6.prospective-freeze.1",
+  "candidate_version": "multi-regime-collision-v2.6",
+  "status": "FROZEN_BEFORE_DRAW",
+  "production_enabled": false,
+  "validation": {
+    "workflow_run_id": 33354058817,
+    "workflow_conclusion": "success",
+    "validated_pr_merge_commit": "b07a9eae8806197554ec6ee64328fc11d33bda13",
+    "validated_research_head": "e13480b7e97f771a47528a97af8624e84edda4ba",
+    "production_data_base_commit": "7a4f1bbecbba99506a1a36ec38e75f3cd0baa9cd",
+    "tests": 9,
+    "pushplus_dry_run": ["DLT", "SSQ"]
+  },
+  "guardrail": "These outputs are frozen before their draws. V2.6 parameters and tickets must not be changed based on subsequent outcomes. PushPlus and local output must render from the same V2.6 digest.",
+  "predictions": {
+    "DLT_26099": {
+      "game": "DLT",
+      "target_issue": "26099",
+      "history_cutoff_issue": "26098",
+      "core_pool": [26, 23, 14, 5, 13, 16, 29, 22, 12, 10, 2, 1],
+      "core_reference": {
+        "front": [3, 5, 22, 24, 27],
+        "back": [5, 8],
+        "rank_score": 0.7079,
+        "front_collision_profile": {"0": 1279, "1": 1227, "2": 369, "3": 40, "4": 1, "5": 0}
+      },
+      "evidence_pool": [12, 26, 10, 14, 3, 9],
+      "scarcity_pool": [1, 2, 13, 23, 28, 30],
+      "neutral_pool": [16, 29, 22, 5, 17, 15],
+      "tickets": [
+        {"front": [3, 5, 22, 24, 27], "back": [5, 8], "rank_score": 0.7079},
+        {"front": [4, 12, 13, 26, 29], "back": [1, 12], "rank_score": 0.6955},
+        {"front": [1, 4, 23, 27, 32], "back": [2, 4], "rank_score": 0.6863},
+        {"front": [3, 15, 16, 26, 29], "back": [5, 6], "rank_score": 0.7059},
+        {"front": [3, 12, 14, 27, 32], "back": [3, 7], "rank_score": 0.6941},
+        {"front": [5, 10, 22, 23, 26], "back": [1, 5], "rank_score": 0.6916},
+        {"front": [5, 12, 14, 24, 29], "back": [11, 12], "rank_score": 0.6737},
+        {"front": [1, 14, 22, 26, 27], "back": [7, 8], "rank_score": 0.6827},
+        {"front": [2, 12, 15, 23, 32], "back": [3, 12], "rank_score": 0.6609},
+        {"front": [4, 10, 16, 23, 29], "back": [2, 5], "rank_score": 0.6639}
+      ]
+    },
+    "SSQ_2026101": {
+      "game": "SSQ",
+      "target_issue": "2026101",
+      "history_cutoff_issue": "2026100",
+      "core_pool": [2, 24, 15, 7, 9, 5, 10, 25, 3, 18, 22, 19],
+      "core_reference": {
+        "front": [2, 10, 15, 18, 27, 33],
+        "back": [5],
+        "rank_score": 0.7110,
+        "front_collision_profile": {"0": 930, "1": 1533, "2": 839, "3": 178, "4": 17, "5": 0, "6": 0}
+      },
+      "evidence_pool": [24, 25, 22, 18, 16, 4],
+      "scarcity_pool": [2, 7, 19, 10, 11, 20],
+      "neutral_pool": [9, 3, 15, 5, 21, 6],
+      "tickets": [
+        {"front": [2, 10, 15, 18, 27, 33], "back": [5], "rank_score": 0.7110},
+        {"front": [3, 6, 22, 23, 24, 25], "back": [3], "rank_score": 0.6995},
+        {"front": [5, 7, 18, 19, 24, 28], "back": [11], "rank_score": 0.6583},
+        {"front": [2, 7, 21, 22, 23, 27], "back": [4], "rank_score": 0.6777},
+        {"front": [6, 9, 15, 19, 27, 28], "back": [6], "rank_score": 0.6614},
+        {"front": [2, 9, 18, 21, 24, 25], "back": [9], "rank_score": 0.6657},
+        {"front": [3, 5, 18, 22, 25, 28], "back": [15], "rank_score": 0.6789},
+        {"front": [6, 7, 9, 22, 24, 33], "back": [12], "rank_score": 0.6764},
+        {"front": [5, 6, 10, 21, 24, 27], "back": [1], "rank_score": 0.6396},
+        {"front": [7, 10, 15, 18, 23, 28], "back": [2], "rank_score": 0.6514}
+      ]
+    }
+  }
+}
