@@ -102,10 +102,46 @@
       "claim_scope": "Prospective research freeze only; evaluate the exact frozen tickets after 2026101 without regeneration or retuning."
     }
   },
+  "prospective_v27_tracks": {
+    "V2.7_DLT_26099": {
+      "track_role": "scarcity_combination_forward_shadow",
+      "candidate_version": "multi-regime-scarcity-combo-v2.7",
+      "target_issue": "26099",
+      "history_cutoff_issue": "26098",
+      "design_freeze": "research/v27/design-freeze.json",
+      "freeze_manifest": "research/v27/prospective-freeze-manifest-2026-08-31.json",
+      "full_ranking_artifact_id": 9744975041,
+      "full_ranking_artifact_sha256": "37c5a8a30d546b8177593a7ae5c6b77d5b27f918809e6ef9be5deaafc8c03697",
+      "freeze_file_sha256": "2c62b3db1e72c6c1bcb5798368b828a8ba1d6098c47e5f8f111973afa503ac32",
+      "scarcity_pool_size": 12,
+      "scarcity_full_combination_count": 185,
+      "reviewer": "scripts/review_v27_scarcity.py",
+      "validation_workflow_run": 33355447750,
+      "current_expected_status": "FROZEN_PENDING_TARGET_DRAW",
+      "claim_scope": "Prospective V2.7 scarcity-ranking research only. Replay the frozen full ranking after 26099; never regenerate it from the outcome."
+    },
+    "V2.7_SSQ_2026101": {
+      "track_role": "scarcity_combination_forward_shadow",
+      "candidate_version": "multi-regime-scarcity-combo-v2.7",
+      "target_issue": "2026101",
+      "history_cutoff_issue": "2026100",
+      "design_freeze": "research/v27/design-freeze.json",
+      "freeze_manifest": "research/v27/prospective-freeze-manifest-2026-08-31.json",
+      "full_ranking_artifact_id": 9744975041,
+      "full_ranking_artifact_sha256": "37c5a8a30d546b8177593a7ae5c6b77d5b27f918809e6ef9be5deaafc8c03697",
+      "freeze_file_sha256": "d3a36e7cc7e08e733d3b11b5f6def4122312a9746afeec9ad91c0c7dc26cbeda",
+      "scarcity_pool_size": 12,
+      "scarcity_full_combination_count": 359,
+      "reviewer": "scripts/review_v27_scarcity.py",
+      "validation_workflow_run": 33355447750,
+      "current_expected_status": "FROZEN_PENDING_TARGET_DRAW",
+      "claim_scope": "Prospective V2.7 scarcity-ranking research only. Replay the frozen full ranking after 2026101; never regenerate it from the outcome."
+    }
+  },
   "consumed_historical_evidence": {
     "recent_outcome_blocks": {
       "minimum_consumed_recent_outcome_count": 200,
-      "reason": "development, V1 holdout, V2.1 holdout, V2.4 exclude-150 validation, feature-pruned exclude-200 validation, and V2.5 retrospective stress have inspected these outcome blocks."
+      "reason": "development, V1 holdout, V2.1 holdout, V2.4 exclude-150 validation, feature-pruned exclude-200 validation, V2.5 retrospective stress, and V2.6/V2.7 architecture development have inspected recent outcomes."
     },
     "exclude_150_fresh_block": {
       "consumed": true,
@@ -121,8 +157,8 @@
     }
   },
   "next_actions": {
-    "DLT": "Keep V2.6 DLT 26099 frozen exactly as research/v26/forward-dlt-26099.json until review; do not retune from 2026100 or any pre-target outcome.",
-    "SSQ": "Keep V2.6 SSQ 2026101 frozen exactly as research/v26/forward-ssq-2026101.json until review; do not regenerate after the target draw.",
+    "DLT": "Keep both V2.6 and V2.7 DLT 26099 freezes immutable. V2.7 review must include scarcity pool number ranks, full scarcity-combination rank analysis, and Top10/50/100/full ranking hit distribution.",
+    "SSQ": "Keep both V2.6 and V2.7 SSQ 2026101 freezes immutable. V2.7 review must include scarcity pool number ranks, full scarcity-combination rank analysis, and Top10/50/100/full ranking hit distribution.",
     "historical_research": "Any new 50-outcome promotion holdout must be older than all consumed blocks and use at least excluded_recent_points=250 unless a stricter boundary is recorded first."
   }
 }
