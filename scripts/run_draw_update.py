@@ -236,17 +236,17 @@ def commit_data(game: str) -> None:
     run_with_retry(["git", "push", "origin", "main"], timeout=120)
 
 
-def push_v25_predictions(changed_games: list[str]) -> None:
+def push_v26_predictions(changed_games: list[str]) -> None:
     if not changed_games:
         return
     if not os.environ.get("PUSHPLUS_TOKEN", "").strip():
-        log("检测到新期号，但未配置 PUSHPLUS_TOKEN；跳过 V2.5 PushPlus 推送")
+        log("检测到新期号，但未配置 PUSHPLUS_TOKEN；跳过 V2.6 PushPlus 推送")
         return
     for game in changed_games:
-        log(f"推送 {game.upper()} 下一期 V2.5 预测到 PushPlus")
+        log(f"推送 {game.upper()} 下一期 V2.6 预测到 PushPlus")
         result = run(
-            [sys.executable, "scripts/push_v25_prediction.py", "--game", game.upper(), "--send"],
-            timeout=30,
+            [sys.executable, "scripts/push_v26_prediction.py", "--game", game.upper(), "--send"],
+            timeout=120,
             check=False,
         )
         if result.returncode != 0:
@@ -372,7 +372,7 @@ def main() -> int:
                 log("未发现新期号")
             build_pages()
             publish_pages()
-            push_v25_predictions(changed_games)
+            push_v26_predictions(changed_games)
             message = "自动更新任务完成"
             log(message)
             write_run_status("ok", game, message)
