@@ -53,6 +53,13 @@ ceway/
 - [v1.12.4 后区与蓝球走势分析](docs/ceway_v1_12_4_back_trends.md)
 - [Backlog](docs/backlog.md)
 - [数据导入说明](docs/data_import.md)
+- [Colab 批量回测](docs/colab_batch_runner.md)
+
+## Colab 批量回测
+
+[`notebooks/ceway_colab_batch.ipynb`](notebooks/ceway_colab_batch.ipynb) 可在
+Google Colab 中执行后端测试和 DLT/SSQ 历史回测，并把 JSON 结果归档到
+Google Drive。正式前端、开奖数据更新、推荐与推送仍在原有生产路径运行。
 
 手动启动后端：
 
