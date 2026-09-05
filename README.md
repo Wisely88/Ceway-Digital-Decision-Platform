@@ -3,11 +3,13 @@
 Digital Decision Platform  
 Powered by CBGO Framework
 
-当前版本为“正式使用版”，已支持大乐透 DLT 与双色球 SSQ 的智能推荐、纯随机生成、套餐模拟、自选号码、方案保存、单用户云同步和当期开奖复盘。
+当前 `main` 仍为“正式使用版” v1.12.4，已支持大乐透 DLT 与双色球 SSQ 的智能推荐、纯随机生成、套餐模拟、自选号码、方案保存、单用户云同步和当期开奖复盘。
 
 产品主线：选号只是入口，决策解释和风险控制才是核心。系统会说明本期实际支出、组合覆盖、投注倍率、资金暴露、近 30 日投入、连续加码迹象和历史回测表现。
 
 策维不预测开奖结果，不承诺提高中奖概率。历史评分和回测只能描述历史匹配，不能证明未来收益。
+
+> V2 开发说明：`agent/ceway-v2-research-engine` 分支正在开发 CEWAY-FWD-V2 研究/验证层；尚未合并到生产 `main`。详见 [`docs/ceway_v2_research_engine.md`](docs/ceway_v2_research_engine.md)。
 
 ## 目录
 
@@ -51,6 +53,7 @@ ceway/
 - [v1.12.2 完整历史与性能优化](docs/ceway_v1_12_2_history_performance.md)
 - [v1.12.3 方案永久归档与全量查询](docs/ceway_v1_12_3_record_archive.md)
 - [v1.12.4 后区与蓝球走势分析](docs/ceway_v1_12_4_back_trends.md)
+- [CEWAY-FWD-V2 研究引擎](docs/ceway_v2_research_engine.md)
 - [Backlog](docs/backlog.md)
 - [数据导入说明](docs/data_import.md)
 - [Colab 批量回测](docs/colab_batch_runner.md)
@@ -104,7 +107,7 @@ backend/.venv/bin/python -m unittest discover -s backend/tests -v
 backend/.venv/bin/python scripts/mobile_smoke.py
 ```
 
-当前数据快照：
+当前数据快照（README 的生产快照说明保持 v1.12.4 发布时记录；自动更新后的实时期数以仓库数据文件与 API 为准）：
 
 - 大乐透：2902 期，最新 `26084`（2026-07-27）。
 - 双色球：3482 期，最新 `2026085`（2026-07-26）。
@@ -186,3 +189,17 @@ http://192.168.31.34:8788/ceway/
 ```bash
 ngrok http 8788
 ```
+
+## V2.5 Multi-Regime Exposure 研究状态
+
+统一 Research 线当前新增 **CEWAY V2.5 Multi-Regime Exposure** 候选：将号码状态拆成独立 Evidence / Scarcity / Neutral-Coverage 三个角色，以预注册的 50% / 30% / 20% 槽位曝光生成组合。Scarcity 使用最近 3/7/20 期低频、gap 与长短窗 divergence，仅作为覆盖状态，不解释为更高中奖概率。
+
+60 点 × DLT/SSQ、排除最近 200 期、3 个结构匹配随机 seed 的回顾性压力验证结果：
+
+- DLT：V2.5 相对 V9 best-hit uplift `+0.3667`，95% CI `[+0.1500, +0.5667]`；相对结构匹配随机 `+0.0722`，CI `[-0.1111, +0.2500]`。
+- SSQ：V2.5 相对 V2.4 best-hit uplift `+0.3167`，95% CI `[+0.0833, +0.5500]`；相对结构匹配随机 `+0.1556`，CI `[-0.0222, +0.3389]`。
+- 组合前区/红球平均 Jaccard 分别为 `0.0512` / `0.0646`，均低于对应结构匹配随机对照，说明同质化明显下降。
+
+当前结论固定为 `HOLD_RETROSPECTIVE`：改善已经出现，但随机对照 CI 仍跨 0，因此 `production_enabled=false`，不进入生产，也不根据本次开奖结果继续微调权重追求显著性。
+
+固化证据：[`research/v25/multiregime-retrospective-stress.json`](research/v25/multiregime-retrospective-stress.json)。

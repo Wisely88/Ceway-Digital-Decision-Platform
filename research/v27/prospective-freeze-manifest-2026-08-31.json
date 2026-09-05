@@ -1,0 +1,51 @@
+{
+  "schema_version": "ceway.v27.prospective-freeze-manifest.v1",
+  "model_version": "multi-regime-scarcity-combo-v2.7",
+  "status": "FROZEN_PENDING_TARGET_DRAWS",
+  "production_enabled": false,
+  "source_commit": "ef9aea1043d308538c5a149506cc2e522bc05a0b",
+  "validation": {
+    "workflow_run": 33355447750,
+    "job": 99376584972,
+    "conclusion": "success",
+    "artifact_id": 9744975041,
+    "artifact_name": "v27-current-full-ranking-freezes",
+    "artifact_sha256": "37c5a8a30d546b8177593a7ae5c6b77d5b27f918809e6ef9be5deaafc8c03697",
+    "artifact_contains_full_rankings": true
+  },
+  "DLT": {
+    "target_issue": "26099",
+    "history_cutoff_issue": "26098",
+    "freeze_file_in_artifact": "dlt-v27.json",
+    "freeze_file_sha256": "2c62b3db1e72c6c1bcb5798368b828a8ba1d6098c47e5f8f111973afa503ac32",
+    "scarcity_pool_ranked": [1, 2, 13, 23, 28, 30, 31, 24, 27, 32, 34, 4],
+    "scarcity_full_combination_count_after_constraints": 185,
+    "scarcity_top1": [1, 4, 23, 27, 32],
+    "scarcity_track_selected_ranks": [1, 7, 2]
+  },
+  "SSQ": {
+    "target_issue": "2026101",
+    "history_cutoff_issue": "2026100",
+    "freeze_file_in_artifact": "ssq-v27.json",
+    "freeze_file_sha256": "d3a36e7cc7e08e733d3b11b5f6def4122312a9746afeec9ad91c0c7dc26cbeda",
+    "scarcity_pool_ranked": [2, 7, 19, 10, 11, 20, 28, 32, 27, 23, 5, 17],
+    "scarcity_full_combination_count_after_constraints": 359,
+    "scarcity_top1": [2, 10, 19, 20, 23, 27],
+    "scarcity_track_selected_ranks": [1, 5, 8]
+  },
+  "immutability": {
+    "full_rankings_must_not_be_regenerated_for_target_review": true,
+    "reviewer": "scripts/review_v27_scarcity.py",
+    "review_source": "frozen artifact JSON only",
+    "ranking_recompute_after_draw": false
+  },
+  "review_scope": [
+    "winning numbers' original scarcity pool ranks",
+    "scarcity pool hit count",
+    "exact winning-combination rank when candidate-eligible",
+    "best matching scarcity combination and its original rank",
+    "first rank reaching 2/3/4+ hits",
+    "Top10/Top50/Top100/full-ranking hit distribution"
+  ],
+  "claim_scope": "Scarcity and collision rankings are descriptive research features and do not imply increased future winning probability."
+}
