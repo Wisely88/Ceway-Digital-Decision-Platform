@@ -28,9 +28,14 @@ jobs:
           python scripts/predict_v29_request.py \
             --request research/v29/requests/ssq-2026104.json \
             --output /tmp/v29-freezes/ssq-2026104-v29.json
-      - name: Upload V2.9 freeze
+      - name: Generate DLT 26102 V2.9 freeze
+        run: |
+          python scripts/predict_v29_request.py \
+            --request research/v29/requests/dlt-26102.json \
+            --output /tmp/v29-freezes/dlt-26102-v29.json
+      - name: Upload V2.9 freezes
         uses: actions/upload-artifact@v4
         with:
-          name: v29-ssq-2026104-freeze
-          path: /tmp/v29-freezes/ssq-2026104-v29.json
+          name: v29-next-draw-freezes
+          path: /tmp/v29-freezes/*.json
           if-no-files-found: error
