@@ -1,0 +1,36 @@
+name: CEWAY V2.9 Protected Fusion Validation
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Syntax-check V2.9
+        run: python -m py_compile backend/multiregime_v29.py scripts/predict_v29_request.py
+      - name: Generate SSQ 2026104 V2.9 freeze
+        run: |
+          mkdir -p /tmp/v29-freezes
+          python scripts/predict_v29_request.py \
+            --request research/v29/requests/ssq-2026104.json \
+            --output /tmp/v29-freezes/ssq-2026104-v29.json
+      - name: Upload V2.9 freeze
+        uses: actions/upload-artifact@v4
+        with:
+          name: v29-ssq-2026104-freeze
+          path: /tmp/v29-freezes/ssq-2026104-v29.json
+          if-no-files-found: error
