@@ -1,0 +1,43 @@
+{
+  "schema_version": "ceway.v29.combined-prospective-freeze.v1",
+  "generator_version": "protected-core-incremental-fusion-v2.9",
+  "production_enabled": false,
+  "immutable": true,
+  "artifact": {"run_id": 34039124375, "artifact_id": 9991118998, "sha256": "b4fbae2f9a5776bb74ca67363159c0b13834d6ec9a750056b8073cabec4f735a"},
+  "SSQ": {
+    "target_issue": "2026104",
+    "history_cutoff_issue": "2026103",
+    "track_counts": {"evidence": 3, "scarcity": 3, "neutral": 2, "fusion": 2},
+    "core_reference": {"origin_track":"scarcity","front":[2,7,17,21,23,32],"back":[6]},
+    "items": [
+      {"origin_track":"evidence","front":[4,9,18,22,24,25],"back":[4]},
+      {"origin_track":"scarcity","front":[2,7,17,21,23,32],"back":[6]},
+      {"origin_track":"evidence","front":[6,9,13,18,24,33],"back":[2]},
+      {"origin_track":"neutral","front":[3,10,11,12,26,31],"back":[11]},
+      {"origin_track":"evidence","front":[4,9,13,22,25,30],"back":[5]},
+      {"origin_track":"scarcity","front":[2,7,15,19,29,32],"back":[3]},
+      {"origin_track":"fusion","front":[7,10,16,18,25,31],"back":[7]},
+      {"origin_track":"scarcity","front":[1,2,14,21,29,33],"back":[5]},
+      {"origin_track":"fusion","front":[2,10,14,19,25,33],"back":[5]},
+      {"origin_track":"neutral","front":[3,5,12,26,27,28],"back":[7]}
+    ]
+  },
+  "DLT": {
+    "target_issue": "26102",
+    "history_cutoff_issue": "26101",
+    "track_counts": {"evidence": 3, "scarcity": 3, "neutral": 2, "fusion": 2},
+    "core_reference": {"origin_track":"neutral","front":[7,8,14,25,27],"back":[4,12]},
+    "items": [
+      {"origin_track":"evidence","front":[9,12,14,26,33],"back":[7,8]},
+      {"origin_track":"scarcity","front":[1,5,13,28,34],"back":[6,10]},
+      {"origin_track":"evidence","front":[10,11,15,18,33],"back":[1,5]},
+      {"origin_track":"neutral","front":[7,8,14,25,27],"back":[4,12]},
+      {"origin_track":"evidence","front":[3,12,15,26,29],"back":[1,7]},
+      {"origin_track":"scarcity","front":[4,5,23,27,30],"back":[1,10]},
+      {"origin_track":"fusion","front":[4,7,13,26,33],"back":[1,12]},
+      {"origin_track":"scarcity","front":[1,13,22,27,28],"back":[5,6]},
+      {"origin_track":"fusion","front":[3,10,19,26,27],"back":[1,5]},
+      {"origin_track":"neutral","front":[7,8,20,24,27],"back":[11,12]}
+    ]
+  }
+}

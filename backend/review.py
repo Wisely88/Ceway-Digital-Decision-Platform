@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from itertools import combinations
 
+from freeze_v2 import verify_plan_freeze
 from prizes import prize_financials, review_financial_summary
+from research_v2 import DLT, SSQ
 
 
 DLT_LABELS = {
@@ -181,6 +183,7 @@ def review_plan(plan: dict, draw: dict) -> dict:
     return {
         "scene": "DLT",
         "play_labels": plan.get("play_labels") or DLT_LABELS,
+        "freeze_integrity": verify_plan_freeze(plan, DLT),
         "actual": {
             "issue": draw["issue"],
             "date": draw["date"],
@@ -211,6 +214,7 @@ def build_review(records: list[dict], history: list[dict], limit: int = 20, priz
                     "latest_issue": record.get("latest_issue"),
                     "recommended_issue": plan.get("recommended_issue"),
                     "plan": plan,
+                    "freeze_integrity": verify_plan_freeze(plan, DLT),
                     "scene": plan.get("scene", "DLT"),
                     "play_labels": plan.get("play_labels") or DLT_LABELS,
                     "status": "pending",
@@ -274,7 +278,7 @@ def build_review(records: list[dict], history: list[dict], limit: int = 20, priz
             **financials,
         },
         "items": items,
-        "disclaimer": "复盘只统计历史推荐与实际开奖号码的匹配结果，不代表未来命中概率或收益能力。",
+        "disclaimer": "复盘只统计历史推荐与实际开奖号码的匹配结果，不代表未来命中概率或收益能力。V2 记录同时验证冻结 SHA 与当前票面完整性。",
     }
 
 
@@ -389,6 +393,7 @@ def review_ssq_plan(plan: dict, draw: dict) -> dict:
     return {
         "scene": "SSQ",
         "play_labels": plan.get("play_labels") or SSQ_LABELS,
+        "freeze_integrity": verify_plan_freeze(plan, SSQ),
         "actual": {
             "issue": draw["issue"],
             "date": draw["date"],
@@ -419,6 +424,7 @@ def build_ssq_review(records: list[dict], history: list[dict], limit: int = 20, 
                     "latest_issue": record.get("latest_issue"),
                     "recommended_issue": plan.get("recommended_issue"),
                     "plan": plan,
+                    "freeze_integrity": verify_plan_freeze(plan, SSQ),
                     "scene": plan.get("scene", "SSQ"),
                     "play_labels": plan.get("play_labels") or SSQ_LABELS,
                     "status": "pending",
@@ -481,5 +487,5 @@ def build_ssq_review(records: list[dict], history: list[dict], limit: int = 20, 
             **financials,
         },
         "items": items,
-        "disclaimer": "复盘只统计历史推荐与实际开奖号码的匹配结果，不代表未来命中概率或收益能力。",
+        "disclaimer": "复盘只统计历史推荐与实际开奖号码的匹配结果，不代表未来命中概率或收益能力。V2 记录同时验证冻结 SHA 与当前票面完整性。",
     }

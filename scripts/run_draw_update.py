@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import fcntl
 import json
 import os
@@ -23,6 +24,10 @@ DATA_FILES = [
     Path("backend/data/dlt_prizes.json"),
     Path("backend/data/ssq_prizes.json"),
 ]
+HISTORY_FILES = {
+    "dlt": ROOT_DIR / "backend/data/dlt_history.csv",
+    "ssq": ROOT_DIR / "backend/data/ssq_history.csv",
+}
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 DLT_DRAW_WEEKDAYS = {0, 2, 5}
 SSQ_DRAW_WEEKDAYS = {1, 3, 6}
@@ -153,6 +158,23 @@ def scheduled_game(now: datetime | None = None) -> str | None:
     return None
 
 
+def selected_games(game: str) -> list[str]:
+    return ["dlt", "ssq"] if game == "all" else [game]
+
+
+def latest_issue(game: str) -> str:
+    path = HISTORY_FILES[game]
+    latest = ""
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        for row in csv.DictReader(handle):
+            latest = str(row.get("issue", "")).strip()
+    return latest
+
+
+def latest_issue_snapshot(game: str) -> dict[str, str]:
+    return {selected: latest_issue(selected) for selected in selected_games(game)}
+
+
 def ensure_safe_worktree() -> None:
     result = run(
         ["git", "status", "--porcelain", "--untracked-files=normal"],
@@ -190,8 +212,7 @@ def update_history(game: str) -> None:
         "dlt": [sys.executable, "scripts/update_dlt_history.py", "--source", "auto", "--mode", "append"],
         "ssq": [sys.executable, "scripts/update_ssq_history.py", "--source", "auto", "--mode", "append"],
     }
-    games = ["dlt", "ssq"] if game == "all" else [game]
-    for selected in games:
+    for selected in selected_games(game):
         log(f"从 78500.cn 更新 {selected.upper()} 历史数据")
         run(commands[selected], timeout=30)
     run([sys.executable, "scripts/validate_lottery_history.py"], timeout=30)
@@ -215,6 +236,23 @@ def commit_data(game: str) -> None:
     run_with_retry(["git", "push", "origin", "main"], timeout=120)
 
 
+def push_v27_predictions(changed_games: list[str]) -> None:
+    if not changed_games:
+        return
+    if not os.environ.get("PUSHPLUS_TOKEN", "").strip():
+        log("检测到新期号，但未配置 PUSHPLUS_TOKEN；跳过 V2.7 PushPlus 推送")
+        return
+    for game in changed_games:
+        log(f"推送 {game.upper()} 下一期 V2.7 预测到 PushPlus")
+        result = run(
+            [sys.executable, "scripts/push_v27_prediction.py", "--game", game.upper(), "--send"],
+            timeout=120,
+            check=False,
+        )
+        if result.returncode != 0:
+            log(f"PushPlus 推送失败但不回滚开奖数据更新：{game.upper()}")
+
+
 def frontend_dependencies_are_stale(frontend_dir: Path = FRONTEND_DIR) -> bool:
     node_modules = frontend_dir / "node_modules"
     package_lock = frontend_dir / "package-lock.json"
@@ -228,7 +266,6 @@ def build_pages() -> None:
     npm = shutil.which("npm", path=AUTOMATION_PATH)
     if not npm:
         raise RuntimeError("未找到 npm，无法构建 GitHub Pages")
-    node_modules = FRONTEND_DIR / "node_modules"
     if frontend_dependencies_are_stale():
         log("前端依赖有更新，执行 npm ci")
         run([npm, "ci"], cwd=FRONTEND_DIR, timeout=600)
@@ -321,7 +358,13 @@ def main() -> int:
         try:
             ensure_safe_worktree()
             refresh_checkout()
+            issues_before = latest_issue_snapshot(game)
             update_history(game)
+            issues_after = latest_issue_snapshot(game)
+            changed_games = [
+                selected for selected in selected_games(game)
+                if issues_after.get(selected) and issues_after.get(selected) != issues_before.get(selected)
+            ]
             if data_changed():
                 log("发现新期号，保存历史数据到 GitHub")
                 commit_data(game)
@@ -329,6 +372,7 @@ def main() -> int:
                 log("未发现新期号")
             build_pages()
             publish_pages()
+            push_v27_predictions(changed_games)
             message = "自动更新任务完成"
             log(message)
             write_run_status("ok", game, message)

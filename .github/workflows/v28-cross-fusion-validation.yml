@@ -1,0 +1,43 @@
+name: CEWAY V2.8 Cross-Regime Fusion Validation
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Syntax-check V2.8
+        run: python -m py_compile backend/multiregime_v28.py backend/pushplus_v28.py scripts/push_v28_prediction.py scripts/review_v28_fusion.py scripts/freeze_v28_prediction.py
+      - name: Run V2.8 unit tests
+        run: python -m unittest tests.test_multiregime_v28 tests.test_pushplus_v28 -v
+        working-directory: backend
+      - name: Dry-run DLT V2.8 with full fusion ranking
+        run: python scripts/push_v28_prediction.py --game DLT
+      - name: Dry-run SSQ V2.8 with full fusion ranking
+        run: python scripts/push_v28_prediction.py --game SSQ
+      - name: Export current V2.8 full-ranking freezes
+        run: |
+          mkdir -p /tmp/v28-freezes
+          python scripts/freeze_v28_prediction.py --game DLT --output /tmp/v28-freezes/dlt-v28.json
+          python scripts/freeze_v28_prediction.py --game SSQ --output /tmp/v28-freezes/ssq-v28.json
+      - name: Upload V2.8 full-ranking freezes
+        uses: actions/upload-artifact@v4
+        with:
+          name: v28-current-full-ranking-freezes
+          path: /tmp/v28-freezes/*.json
+          if-no-files-found: error
+          retention-days: 90

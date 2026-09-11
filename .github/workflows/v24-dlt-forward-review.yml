@@ -1,0 +1,51 @@
+name: CEWAY V2.4 DLT Forward Review
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/data/dlt_history.csv"
+      - "research/forward/dlt/26092-v24.json"
+      - "scripts/review_dlt_forward_shadow.py"
+      - "backend/tests/test_forward_shadow_review.py"
+      - ".github/workflows/v24-dlt-forward-review.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ceway-v24-dlt-forward-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Verify immutable forward review behavior
+        working-directory: backend
+        run: python -m unittest tests.test_forward_shadow_review tests.test_freeze_v2 -v
+
+      - name: Review frozen DLT 26092 shadow if outcome exists
+        run: |
+          python scripts/review_dlt_forward_shadow.py \
+            --registry research/forward/dlt/26092-v24.json \
+            --output artifacts/dlt_26092_v24_forward_review.json
+
+      - name: Upload forward review status
+        uses: actions/upload-artifact@v4
+        with:
+          name: ceway-v24-dlt-26092-forward-review
+          path: artifacts/dlt_26092_v24_forward_review.json
+          if-no-files-found: error

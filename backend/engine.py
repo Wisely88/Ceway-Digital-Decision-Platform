@@ -22,6 +22,8 @@ from db import (
     save_ssq_record_db,
     upsert_ssq_draws,
 )
+from freeze_v2 import ensure_plan_v2_metadata
+from research_v2 import DLT, SSQ
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -132,7 +134,37 @@ def load_dlt_records() -> list[dict]:
     return payload
 
 
+def _next_issue_label(issue: str | None) -> str | None:
+    issue_text = str(issue or "")
+    if not issue_text.isdigit():
+        return None
+    return f"{int(issue_text) + 1:0{len(issue_text)}d}"
+
+
 def save_dlt_record(record: dict) -> list[dict]:
+    history = load_dlt_history()
+    plan = record.get("plan") or {}
+    cutoff_issue = (
+        record.get("latest_issue")
+        or plan.get("based_on_issue")
+        or (history[-1]["issue"] if history else None)
+    )
+    target_issue = plan.get("recommended_issue") or _next_issue_label(cutoff_issue)
+    ensure_plan_v2_metadata(
+        plan,
+        game="dlt",
+        spec=DLT,
+        history=history,
+        history_cutoff_issue=cutoff_issue,
+        target_issue=target_issue,
+        parameters={
+            "budget": record.get("budget", plan.get("cost", 0)),
+            "strategy": record.get("strategy") or plan.get("strategy") or "unknown",
+            "mode": plan.get("mode"),
+            "source": "record_save",
+        },
+    )
+    record["plan"] = plan
     return save_dlt_record_db(record)
 
 
@@ -304,6 +336,29 @@ def load_ssq_records() -> list[dict]:
 
 
 def save_ssq_record(record: dict) -> list[dict]:
+    history = load_ssq_history()
+    plan = record.get("plan") or {}
+    cutoff_issue = (
+        record.get("latest_issue")
+        or plan.get("based_on_issue")
+        or (history[-1]["issue"] if history else None)
+    )
+    target_issue = plan.get("recommended_issue") or _next_issue_label(cutoff_issue)
+    ensure_plan_v2_metadata(
+        plan,
+        game="ssq",
+        spec=SSQ,
+        history=history,
+        history_cutoff_issue=cutoff_issue,
+        target_issue=target_issue,
+        parameters={
+            "budget": record.get("budget", plan.get("cost", 0)),
+            "strategy": record.get("strategy") or plan.get("strategy") or "unknown",
+            "mode": plan.get("mode"),
+            "source": "record_save",
+        },
+    )
+    record["plan"] = plan
     return save_ssq_record_db(record)
 
 
