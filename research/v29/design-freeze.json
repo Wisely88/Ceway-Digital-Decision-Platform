@@ -1,0 +1,29 @@
+{
+  "schema_version": "ceway.v29.design-freeze.v1",
+  "version": "protected-core-incremental-fusion-v2.9",
+  "parent_versions": ["multi-regime-scarcity-combo-v2.7", "multi-regime-cross-fusion-v2.8"],
+  "production_enabled": false,
+  "change_reason": "V2.8 forward reviews showed two complementary risks: forced Fusion slots can displace a strong Evidence ticket, while a strong Scarcity complete combination can deserve protection. V2.9 therefore restores the full V2.7 5/3/2 portfolio as the baseline and makes Fusion replacement conditional rather than mandatory.",
+  "baseline": {
+    "portfolio": "V2.7 complete-ticket portfolio",
+    "default_10_ticket_quota": {"evidence": 5, "scarcity": 3, "neutral": 2}
+  },
+  "protected_core": {
+    "rule": "Protect the highest combined-score selected ticket from each of Evidence, Scarcity and Neutral before considering Fusion replacement.",
+    "protected_count_default": 3
+  },
+  "fusion_replacement": {
+    "max_replacements": 2,
+    "objective": "0.50*score_delta + 0.35*(added_unique_ratio-lost_unique_ratio) + 0.15*(1-max_jaccard)",
+    "acceptance": "replacement_gain > 0 AND lost_unique_ratio <= added_unique_ratio",
+    "mandatory_fusion_share": false,
+    "manual_selection": false
+  },
+  "anti_overfit_guard": {
+    "v27_scorers_unchanged": true,
+    "v28_fusion_scorers_unchanged": true,
+    "historical_collision_layer_retained": true,
+    "post_draw_regeneration_prohibited": true,
+    "single_draw_cannot_trigger_promotion": true
+  }
+}

@@ -1,0 +1,73 @@
+name: CEWAY V2.1 Score Exposure Ablation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/generator_v2.py"
+      - "backend/random_control_v2.py"
+      - "backend/tests/test_generator_v2.py"
+      - "backend/tests/test_random_control_v2.py"
+      - "scripts/run_v2_generator_exposure_ablation.py"
+      - ".github/workflows/v21-generator-ablation.yml"
+  workflow_dispatch:
+    inputs:
+      periods:
+        description: "Development walk-forward points"
+        required: false
+        default: "50"
+      windows:
+        description: "Comma-separated scoring windows"
+        required: false
+        default: "50,100,200"
+      baseline_seeds:
+        description: "Matched-random seeds"
+        required: false
+        default: "3"
+
+concurrency:
+  group: ceway-v21-generator-ablation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ablation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Verify generator structure and random controls
+        working-directory: backend
+        run: python -m unittest tests.test_generator_v2 tests.test_random_control_v2 -v
+
+      - name: Run V2.1 development A/B
+        env:
+          PERIODS: ${{ inputs.periods || '50' }}
+          WINDOWS: ${{ inputs.windows || '50,100,200' }}
+          BASELINE_SEEDS: ${{ inputs.baseline_seeds || '3' }}
+        run: |
+          python scripts/run_v2_generator_exposure_ablation.py \
+            --periods "$PERIODS" \
+            --windows "$WINDOWS" \
+            --baseline-seeds "$BASELINE_SEEDS" \
+            --budget 20 \
+            --strategy balanced \
+            --output artifacts/ceway_v21_generator_ablation.json
+
+      - name: Upload V2.1 development report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ceway-v21-generator-ablation
+          path: artifacts/ceway_v21_generator_ablation.json
+          if-no-files-found: error
