@@ -1,0 +1,28 @@
+{
+  "schema_version": "ceway.guard-lifecycle.v1",
+  "policy": {
+    "unit": "complete_combination",
+    "minimum_consecutive_draws": 5,
+    "no_midcycle_number_swap": true,
+    "no_midcycle_drop_after_miss": true,
+    "review_only_after_minimum_cycle": true,
+    "extension_allowed_after_review": true,
+    "production_enabled": false
+  },
+  "SSQ": {
+    "combination": {"front":[2,7,17,21,23,32],"back":[6]},
+    "start_issue": "2026105",
+    "minimum_through_issue": "2026109",
+    "completed_draws_before_next_prediction": 1,
+    "next_issue": "2026106",
+    "next_cycle_position": "2/5"
+  },
+  "DLT": {
+    "combination": {"front":[4,5,13,30,34],"back":[1,10]},
+    "start_issue": "26103",
+    "minimum_through_issue": "26107",
+    "completed_draws_before_next_prediction": 1,
+    "next_issue": "26104",
+    "next_cycle_position": "2/5"
+  }
+}

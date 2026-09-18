@@ -1,0 +1,53 @@
+name: CEWAY V3.0 Next Draw 2026108 26106
+
+on:
+  push:
+    branches: [agent/ceway-v2-research-engine]
+    paths:
+      - '.github/workflows/v30-next-2026108-26106.yml'
+      - 'research/v30/requests/ssq-2026108.json'
+      - 'research/v30/requests/dlt-26106.json'
+  workflow_dispatch:
+
+jobs:
+  freeze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ceway-v2-research-engine
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Sync repository history and append confirmed latest draws in working tree only
+        run: |
+          git fetch origin main
+          git checkout origin/main -- backend/data/ssq_history.csv backend/data/dlt_history.csv
+          if ! grep -q '^2026107,' backend/data/ssq_history.csv; then
+            printf '\n2026107,2026-09-15,1,5,9,17,24,33,4\n' >> backend/data/ssq_history.csv
+          fi
+          if ! grep -q '^26105,' backend/data/dlt_history.csv; then
+            printf '\n26105,2026-09-14,10,14,30,33,34,9,12\n' >> backend/data/dlt_history.csv
+          fi
+          tail -n 4 backend/data/ssq_history.csv
+          tail -n 4 backend/data/dlt_history.csv
+      - name: Install dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Generate next V3.0 prospective freezes
+        run: |
+          mkdir -p /tmp/v30-next
+          python scripts/predict_v30_request.py --request research/v30/requests/ssq-2026108.json --output /tmp/v30-next/ssq-2026108-v30.json | tee /tmp/v30-next/ssq-summary.txt
+          python scripts/predict_v30_request.py --request research/v30/requests/dlt-26106.json --output /tmp/v30-next/dlt-26106-v30.json | tee /tmp/v30-next/dlt-summary.txt
+      - name: Upload freezes
+        uses: actions/upload-artifact@v4
+        with:
+          name: v30-next-2026108-26106
+          path: /tmp/v30-next/*
+          if-no-files-found: error
+          retention-days: 90
