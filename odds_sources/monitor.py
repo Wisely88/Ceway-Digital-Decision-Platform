@@ -76,6 +76,14 @@ def check_page(source, today, fetcher=fetch):
             record["reachability"] = "http_error"
             return record
         record["reachability"] = "page_reachable"
+        # A reachable third-party page can explicitly warn about its own sales pause.
+        # Never infer an official Sporttery suspension from that third-party notice.
+        if source["id"] == "zgzcw_basketball":
+            plain = re.sub(r"\\s+", "", re.sub(r"<[^>]*>", " ", body))
+            record["page_sales_notice"] = (
+                "third_party_page_reports_paused"
+                if "该彩种暂停销售" in plain else "not_detected"
+            )
         dates = set()
         for match in PAGE_DATE.findall(body):
             try:
