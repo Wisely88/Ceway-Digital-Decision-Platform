@@ -1,5 +1,5 @@
 {
-  "checked_at_utc": "2026-09-24T17:51:16Z",
+  "checked_at_utc": "2026-09-24T22:21:15Z",
   "meaning": "availability only; quote freshness always unverified",
   "sources": [
     {
@@ -83,11 +83,12 @@
       "url": "https://www.zgzcw.com/"
     },
     {
-      "date_signal": "not_checked",
-      "http_status": 418,
+      "date_signal": "current_fixture_date_visible",
+      "http_status": 200,
       "id": "zgzcw_basketball",
       "odds_freshness": "not_verified",
-      "reachability": "http_error",
+      "page_sales_notice": "third_party_page_reports_paused",
+      "reachability": "page_reachable",
       "url": "https://cp.zgzcw.com/lottery/jcplayvsForJsp.action?lotteryId=27"
     },
     {
