@@ -1,5 +1,5 @@
 {
-  "checked_at_utc": "2026-09-24T08:33:56Z",
+  "checked_at_utc": "2026-09-24T17:51:16Z",
   "meaning": "availability only; quote freshness always unverified",
   "sources": [
     {
@@ -43,7 +43,7 @@
       "url": "https://www.okooo.com/jingcai/"
     },
     {
-      "date_signal": "current_fixture_date_visible",
+      "date_signal": "no_current_fixture_date_detected",
       "http_status": 200,
       "id": "okooo_basketball",
       "odds_freshness": "not_verified",
@@ -67,7 +67,7 @@
       "url": "https://zx.500star.com/jczq/jjzs.php?play=1"
     },
     {
-      "date_signal": "current_fixture_date_visible",
+      "date_signal": "no_current_fixture_date_detected",
       "http_status": 200,
       "id": "500star_basketball",
       "odds_freshness": "not_verified",
@@ -83,12 +83,11 @@
       "url": "https://www.zgzcw.com/"
     },
     {
-      "date_signal": "current_fixture_date_visible",
-      "http_status": 200,
+      "date_signal": "not_checked",
+      "http_status": 418,
       "id": "zgzcw_basketball",
       "odds_freshness": "not_verified",
-      "page_sales_notice": "third_party_page_reports_paused",
-      "reachability": "page_reachable",
+      "reachability": "http_error",
       "url": "https://cp.zgzcw.com/lottery/jcplayvsForJsp.action?lotteryId=27"
     },
     {
