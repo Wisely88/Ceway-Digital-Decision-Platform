@@ -1,0 +1,57 @@
+{
+  "type": "historical_user_screenshot_evidence_not_live_feed",
+  "page": "https://model.honghuo66.com/",
+  "capture_local_time": "2026-09-24T15:46:00+08:00",
+  "official_origin_confirmed": false,
+  "note": "All 4302–4305 prices are handicap SP, not unhandicapped moneyline.",
+  "matches": [
+    {
+      "display_number": "4302",
+      "away": "墨尔本联",
+      "home": "墨凤凰",
+      "market": "basketball_spread",
+      "home_line": 2.5,
+      "away_sp": 1.65,
+      "home_sp": 1.75,
+      "total_line": 193.5,
+      "over_sp": 1.7,
+      "under_sp": 1.7
+    },
+    {
+      "display_number": "4303",
+      "away": "泰国女",
+      "home": "日本女",
+      "market": "basketball_spread",
+      "home_line": -58.5,
+      "away_sp": 1.7,
+      "home_sp": 1.7,
+      "total_line": 149.5,
+      "over_sp": 1.74,
+      "under_sp": 1.66
+    },
+    {
+      "display_number": "4304",
+      "away": "阿德莱德",
+      "home": "珀斯",
+      "market": "basketball_spread",
+      "home_line": 2.5,
+      "away_sp": 1.65,
+      "home_sp": 1.75,
+      "total_line": 185.5,
+      "over_sp": 1.62,
+      "under_sp": 1.78
+    },
+    {
+      "display_number": "4305",
+      "away": "皇马",
+      "home": "迪拜",
+      "market": "basketball_spread",
+      "home_line": -1.5,
+      "away_sp": 1.7,
+      "home_sp": 1.7,
+      "total_line": 174.5,
+      "over_sp": 1.62,
+      "under_sp": 1.78
+    }
+  ]
+}

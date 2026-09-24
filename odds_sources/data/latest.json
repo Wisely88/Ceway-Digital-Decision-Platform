@@ -1,0 +1,9 @@
+{
+  "checked_at_utc": null,
+  "status": "not_initialized",
+  "is_fresh": false,
+  "max_quote_age_minutes": 45,
+  "quotes": [],
+  "rejected_quotes": [],
+  "note": "An empty feed is safer than stale or inferred odds."
+}

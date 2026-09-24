@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "maintained_since": "2026-09-24",
+  "note": "Page reachability is never proof of current odds or official SP.",
+  "sources": [
+    {
+      "id": "sporttery_football",
+      "name": "中国竞彩网·足球胜平负/让球",
+      "sport": "football",
+      "tier": "official_web",
+      "url": "https://www.sporttery.cn/jc/jsq/zqspf/",
+      "provides": [
+        "fixtures",
+        "football_1x2",
+        "football_handicap_1x2"
+      ],
+      "access": "dynamic_html",
+      "initial_evidence": "official_index_2026-09-24",
+      "automated_quote_extraction": "not_verified"
+    },
+    {
+      "id": "sporttery_football_schedule",
+      "name": "中国竞彩网·足球竞猜赛程",
+      "sport": "football",
+      "tier": "official_web",
+      "url": "https://www.sporttery.cn/jc/zqszsc/index.html",
+      "provides": [
+        "fixtures",
+        "sale_status"
+      ],
+      "access": "dynamic_html",
+      "initial_evidence": "official_index_2026-09-24",
+      "automated_quote_extraction": "not_verified"
+    },
+    {
+      "id": "sporttery_basketball",
+      "name": "中国竞彩网·篮球让分胜负",
+      "sport": "basketball",
+      "tier": "official_web",
+      "url": "https://www.sporttery.cn/jc/jsq/lqrfsf/",
+      "provides": [
+        "basketball_spread",
+        "fixtures"
+      ],
+      "access": "dynamic_html",
+      "initial_evidence": "official_index_2026-09-24",
+      "automated_quote_extraction": "not_verified"
+    },
+    {
+      "id": "sporttery_basketball_total",
+      "name": "中国竞彩网·篮球大小分",
+      "sport": "basketball",
+      "tier": "official_web",
+      "url": "https://www.sporttery.cn/jc/jsq/lqdxf/",
+      "provides": [
+        "basketball_total"
+      ],
+      "access": "dynamic_html",
+      "initial_evidence": "official_index_2026-09-24",
+      "automated_quote_extraction": "not_verified"
+    },
+    {
+      "id": "okooo_football",
+      "name": "澳客·竞彩足球",
+      "sport": "football",
+      "tier": "third_party",
+      "url": "https://www.okooo.com/jingcai/",
+      "provides": [
+        "fixtures",
+        "football_1x2",
+        "football_handicap_1x2"
+      ],
+      "access": "public_html",
+      "initial_evidence": "public_page_2026-09-24",
+      "automated_quote_extraction": "not_verified"
+    },
+    {
+      "id": "okooo_basketball",
+      "name": "澳客·竞彩篮球混合过关",
+      "sport": "basketball",
+      "tier": "third_party",
+      "url": "https://www.okooo.com/jingcailanqiu/hunhe/",
+      "provides": [
+        "fixtures",
+        "basketball_moneyline",
+        "basketball_spread",
+        "basketball_total",
+        "basketball_margin"
+      ],
+      "access": "public_html_may_cache",
+      "initial_evidence": "public_page_2026-09-24_and_user_screenshot_crosscheck",
+      "automated_quote_extraction": "not_verified"
+    },
+    {
+      "id": "honghuo66",
+      "name": "Honghuo66·竞彩足球/篮球",
+      "sport": "both",
+      "tier": "third_party_unknown_origin",
+      "url": "https://model.honghuo66.com/",
+      "provides": [
+        "football_1x2",
+        "football_handicap_1x2",
+        "basketball_spread",
+        "basketball_total"
+      ],
+      "access": "app_dynamic_login_or_external_access_unverified",
+      "initial_evidence": "user_screenshots_2026-09-24",
+      "automated_quote_extraction": "not_verified"
+    },
+    {
+      "id": "500star_football",
+      "name": "500网·竞彩足球奖金走势",
+      "sport": "football",
+      "tier": "third_party",
+      "url": "https://zx.500star.com/jczq/jjzs.php?play=1",
+      "provides": [
+        "football_handicap_1x2",
+        "odds_movement"
+      ],
+      "access": "public_html_may_cache",
+      "initial_evidence": "public_page_2026-09-24",
+      "automated_quote_extraction": "not_verified"
+    },
+    {
+      "id": "500star_basketball",
+      "name": "500网·竞彩篮球奖金走势",
+      "sport": "basketball",
+      "tier": "third_party",
+      "url": "https://zx.500star.com/jclq/jjzs.php?play=2&type=2",
+      "provides": [
+        "basketball_spread",
+        "odds_movement"
+      ],
+      "access": "public_html_may_cache",
+      "initial_evidence": "public_page_with_old_rows_2026-09-24",
+      "automated_quote_extraction": "not_verified"
+    },
+    {
+      "id": "zgzcw_football",
+      "name": "中国足彩网·竞彩足球",
+      "sport": "football",
+      "tier": "third_party",
+      "url": "https://www.zgzcw.com/",
+      "provides": [
+        "fixtures",
+        "football_1x2"
+      ],
+      "access": "site_entry_only",
+      "initial_evidence": "previous_conversation_unverified_exact_page",
+      "automated_quote_extraction": "not_verified"
+    },
+    {
+      "id": "licensed_feed",
+      "name": "自有/授权JSON数据源（可选）",
+      "sport": "both",
+      "tier": "authorized_feed_user_configured",
+      "url": null,
+      "provides": [
+        "football_1x2",
+        "football_handicap_1x2",
+        "basketball_moneyline",
+        "basketball_spread",
+        "basketball_total"
+      ],
+      "access": "ODDS_FEED_URL_GitHub_secret",
+      "initial_evidence": "integration_contract_only",
+      "automated_quote_extraction": "implemented_requires_authorized_feed"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+name: Football + Basketball odds source monitor
+on:
+  schedule:
+    - cron: '17 1,7,13,19 * * *'
+    - cron: '23 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'all, health, or feed'
+        type: choice
+        options: [all, health, feed]
+        default: all
+permissions:
+  contents: write
+concurrency:
+  group: odds-source-monitor
+  cancel-in-progress: false
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check public sources and optional authorized feed
+        env:
+          ODDS_FEED_URL: ${{ secrets.ODDS_FEED_URL }}
+          ODDS_FEED_BEARER: ${{ secrets.ODDS_FEED_BEARER }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          EVENT_MODE: ${{ inputs.mode }}
+        shell: bash
+        run: |
+          MODE="${EVENT_MODE:-}"
+          if [[ -z "$MODE" ]]; then
+            if [[ "$EVENT_SCHEDULE" == '23 * * * *' ]]; then MODE='feed'; else MODE='health'; fi
+          fi
+          if [[ "$MODE" == 'feed' && -z "$ODDS_FEED_URL" ]]; then
+            echo 'No authorized feed configured; no synthetic odds generated.'
+            exit 0
+          fi
+          python -m unittest discover -s odds_sources/tests -v
+          python odds_sources/monitor.py --mode "$MODE"
+      - name: Commit health and verified feed only
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add odds_sources/status/latest.json odds_sources/data/latest.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'chore(odds): refresh source health and validated feed [skip ci]'
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
