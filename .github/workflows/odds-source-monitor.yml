@@ -1,5 +1,11 @@
 name: Football + Basketball odds source monitor
 on:
+  push:
+    paths:
+      - '.github/workflows/odds-source-monitor.yml'
+      - 'odds_sources/monitor.py'
+      - 'odds_sources/sources.json'
+      - 'odds_sources/tests/**'
   schedule:
     - cron: '17 1,7,13,19 * * *'
     - cron: '23 * * * *'
@@ -36,7 +42,7 @@ jobs:
         run: |
           MODE="${EVENT_MODE:-}"
           if [[ -z "$MODE" ]]; then
-            if [[ "$EVENT_SCHEDULE" == '23 * * * *' ]]; then MODE='feed'; else MODE='health'; fi
+            if [[ "$EVENT_SCHEDULE" == '23 * * * *' ]]; then MODE='feed'; elif [[ -n "$EVENT_SCHEDULE" ]]; then MODE='health'; else MODE='all'; fi
           fi
           if [[ "$MODE" == 'feed' && -z "$ODDS_FEED_URL" ]]; then
             echo 'No authorized feed configured; no synthetic odds generated.'
