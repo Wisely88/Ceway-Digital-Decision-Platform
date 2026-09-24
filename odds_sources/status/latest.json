@@ -1,5 +1,5 @@
 {
-  "checked_at_utc": "2026-09-24T08:18:29Z",
+  "checked_at_utc": "2026-09-24T08:33:56Z",
   "meaning": "availability only; quote freshness always unverified",
   "sources": [
     {
@@ -51,12 +51,11 @@
       "url": "https://www.okooo.com/jingcailanqiu/hunhe/"
     },
     {
-      "date_signal": "not_checked",
-      "error_type": "URLError",
-      "http_status": null,
+      "date_signal": "no_current_fixture_date_detected",
+      "http_status": 200,
       "id": "honghuo66",
       "odds_freshness": "not_verified",
-      "reachability": "request_failed",
+      "reachability": "page_reachable",
       "url": "https://model.honghuo66.com/"
     },
     {
@@ -82,6 +81,15 @@
       "odds_freshness": "not_verified",
       "reachability": "page_reachable",
       "url": "https://www.zgzcw.com/"
+    },
+    {
+      "date_signal": "current_fixture_date_visible",
+      "http_status": 200,
+      "id": "zgzcw_basketball",
+      "odds_freshness": "not_verified",
+      "page_sales_notice": "third_party_page_reports_paused",
+      "reachability": "page_reachable",
+      "url": "https://cp.zgzcw.com/lottery/jcplayvsForJsp.action?lotteryId=27"
     },
     {
       "date_signal": "not_checked",

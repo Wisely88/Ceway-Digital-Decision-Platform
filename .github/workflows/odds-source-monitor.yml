@@ -4,6 +4,7 @@ on:
     paths:
       - '.github/workflows/odds-source-monitor.yml'
       - 'odds_sources/monitor.py'
+      - 'odds_sources/for_prediction.py'
       - 'odds_sources/sources.json'
       - 'odds_sources/tests/**'
   schedule:
@@ -50,14 +51,23 @@ jobs:
           fi
           python -m unittest discover -s odds_sources/tests -v
           python odds_sources/monitor.py --mode "$MODE"
-      - name: Commit health and verified feed only
+      - name: Commit health and validated feed on default branch only
+        if: github.ref == 'refs/heads/main'
         shell: bash
         run: |
+          # Save only generated results, refresh HEAD, then overlay only those files.
+          # This avoids replaying stale checkout state or rebasing two generated JSONs.
+          mkdir -p "$RUNNER_TEMP/odds-generated"
+          cp odds_sources/status/latest.json "$RUNNER_TEMP/odds-generated/status.json"
+          cp odds_sources/data/latest.json "$RUNNER_TEMP/odds-generated/data.json"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -f odds_sources/status/latest.json
-          git add odds_sources/data/latest.json
+          git fetch origin main
+          git reset --hard origin/main
+          mkdir -p odds_sources/status odds_sources/data
+          cp "$RUNNER_TEMP/odds-generated/status.json" odds_sources/status/latest.json
+          cp "$RUNNER_TEMP/odds-generated/data.json" odds_sources/data/latest.json
+          git add -f odds_sources/status/latest.json odds_sources/data/latest.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m 'chore(odds): refresh source health and validated feed [skip ci]'
-          git pull --rebase origin "${GITHUB_REF_NAME}"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin HEAD:main
