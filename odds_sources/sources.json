@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "maintained_since": "2026-09-24",
-  "note": "Page reachability is never proof of current odds or official SP.",
+  "note": "Page reachability/visible dates never prove current SP. Only www.sporttery.cn is treated as the official domain; third-party sites may cache fixtures or report their own sales restrictions.",
   "sources": [
     {
       "id": "sporttery_football",
@@ -148,6 +148,25 @@
       "access": "site_entry_only",
       "initial_evidence": "previous_conversation_unverified_exact_page",
       "automated_quote_extraction": "not_verified"
+    },
+    {
+      "id": "zgzcw_basketball",
+      "name": "中国足彩网·竞彩篮球（第三方，页面提示暂停销售）",
+      "sport": "basketball",
+      "tier": "third_party",
+      "url": "https://cp.zgzcw.com/lottery/jcplayvsForJsp.action?lotteryId=27",
+      "provides": [
+        "fixtures",
+        "basketball_moneyline",
+        "basketball_spread",
+        "basketball_total",
+        "basketball_margin"
+      ],
+      "access": "public_html_may_cache_sales_notice",
+      "initial_evidence": "public_page_2026-09-24_notice_sales_paused_last_visible_fixture_2026-09-20",
+      "automated_quote_extraction": "not_verified",
+      "use_for_prediction": "historical_or_crosscheck_only_until_current_prices_independently_verified",
+      "warning": "Third-party pause notice is not proof that official Sporttery has suspended sales."
     },
     {
       "id": "licensed_feed",
