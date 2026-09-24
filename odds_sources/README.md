@@ -13,6 +13,7 @@
 | [Honghuo66](https://model.honghuo66.com/) | 截图展示竞彩官方切换 | 截图展示让分和大小分 | 具体 JSON API 和篮球上游来源尚未核实，用户截图存于 examples/ |
 | 500网 | [足球奖金走势](https://zx.500star.com/jczq/jjzs.php?play=1) | [篮球奖金走势](https://zx.500star.com/jclq/jjzs.php?play=2&type=2) | 足球当日数据可在网页看到；篮球本次出现旧日期，只作历史辅助 |
 | [中国足彩网](https://www.zgzcw.com/) | 赛程与赔率辅助 | 具体页面待核 | 仅登记站点入口，不能谎称本次验证了可用实时接口 |
+| [中国足彩网·篮球](https://cp.zgzcw.com/lottery/jcplayvsForJsp.action?lotteryId=27) | — | 让分/大小分/胜分差等第三方展示 | 2026-09-24 页面提示“该彩种暂停销售”，可见比赛日期停留在 2026-09-20；**仅历史或交叉核对，不得作实时 SP**。这是该第三方页面提示，不代表官方体彩停售。 |
 
 历史截图 [2026-09-24 Honghuo66 篮球示例](examples/2026-09-24-honghuo66-basketball-screenshot.json) 明确标记为历史证据；不能自动晋升为最新盘口。不同站可能共享上游，不应误以为报价一致就是独立核验。海外公司赔率、交易所指数和模型估算赔率不等于体彩官方 SP。
 
@@ -54,3 +55,17 @@
 ## 后续比赛预测
 
 见 [INTEGRATION.md](INTEGRATION.md)。每次必须先检查最近的 GitHub Actions 运行，再读取 data/latest.json；只有 is_fresh=true、生成和逐条报价不超过 45 分钟、主客名称/编号/比赛时间/玩法/盘口符号一致时，才把它作为**带来源标记的报价快照**用于分析。没有有效报价就返回原站核查；严禁混用不同玩法 SP 或拿 ClawScore 旧版 estimated 赔率冒充体彩报价。
+
+## 预测端从 GitHub 取数（自动拒绝过期报价）
+
+已有独立读取脚本 [for_prediction.py](for_prediction.py)。后续从本仓库的 `main` 分支读取 `odds_sources/data/latest.json`，而不是从资料截图或页面健康状态拼出赔率：
+
+```bash
+python3 odds_sources/for_prediction.py --sport football --market football_handicap_1x2
+python3 odds_sources/for_prediction.py --sport basketball --market basketball_spread
+# 指定竞彩编号/映射 ID 时，增加 --fixture-id；必要时增加 --home-team / --away-team
+```
+
+返回 `fresh_quotes` 才可作为**有来源标签的报价快照**进入后续盘口比较；`no_live_feed`、`stale_snapshot`、`no_matching_fresh_quotes` 一律不能当作最新盘口使用。抓取时间和报价发布时间都要在 45 分钟内且比赛未开始，遇到空数据必须回到原站复核。**API 数据新鲜不等于官方身份真实**：自报来源始终需要与 `www.sporttery.cn` 原站/销售票面独立核验。切勿把相似域名的“官方竞彩网”宣传站当作官方接口。
+
+本工具没有绕过登录、验证码、反爬或商业授权；只有配置合法授权的 `ODDS_FEED_URL` 才能自动填充新盘口。
