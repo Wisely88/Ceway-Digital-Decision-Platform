@@ -1,5 +1,95 @@
 {
-  "checked_at_utc": null,
-  "meaning": "not yet checked by scheduled GitHub workflow",
-  "sources": []
+  "checked_at_utc": "2026-09-24T08:18:29Z",
+  "meaning": "availability only; quote freshness always unverified",
+  "sources": [
+    {
+      "date_signal": "not_checked",
+      "http_status": 567,
+      "id": "sporttery_football",
+      "odds_freshness": "not_verified",
+      "reachability": "http_error",
+      "url": "https://www.sporttery.cn/jc/jsq/zqspf/"
+    },
+    {
+      "date_signal": "not_checked",
+      "http_status": 567,
+      "id": "sporttery_football_schedule",
+      "odds_freshness": "not_verified",
+      "reachability": "http_error",
+      "url": "https://www.sporttery.cn/jc/zqszsc/index.html"
+    },
+    {
+      "date_signal": "not_checked",
+      "http_status": 567,
+      "id": "sporttery_basketball",
+      "odds_freshness": "not_verified",
+      "reachability": "http_error",
+      "url": "https://www.sporttery.cn/jc/jsq/lqrfsf/"
+    },
+    {
+      "date_signal": "not_checked",
+      "http_status": 567,
+      "id": "sporttery_basketball_total",
+      "odds_freshness": "not_verified",
+      "reachability": "http_error",
+      "url": "https://www.sporttery.cn/jc/jsq/lqdxf/"
+    },
+    {
+      "date_signal": "current_fixture_date_visible",
+      "http_status": 200,
+      "id": "okooo_football",
+      "odds_freshness": "not_verified",
+      "reachability": "page_reachable",
+      "url": "https://www.okooo.com/jingcai/"
+    },
+    {
+      "date_signal": "current_fixture_date_visible",
+      "http_status": 200,
+      "id": "okooo_basketball",
+      "odds_freshness": "not_verified",
+      "reachability": "page_reachable",
+      "url": "https://www.okooo.com/jingcailanqiu/hunhe/"
+    },
+    {
+      "date_signal": "not_checked",
+      "error_type": "URLError",
+      "http_status": null,
+      "id": "honghuo66",
+      "odds_freshness": "not_verified",
+      "reachability": "request_failed",
+      "url": "https://model.honghuo66.com/"
+    },
+    {
+      "date_signal": "current_fixture_date_visible",
+      "http_status": 200,
+      "id": "500star_football",
+      "odds_freshness": "not_verified",
+      "reachability": "page_reachable",
+      "url": "https://zx.500star.com/jczq/jjzs.php?play=1"
+    },
+    {
+      "date_signal": "current_fixture_date_visible",
+      "http_status": 200,
+      "id": "500star_basketball",
+      "odds_freshness": "not_verified",
+      "reachability": "page_reachable",
+      "url": "https://zx.500star.com/jclq/jjzs.php?play=2&type=2"
+    },
+    {
+      "date_signal": "current_fixture_date_visible",
+      "http_status": 200,
+      "id": "zgzcw_football",
+      "odds_freshness": "not_verified",
+      "reachability": "page_reachable",
+      "url": "https://www.zgzcw.com/"
+    },
+    {
+      "date_signal": "not_checked",
+      "http_status": null,
+      "id": "licensed_feed",
+      "odds_freshness": "not_verified",
+      "reachability": "requires_configuration",
+      "url": null
+    }
+  ]
 }

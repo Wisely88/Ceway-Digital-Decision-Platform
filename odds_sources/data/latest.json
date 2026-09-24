@@ -1,9 +1,9 @@
 {
-  "checked_at_utc": null,
-  "status": "not_initialized",
+  "checked_at_utc": "2026-09-24T08:18:29Z",
   "is_fresh": false,
   "max_quote_age_minutes": 45,
+  "note": "No live Sporttery odds are implied by source health checks.",
   "quotes": [],
   "rejected_quotes": [],
-  "note": "An empty feed is safer than stale or inferred odds."
+  "status": "no_authorized_feed"
 }
