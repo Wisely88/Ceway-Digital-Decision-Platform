@@ -58,6 +58,19 @@ class MonitorTests(unittest.TestCase):
         self.assertEqual(rec["date_signal"], "current_fixture_date_visible")
         self.assertEqual(rec["odds_freshness"], "not_verified")
 
+    def test_third_party_pause_notice_is_not_qualified_as_live_sp(self):
+        def fake(_url):
+            return 200, "text/html", (
+                "<p>因系统升级，该彩种暂停销售！</p>"
+                "<p>2026-09-20 篮球历史比赛</p>"
+            ).encode("utf-8")
+        rec = check_page({"id": "zgzcw_basketball",
+                          "url": "https://cp.zgzcw.com/lottery/jcplayvsForJsp.action?lotteryId=27"},
+                         NOW.date(), fake)
+        self.assertEqual(rec["page_sales_notice"], "third_party_page_reports_paused")
+        self.assertEqual(rec["odds_freshness"], "not_verified")
+        self.assertEqual(rec["date_signal"], "no_current_fixture_date_detected")
+
     def test_mismatched_football_market_rejected(self):
         valid, rejected = validate_quotes(payload(item(sport="football")), REGISTRY, NOW)
         self.assertFalse(valid)
