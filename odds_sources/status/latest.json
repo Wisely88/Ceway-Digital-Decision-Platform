@@ -1,5 +1,5 @@
 {
-  "checked_at_utc": "2026-09-26T12:12:43Z",
+  "checked_at_utc": "2026-09-26T17:07:41Z",
   "meaning": "availability only; quote freshness always unverified",
   "sources": [
     {
@@ -35,15 +35,15 @@
       "url": "https://www.sporttery.cn/jc/jsq/lqdxf/"
     },
     {
-      "date_signal": "not_checked",
+      "date_signal": "current_fixture_date_visible",
       "http_status": 200,
       "id": "okooo_football",
       "odds_freshness": "not_verified",
-      "reachability": "oversized_response",
+      "reachability": "page_reachable",
       "url": "https://www.okooo.com/jingcai/"
     },
     {
-      "date_signal": "current_fixture_date_visible",
+      "date_signal": "no_current_fixture_date_detected",
       "http_status": 200,
       "id": "okooo_basketball",
       "odds_freshness": "not_verified",
@@ -67,7 +67,7 @@
       "url": "https://zx.500star.com/jczq/jjzs.php?play=1"
     },
     {
-      "date_signal": "current_fixture_date_visible",
+      "date_signal": "no_current_fixture_date_detected",
       "http_status": 200,
       "id": "500star_basketball",
       "odds_freshness": "not_verified",
