@@ -1,0 +1,14 @@
+{
+  "schema_version": "ceway.v30.request.v1",
+  "game": "SSQ",
+  "target_issue": "2026112",
+  "required_history_cutoff": "2026111",
+  "budget": 20,
+  "model": "protected-core-aggregation-v3.0",
+  "purpose": "pre-draw-scarcity-tier-selection",
+  "rules": {
+    "do_not_modify_after_generation": true,
+    "do_not_regenerate_after_target_draw": true,
+    "production_enabled": false
+  }
+}

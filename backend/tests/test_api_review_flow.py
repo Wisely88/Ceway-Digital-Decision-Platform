@@ -98,11 +98,17 @@ class ApiReviewFlowTests(unittest.TestCase):
 
         self.assertEqual(save_status, 200)
         self.assertEqual(saved["status"], "ok")
+        research = saved["record"]["plan"]["v2_research"]
+        self.assertEqual(research["status"], "frozen")
+        self.assertEqual(research["history_cutoff_issue"], "26001")
+        self.assertEqual(research["target_issue"], "26002")
+        self.assertEqual(len(research["freeze_sha256"]), 64)
         self.assertEqual(review_status, 200)
         self.assertEqual(reviewed["summary"]["reviewed"], 1)
         self.assertEqual(reviewed["items"][0]["status"], "reviewed")
         self.assertEqual(reviewed["items"][0]["actual"]["issue"], "26002")
         self.assertEqual(reviewed["items"][0]["best"]["prize_label"], "一等奖")
+        self.assertTrue(reviewed["items"][0]["freeze_integrity"]["valid"])
         connection = sqlite3.connect(db.DB_PATH)
         try:
             self.assertEqual(connection.execute("select count(*) from dlt_review_results").fetchone()[0], 1)
@@ -122,6 +128,7 @@ class ApiReviewFlowTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(review["items"][0]["status"], "pending")
         self.assertEqual(review["items"][0]["plan"]["items"][0]["front"], [6, 7, 8, 9, 10])
+        self.assertTrue(review["items"][0]["freeze_integrity"]["valid"])
 
     def test_batch_save_keeps_dantuo_compound_and_single_records(self) -> None:
         db.replace_dlt_draws([
@@ -140,12 +147,14 @@ class ApiReviewFlowTests(unittest.TestCase):
                 {"budget": plan["cost"], "strategy": "balanced", "latest_issue": "26001", "plan": plan},
             )
             self.assertEqual(status, 200)
+            self.assertEqual(saved["record"]["plan"]["v2_research"]["status"], "frozen")
             ids.append(saved["record"]["id"])
 
         status, review = request("GET", "/review/dlt")
         self.assertEqual(status, 200)
         self.assertEqual(len(set(ids)), 3)
         self.assertEqual({item["plan"]["mode"] for item in review["items"]}, {"dantuo", "compound", "single"})
+        self.assertTrue(all(item["freeze_integrity"]["valid"] for item in review["items"]))
 
     def test_ssq_save_draw_and_review_flow(self) -> None:
         db.replace_ssq_draws(
@@ -173,11 +182,17 @@ class ApiReviewFlowTests(unittest.TestCase):
 
         self.assertEqual(save_status, 200)
         self.assertEqual(saved["status"], "ok")
+        research = saved["record"]["plan"]["v2_research"]
+        self.assertEqual(research["status"], "frozen")
+        self.assertEqual(research["history_cutoff_issue"], "2026001")
+        self.assertEqual(research["target_issue"], "2026002")
+        self.assertEqual(len(research["freeze_sha256"]), 64)
         self.assertEqual(review_status, 200)
         self.assertEqual(reviewed["summary"]["reviewed"], 1)
         self.assertEqual(reviewed["items"][0]["status"], "reviewed")
         self.assertEqual(reviewed["items"][0]["actual"]["issue"], "2026002")
         self.assertEqual(reviewed["items"][0]["best"]["prize_label"], "一等奖")
+        self.assertTrue(reviewed["items"][0]["freeze_integrity"]["valid"])
         connection = sqlite3.connect(db.DB_PATH)
         try:
             self.assertEqual(connection.execute("select count(*) from ssq_review_results").fetchone()[0], 1)

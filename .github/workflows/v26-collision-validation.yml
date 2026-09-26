@@ -1,0 +1,45 @@
+name: CEWAY V2.6 Collision-Aware Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/multiregime_v26.py"
+      - "backend/pushplus_v26.py"
+      - "backend/tests/test_multiregime_v26.py"
+      - "backend/tests/test_pushplus_v26.py"
+      - "scripts/push_v26_prediction.py"
+      - "scripts/run_draw_update.py"
+      - ".github/workflows/v26-collision-validation.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Syntax-check V2.6 and updater integration
+        run: python -m py_compile backend/multiregime_v26.py backend/pushplus_v26.py scripts/push_v26_prediction.py scripts/run_draw_update.py
+
+      - name: Run V2.6 unit tests
+        working-directory: backend
+        run: python -m unittest tests.test_multiregime_v26 tests.test_pushplus_v26 -v
+
+      - name: Dry-run current DLT V2.6 PushPlus content
+        run: python scripts/push_v26_prediction.py --game DLT
+
+      - name: Dry-run current SSQ V2.6 PushPlus content
+        run: python scripts/push_v26_prediction.py --game SSQ
