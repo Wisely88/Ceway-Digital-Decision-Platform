@@ -1,0 +1,66 @@
+name: CEWAY V2.4 DLT Forward Freeze
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/freeze_v24_dlt_forward.py"
+      - "backend/fixed_window_v24.py"
+      - "backend/freeze_v2.py"
+      - ".github/workflows/v24-dlt-forward-freeze.yml"
+  workflow_dispatch:
+    inputs:
+      target_issue:
+        description: "Optional explicit DLT target issue; blank means latest history + 1"
+        required: false
+        default: ""
+
+concurrency:
+  group: ceway-v24-dlt-forward-freeze-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Verify freeze integrity tests
+        working-directory: backend
+        run: python -m unittest tests.test_fixed_window_v24 tests.test_freeze_v2 -v
+
+      - name: Freeze next DLT forward-shadow candidate
+        env:
+          TARGET_ISSUE: ${{ inputs.target_issue || '' }}
+        run: |
+          if [ -n "$TARGET_ISSUE" ]; then
+            python scripts/freeze_v24_dlt_forward.py \
+              --target-issue "$TARGET_ISSUE" \
+              --budget 20 \
+              --strategy balanced \
+              --output artifacts/dlt_v24_forward_freeze.json
+          else
+            python scripts/freeze_v24_dlt_forward.py \
+              --budget 20 \
+              --strategy balanced \
+              --output artifacts/dlt_v24_forward_freeze.json
+          fi
+
+      - name: Upload forward freeze
+        uses: actions/upload-artifact@v4
+        with:
+          name: ceway-v24-dlt-forward-freeze
+          path: artifacts/dlt_v24_forward_freeze.json
+          if-no-files-found: error

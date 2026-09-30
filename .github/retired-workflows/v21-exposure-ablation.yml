@@ -1,0 +1,26 @@
+name: CEWAY V2.1 Exposure Ablation (Archived Alias)
+
+on:
+  workflow_dispatch:
+    inputs:
+      periods:
+        description: "Development prediction points per configuration"
+        required: false
+        default: "50"
+      windows:
+        description: "Comma-separated history windows"
+        required: false
+        default: "50,100,200"
+      baseline_seeds:
+        description: "Matched-random seeds per prediction point"
+        required: false
+        default: "3"
+
+jobs:
+  note:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Archived alias
+        run: |
+          echo "This duplicate workflow is archived."
+          echo "Use CEWAY V2.1 Score Exposure Ablation (.github/workflows/v21-generator-ablation.yml)."

@@ -1,0 +1,92 @@
+{
+  "schema_version": "ceway.v30.five-draw-guard.v1",
+  "freeze_date": "2026-09-30",
+  "production_enabled": false,
+  "immutable_until_cycle_end": true,
+  "method": "Select the highest-scoring non-core neutral-track V3.0 ticket that remains H13=0 and has low front overlap with the current dynamic core, so the five-draw guard is independent from the one-draw core rather than a duplicate.",
+  "note": "Historical scarcity is descriptive and does not increase lottery probability.",
+  "source": {
+    "workflow_run": 36655126399,
+    "artifact_id": 11071814232,
+    "artifact_sha256": "d7bec2ceed1673b2242ceba17e34a648b417c1d52d7c7b405078e857acbc061a"
+  },
+  "SSQ": {
+    "cycle_start": "2026114",
+    "cycle_end": "2026118",
+    "cycle_length": 5,
+    "current_position": "1/5",
+    "front": [
+      3,
+      9,
+      15,
+      16,
+      26,
+      31
+    ],
+    "back": [
+      12
+    ],
+    "origin_track": "neutral",
+    "v30_rank_score": 0.818004,
+    "scarcity": {
+      "cutoff": "2026113",
+      "level": "L4",
+      "H13": 0,
+      "H45": 27
+    },
+    "dynamic_core_at_freeze": {
+      "front": [
+        5,
+        9,
+        12,
+        17,
+        26,
+        28
+      ],
+      "back": [
+        6
+      ],
+      "front_overlap": 2
+    }
+  },
+  "DLT": {
+    "cycle_start": "26112",
+    "cycle_end": "26116",
+    "cycle_length": 5,
+    "current_position": "1/5",
+    "front": [
+      2,
+      7,
+      15,
+      28,
+      34
+    ],
+    "back": [
+      6,
+      12
+    ],
+    "origin_track": "neutral",
+    "v30_rank_score": 0.82655,
+    "scarcity": {
+      "cutoff": "26111",
+      "level": "L2",
+      "H13": 0,
+      "H45": 2
+    },
+    "dynamic_core_at_freeze": {
+      "front": [
+        1,
+        7,
+        22,
+        27,
+        28
+      ],
+      "back": [
+        3,
+        12
+      ],
+      "front_overlap": 2,
+      "back_overlap": 1
+    }
+  }
+}

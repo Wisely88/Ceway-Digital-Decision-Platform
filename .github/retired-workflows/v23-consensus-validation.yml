@@ -1,0 +1,119 @@
+name: CEWAY V2.3 Median Consensus Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/consensus_v23.py"
+      - "backend/tests/test_consensus_v23.py"
+      - "backend/generator_v2.py"
+      - "backend/random_control_v2.py"
+      - "scripts/run_v23_consensus_ablation.py"
+      - "scripts/run_v23_consensus_holdout.py"
+      - ".github/workflows/v23-consensus-validation.yml"
+  workflow_dispatch:
+    inputs:
+      periods:
+        description: "Prediction points per development/holdout block"
+        required: false
+        default: "50"
+      baseline_seeds:
+        description: "Structure-matched random seeds per prediction point"
+        required: false
+        default: "3"
+
+concurrency:
+  group: ceway-v23-consensus-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  development:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      advance: ${{ steps.gate.outputs.advance }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Verify V2.3 median consensus structure
+        working-directory: backend
+        run: python -m unittest tests.test_consensus_v23 tests.test_random_control_v2 -v
+
+      - name: Run V2.3 development A/B
+        env:
+          PERIODS: ${{ inputs.periods || '50' }}
+          BASELINE_SEEDS: ${{ inputs.baseline_seeds || '3' }}
+        run: |
+          python scripts/run_v23_consensus_ablation.py \
+            --periods "$PERIODS" \
+            --baseline-seeds "$BASELINE_SEEDS" \
+            --budget 20 \
+            --strategy balanced \
+            --output artifacts/ceway_v23_consensus_ablation.json
+
+      - name: Read development gate
+        id: gate
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          report = json.loads(Path("artifacts/ceway_v23_consensus_ablation.json").read_text(encoding="utf-8"))
+          print(f"advance={str(bool(report.get('all_games_advance'))).lower()}")
+          PY
+
+      - name: Upload V2.3 development report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ceway-v23-median-consensus-development
+          path: artifacts/ceway_v23_consensus_ablation.json
+          if-no-files-found: error
+
+  fresh-holdout:
+    needs: development
+    if: needs.development.outputs.advance == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Run V2.3 fresh holdout
+        env:
+          PERIODS: ${{ inputs.periods || '50' }}
+          BASELINE_SEEDS: ${{ inputs.baseline_seeds || '3' }}
+        run: |
+          python scripts/run_v23_consensus_holdout.py \
+            --periods "$PERIODS" \
+            --excluded-recent-points 150 \
+            --baseline-seeds "$BASELINE_SEEDS" \
+            --budget 20 \
+            --strategy balanced \
+            --output artifacts/ceway_v23_consensus_holdout.json
+
+      - name: Upload V2.3 fresh holdout report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ceway-v23-median-consensus-fresh-holdout
+          path: artifacts/ceway_v23_consensus_holdout.json
+          if-no-files-found: error
