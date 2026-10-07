@@ -23,24 +23,23 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: backend/requirements.txt
-      - name: Sync verified main history then append latest official draws
+      - name: Sync verified main history then ensure latest official draws
         run: |
           git fetch origin main
           git checkout origin/main -- backend/data/ssq_history.csv backend/data/dlt_history.csv
           python - <<'PY'
           from pathlib import Path
-          ssq=Path("backend/data/ssq_history.csv")
-          dlt=Path("backend/data/dlt_history.csv")
-          def append(path, expected_last, row, target):
+          def ensure(path, target, row):
               lines=path.read_text(encoding="utf-8-sig").splitlines()
-              assert lines[-1].split(",")[0] == expected_last, (path, lines[-1])
-              if not any(x.startswith(target+",") for x in lines[1:]):
-                  with path.open("a", encoding="utf-8") as f:
-                      f.write(row+"\n")
-          append(ssq,"2026113","2026114,2026-10-06,7,18,23,24,29,31,10","2026114")
-          append(dlt,"26112","26113,2026-10-05,2,4,6,10,11,1,10","26113")
-          print("SSQ:", ssq.read_text(encoding="utf-8").splitlines()[-2:])
-          print("DLT:", dlt.read_text(encoding="utf-8").splitlines()[-2:])
+              issues=[x.split(",")[0] for x in lines[1:]]
+              if target not in issues:
+                  lines.append(row)
+                  path.write_text("\n".join(lines)+"\n", encoding="utf-8")
+              assert path.read_text(encoding="utf-8-sig").splitlines()[-1].split(",")[0] == target
+          ensure(Path("backend/data/ssq_history.csv"),"2026114","2026114,2026-10-06,7,18,23,24,29,31,10")
+          ensure(Path("backend/data/dlt_history.csv"),"26113","26113,2026-10-05,2,4,6,10,11,1,10")
+          print("SSQ:", Path("backend/data/ssq_history.csv").read_text(encoding="utf-8").splitlines()[-2:])
+          print("DLT:", Path("backend/data/dlt_history.csv").read_text(encoding="utf-8").splitlines()[-2:])
           PY
       - name: Install dependencies
         run: python -m pip install -r backend/requirements.txt
