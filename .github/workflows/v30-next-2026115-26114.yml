@@ -23,8 +23,10 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: backend/requirements.txt
-      - name: Append verified current draws in isolated working tree
+      - name: Sync verified main history then append latest official draws
         run: |
+          git fetch origin main
+          git checkout origin/main -- backend/data/ssq_history.csv backend/data/dlt_history.csv
           python - <<'PY'
           from pathlib import Path
           ssq=Path("backend/data/ssq_history.csv")
