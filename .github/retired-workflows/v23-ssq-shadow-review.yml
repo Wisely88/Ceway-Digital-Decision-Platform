@@ -1,0 +1,46 @@
+name: CEWAY V2.3 SSQ Shadow Review
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/data/ssq_history.csv"
+      - "research/shadow/ssq/2026094-v23-coverage-shadow.json"
+      - "research/shadow/ssq/2026094-v23-matched-random-controls.json"
+      - "scripts/review_v23_ssq_shadow.py"
+      - ".github/workflows/v23-ssq-shadow-review.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ceway-v23-ssq-shadow-review-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Verify and review frozen shadow
+        run: |
+          python scripts/review_v23_ssq_shadow.py \
+            --output artifacts/ceway_v23_ssq_shadow_review.json
+
+      - name: Upload shadow review
+        uses: actions/upload-artifact@v4
+        with:
+          name: ceway-v23-ssq-shadow-review-${{ github.sha }}
+          path: artifacts/ceway_v23_ssq_shadow_review.json
+          if-no-files-found: error

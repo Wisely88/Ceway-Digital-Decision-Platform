@@ -1,0 +1,438 @@
+{
+  "schema_version": "ceway.v30.pre_draw_tier_selection.v2",
+  "freeze_date": "2026-09-28",
+  "time_context": "before both target draws",
+  "production_enabled": false,
+  "original_V3": {
+    "workflow_run": 36362668376,
+    "artifact_id": 10946341812,
+    "artifact_sha256": "049ed8ef5c2675bd55f5180cb6bc0759a181da2396c012b53ddb65b2bea4fc04",
+    "original_tickets_unchanged": true
+  },
+  "ranking": "Heuristic shortlist within predeclared historical collision tier, not empirical probability. Candidate fronts from original V3 final10 and complete aggregation front ranking; legal backs scored from pre-draw V3 back regime. 0.78*frozen_front_rank_score+0.22*(0.45*neutral_back+0.35*evidence_back+0.20*scarcity_back)+0.025 if original full ticket+0.008 if original final10 uses back. Greedy distinct fronts and backs across each game's 10.",
+  "definitions": {
+    "SSQ": {
+      "H13": "N6+1+N6+0+N5+1",
+      "H45": "N5+0+N4+1+N4+0+N3+1",
+      "L4": "H13=0 and H45 in 26..30",
+      "L5": "H13=0 and H45 in 31..40"
+    },
+    "DLT": {
+      "H13": "N5+2+N5+1+N5+0+N4+2",
+      "H45": "N4+1+N4+0+N3+2",
+      "L2": "H13=0 and H45=2",
+      "L3": "H13=0 and H45=3..4"
+    }
+  },
+  "targets": {
+    "SSQ": {
+      "issue": "2026113",
+      "cutoff": "2026112",
+      "historical_draws": 3509,
+      "original_core": {
+        "front": [
+          2,
+          9,
+          17,
+          20,
+          28,
+          29
+        ],
+        "back": [
+          6
+        ],
+        "grade": "L4",
+        "H13": 0,
+        "H45": 26
+      },
+      "L4": [
+        {
+          "front": [
+            2,
+            9,
+            17,
+            20,
+            28,
+            29
+          ],
+          "back": [
+            6
+          ],
+          "H13": 0,
+          "H45": 26,
+          "heuristic": 0.830051
+        },
+        {
+          "front": [
+            2,
+            5,
+            12,
+            20,
+            31,
+            33
+          ],
+          "back": [
+            12
+          ],
+          "H13": 0,
+          "H45": 28,
+          "heuristic": 0.803121
+        },
+        {
+          "front": [
+            8,
+            10,
+            18,
+            21,
+            23,
+            27
+          ],
+          "back": [
+            8
+          ],
+          "H13": 0,
+          "H45": 29,
+          "heuristic": 0.793125
+        },
+        {
+          "front": [
+            3,
+            10,
+            18,
+            21,
+            25,
+            27
+          ],
+          "back": [
+            15
+          ],
+          "H13": 0,
+          "H45": 28,
+          "heuristic": 0.781674
+        },
+        {
+          "front": [
+            1,
+            11,
+            13,
+            22,
+            24,
+            30
+          ],
+          "back": [
+            4
+          ],
+          "H13": 0,
+          "H45": 28,
+          "heuristic": 0.778291
+        }
+      ],
+      "L5": [
+        {
+          "front": [
+            2,
+            11,
+            15,
+            18,
+            27,
+            30
+          ],
+          "back": [
+            1
+          ],
+          "H13": 0,
+          "H45": 31,
+          "heuristic": 0.739504
+        },
+        {
+          "front": [
+            2,
+            3,
+            15,
+            18,
+            30,
+            33
+          ],
+          "back": [
+            2
+          ],
+          "H13": 0,
+          "H45": 31,
+          "heuristic": 0.739253
+        },
+        {
+          "front": [
+            6,
+            11,
+            15,
+            16,
+            25,
+            30
+          ],
+          "back": [
+            7
+          ],
+          "H13": 0,
+          "H45": 34,
+          "heuristic": 0.730583
+        },
+        {
+          "front": [
+            2,
+            9,
+            15,
+            18,
+            28,
+            30
+          ],
+          "back": [
+            3
+          ],
+          "H13": 0,
+          "H45": 34,
+          "heuristic": 0.727654
+        },
+        {
+          "front": [
+            4,
+            11,
+            13,
+            14,
+            25,
+            30
+          ],
+          "back": [
+            11
+          ],
+          "H13": 0,
+          "H45": 36,
+          "heuristic": 0.7145
+        }
+      ],
+      "guard_final_fifth": {
+        "front": [
+          5,
+          12,
+          16,
+          23,
+          29,
+          33
+        ],
+        "back": [
+          10
+        ]
+      }
+    },
+    "DLT": {
+      "issue": "26111",
+      "cutoff": "26110",
+      "historical_draws": 2928,
+      "original_core": {
+        "front": [
+          1,
+          6,
+          22,
+          27,
+          28
+        ],
+        "back": [
+          1,
+          10
+        ],
+        "grade": "L1",
+        "H13": 0,
+        "H45": 1
+      },
+      "L2": [
+        {
+          "front": [
+            1,
+            6,
+            22,
+            27,
+            28
+          ],
+          "back": [
+            1,
+            6
+          ],
+          "H13": 0,
+          "H45": 2,
+          "heuristic": 0.787136
+        },
+        {
+          "front": [
+            4,
+            9,
+            18,
+            23,
+            29
+          ],
+          "back": [
+            1,
+            10
+          ],
+          "H13": 0,
+          "H45": 2,
+          "heuristic": 0.766471
+        },
+        {
+          "front": [
+            9,
+            11,
+            13,
+            20,
+            32
+          ],
+          "back": [
+            1,
+            2
+          ],
+          "H13": 0,
+          "H45": 2,
+          "heuristic": 0.75127
+        },
+        {
+          "front": [
+            4,
+            8,
+            13,
+            29,
+            31
+          ],
+          "back": [
+            2,
+            12
+          ],
+          "H13": 0,
+          "H45": 2,
+          "heuristic": 0.746576
+        },
+        {
+          "front": [
+            3,
+            12,
+            21,
+            25,
+            26
+          ],
+          "back": [
+            1,
+            12
+          ],
+          "H13": 0,
+          "H45": 2,
+          "heuristic": 0.743205
+        }
+      ],
+      "L3": [
+        {
+          "front": [
+            6,
+            12,
+            14,
+            21,
+            33
+          ],
+          "back": [
+            7,
+            8
+          ],
+          "H13": 0,
+          "H45": 3,
+          "heuristic": 0.758834
+        },
+        {
+          "front": [
+            6,
+            12,
+            15,
+            28,
+            29
+          ],
+          "back": [
+            6,
+            12
+          ],
+          "H13": 0,
+          "H45": 3,
+          "heuristic": 0.745954
+        },
+        {
+          "front": [
+            6,
+            9,
+            14,
+            28,
+            29
+          ],
+          "back": [
+            2,
+            10
+          ],
+          "H13": 0,
+          "H45": 3,
+          "heuristic": 0.725017
+        },
+        {
+          "front": [
+            4,
+            6,
+            21,
+            28,
+            29
+          ],
+          "back": [
+            7,
+            12
+          ],
+          "H13": 0,
+          "H45": 3,
+          "heuristic": 0.703816
+        },
+        {
+          "front": [
+            5,
+            10,
+            14,
+            21,
+            35
+          ],
+          "back": [
+            1,
+            7
+          ],
+          "H13": 0,
+          "H45": 3,
+          "heuristic": 0.698701
+        }
+      ],
+      "guard_final_fifth": {
+        "front": [
+          3,
+          9,
+          16,
+          18,
+          29
+        ],
+        "back": [
+          5,
+          8
+        ]
+      },
+      "repo_original_guard_for_audit": {
+        "front": [
+          7,
+          11,
+          16,
+          19,
+          32
+        ],
+        "back": [
+          4,
+          11
+        ]
+      }
+    }
+  }
+}

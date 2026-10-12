@@ -1,0 +1,27 @@
+{
+  "schema_version": "ceway.v30.design-freeze.v1",
+  "version": "protected-core-aggregation-v3.0",
+  "parent_version": "protected-core-incremental-fusion-v2.9",
+  "production_enabled": false,
+  "change_reason": "Forward reviews showed that final portfolio unions can cover most or all winning front numbers while the best single ticket still captures only a subset. V3.0 adds a second-stage recombination layer without injecting any new numbers and without changing V2.9 core/fusion logic.",
+  "aggregation": {
+    "pool_size": {"DLT": 15, "SSQ": 16},
+    "new_number_injection": false,
+    "number_quality": "0.60*exposure_norm + 0.25*track_breadth + 0.15*core_support",
+    "combo_quality": "0.60*(0.65*mean_member+0.35*min_member) + 0.25*provenance_coverage + 0.15*consensus_strength",
+    "rank_score": "0.50*aggregation_quality + 0.30*collision_calibration + 0.20*structure_quality",
+    "full_combination_ranking_persisted": true
+  },
+  "replacement_gate": {
+    "max_replacements": 2,
+    "protect_highest_ticket_per_surviving_track": true,
+    "objective": "0.45*score_delta + 0.25*(added_unique-lost_unique) + 0.20*provenance_coverage + 0.10*(1-max_jaccard)",
+    "acceptance": "gain>0 AND lost_unique<=added_unique AND provenance>=0.75 AND max_jaccard<=0.60"
+  },
+  "anti_overfit_guard": {
+    "v29_unchanged": true,
+    "combination_collision_layer_retained": true,
+    "post_draw_regeneration_prohibited": true,
+    "single_draw_cannot_trigger_promotion": true
+  }
+}

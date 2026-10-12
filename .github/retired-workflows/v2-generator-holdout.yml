@@ -1,0 +1,70 @@
+name: CEWAY V2 Generator Holdout (V1 Archived)
+
+on:
+  workflow_dispatch:
+    inputs:
+      periods:
+        description: "Holdout prediction points per configuration"
+        required: false
+        default: "50"
+      development_periods:
+        description: "Recent development points to exclude"
+        required: false
+        default: "50"
+      windows:
+        description: "Comma-separated history windows"
+        required: false
+        default: "50,100,200"
+      baseline_seeds:
+        description: "Matched-random seeds per prediction point"
+        required: false
+        default: "3"
+
+concurrency:
+  group: ceway-v2-generator-holdout-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  holdout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Verify matched-random controls
+        working-directory: backend
+        run: python -m unittest tests.test_random_control_v2 -v
+
+      - name: Replay archived non-overlapping historical holdout
+        env:
+          PERIODS: ${{ inputs.periods || '50' }}
+          DEVELOPMENT_PERIODS: ${{ inputs.development_periods || '50' }}
+          WINDOWS: ${{ inputs.windows || '50,100,200' }}
+          BASELINE_SEEDS: ${{ inputs.baseline_seeds || '3' }}
+        run: |
+          python scripts/run_v2_generator_holdout.py \
+            --periods "$PERIODS" \
+            --development-periods "$DEVELOPMENT_PERIODS" \
+            --windows "$WINDOWS" \
+            --baseline-seeds "$BASELINE_SEEDS" \
+            --budget 20 \
+            --strategy balanced \
+            --output artifacts/ceway_v2_generator_holdout.json
+
+      - name: Upload holdout report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ceway-v2-generator-holdout
+          path: artifacts/ceway_v2_generator_holdout.json
+          if-no-files-found: error

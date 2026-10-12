@@ -1,0 +1,67 @@
+{
+  "schema_version": "ceway.v27.design-freeze.v1",
+  "model_version": "multi-regime-scarcity-combo-v2.7",
+  "status": "RESEARCH_ONLY",
+  "production_enabled": false,
+  "parent_version": "multi-regime-collision-v2.6",
+  "parent_mutated": false,
+  "design_intent": "Add a deterministic, replayable scarcity-pool ordering and a full scarcity-combination ranking, while promoting 50/30/20 from number-level exposure to complete-combination origin quotas.",
+  "combination_track_weights": {
+    "evidence": 0.5,
+    "scarcity": 0.3,
+    "neutral": 0.2
+  },
+  "budget_20_track_quotas": {
+    "evidence": 5,
+    "scarcity": 3,
+    "neutral": 2
+  },
+  "front_track_pool_size": {
+    "DLT": 12,
+    "SSQ": 12
+  },
+  "back_track_pool_size": {
+    "DLT": 8,
+    "SSQ": 10
+  },
+  "scarcity_number_ordering": [
+    "scarcity_score desc",
+    "gap_percentile desc",
+    "divergence_score desc",
+    "rarity7 desc",
+    "rarity20 desc",
+    "rarity3 desc",
+    "number asc"
+  ],
+  "scarcity_combination_quality": {
+    "average_scarcity_weight": 0.7,
+    "minimum_scarcity_weight": 0.3,
+    "purpose": "Prevent one or two extreme scarcity numbers from masking a weak member through the average alone."
+  },
+  "track_rank_score": {
+    "track_quality": 0.55,
+    "collision_calibration": 0.25,
+    "structure_quality": 0.2
+  },
+  "cross_track_portfolio_penalties": {
+    "max_jaccard": 0.08,
+    "number_exposure": 0.03,
+    "pair_reuse": 0.04
+  },
+  "scarcity_ranking_persistence": {
+    "persist_full_ranking": true,
+    "recompute_after_draw": false,
+    "review_requires_frozen_ranking": true
+  },
+  "review_metrics": [
+    "scarcity pool winning-number hits",
+    "winning numbers' original scarcity-pool ranks",
+    "exact winning combination rank when candidate-eligible",
+    "best matching combination and its rank",
+    "first rank reaching each hit count",
+    "Top10 / Top50 / Top100 / full-ranking max and mean hits",
+    "counts of combinations reaching 2+, 3+, 4+ hits"
+  ],
+  "anti_leakage": "All ranking features are computed through the declared history cutoff. Target outcomes may only be applied by the replay review function after freeze.",
+  "claim_scope": "Scarcity and historical collision are descriptive research features and do not imply increased future winning probability."
+}

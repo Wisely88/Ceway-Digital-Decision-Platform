@@ -1,0 +1,14 @@
+{
+  "game": "SSQ",
+  "target_issue": "2026102",
+  "required_history_cutoff": "2026101",
+  "model": "multi-regime-scarcity-combo-v2.7",
+  "purpose": "prospective_prediction_trigger_and_audit",
+  "production_enabled": false,
+  "rules": [
+    "use only history through 2026101",
+    "do not retune weights from 2026101 outcome",
+    "preserve complete scarcity ranking",
+    "freeze generated result before target draw"
+  ]
+}

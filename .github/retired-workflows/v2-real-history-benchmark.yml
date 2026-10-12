@@ -1,0 +1,78 @@
+name: CEWAY V2 Real History Benchmark
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/run_v2_benchmark.py"
+      - "scripts/run_v2_diagnostics.py"
+      - ".github/workflows/v2-real-history-benchmark.yml"
+  workflow_dispatch:
+    inputs:
+      periods:
+        description: "Walk-forward periods per configuration"
+        required: false
+        default: "50"
+      windows:
+        description: "Comma-separated history windows"
+        required: false
+        default: "50,100,200"
+      baseline_seeds:
+        description: "Conditional-random seeds per prediction point"
+        required: false
+        default: "3"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Run real-history benchmark
+        env:
+          PERIODS: ${{ inputs.periods || '50' }}
+          WINDOWS: ${{ inputs.windows || '50,100,200' }}
+          BASELINE_SEEDS: ${{ inputs.baseline_seeds || '3' }}
+        run: |
+          python scripts/run_v2_benchmark.py \
+            --periods "$PERIODS" \
+            --windows "$WINDOWS" \
+            --baseline-seeds "$BASELINE_SEEDS" \
+            --budget 20 \
+            --strategy balanced \
+            --output artifacts/ceway_v2_benchmark.json
+
+      - name: Diagnose ranking and coverage
+        env:
+          PERIODS: ${{ inputs.periods || '50' }}
+          WINDOWS: ${{ inputs.windows || '50,100,200' }}
+          BASELINE_SEEDS: ${{ inputs.baseline_seeds || '3' }}
+        run: |
+          python scripts/run_v2_diagnostics.py \
+            --periods "$PERIODS" \
+            --windows "$WINDOWS" \
+            --baseline-seeds "$BASELINE_SEEDS" \
+            --budget 20 \
+            --strategy balanced \
+            --output artifacts/ceway_v2_diagnostics.json
+
+      - name: Upload benchmark reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: ceway-v2-real-history-benchmark
+          path: |
+            artifacts/ceway_v2_benchmark.json
+            artifacts/ceway_v2_diagnostics.json
+          if-no-files-found: error

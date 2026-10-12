@@ -1,0 +1,65 @@
+name: CEWAY V3.0 Next Draw 2026115 26114
+
+on:
+  push:
+    branches: [agent/ceway-v2-research-engine]
+    paths:
+      - '.github/workflows/v30-next-2026115-26114.yml'
+  workflow_dispatch:
+
+jobs:
+  freeze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ceway-v2-research-engine
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Sync verified main history then ensure latest official draws
+        run: |
+          git fetch origin main
+          git checkout origin/main -- backend/data/ssq_history.csv backend/data/dlt_history.csv
+          python - <<'PY'
+          from pathlib import Path
+          def ensure(path, target, row):
+              lines=path.read_text(encoding="utf-8-sig").splitlines()
+              issues=[x.split(",")[0] for x in lines[1:]]
+              if target not in issues:
+                  lines.append(row)
+                  path.write_text("\n".join(lines)+"\n", encoding="utf-8")
+              assert path.read_text(encoding="utf-8-sig").splitlines()[-1].split(",")[0] == target
+          ensure(Path("backend/data/ssq_history.csv"),"2026114","2026114,2026-10-06,7,18,23,24,29,31,10")
+          ensure(Path("backend/data/dlt_history.csv"),"26113","26113,2026-10-05,2,4,6,10,11,1,10")
+          print("SSQ:", Path("backend/data/ssq_history.csv").read_text(encoding="utf-8").splitlines()[-2:])
+          print("DLT:", Path("backend/data/dlt_history.csv").read_text(encoding="utf-8").splitlines()[-2:])
+          PY
+      - name: Install dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Generate frozen V3.0 prospective predictions
+        run: |
+          mkdir -p /tmp/v30-next
+          cat > /tmp/v30-next/ssq-2026115.json <<'JSON'
+          {"game":"SSQ","target_issue":"2026115","required_history_cutoff":"2026114","budget":20,"model":"protected-core-aggregation-v3.0","production_enabled":false}
+          JSON
+          cat > /tmp/v30-next/dlt-26114.json <<'JSON'
+          {"game":"DLT","target_issue":"26114","required_history_cutoff":"26113","budget":20,"model":"protected-core-aggregation-v3.0","production_enabled":false}
+          JSON
+          python scripts/predict_v30_request.py --request /tmp/v30-next/ssq-2026115.json --output /tmp/v30-next/ssq-2026115-v30.json | tee /tmp/v30-next/ssq-summary.txt
+          python scripts/predict_v30_request.py --request /tmp/v30-next/dlt-26114.json --output /tmp/v30-next/dlt-26114-v30.json | tee /tmp/v30-next/dlt-summary.txt
+          cp backend/data/ssq_history.csv /tmp/v30-next/ssq-history-thru-2026114.csv
+          cp backend/data/dlt_history.csv /tmp/v30-next/dlt-history-thru-26113.csv
+      - name: Upload prospective snapshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: v30-next-2026115-26114
+          path: /tmp/v30-next/*
+          if-no-files-found: error
+          retention-days: 90

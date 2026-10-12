@@ -1,0 +1,392 @@
+{
+  "schema_version": "ceway.v30.pre_draw_tier_selection.v1",
+  "analysis_date": "2026-09-26",
+  "production_enabled": false,
+  "immutability": "snapshot; never regenerate after target draws",
+  "model_selection_score_is_probability": false,
+  "selection_method": "Candidates from preregistered V3.0 final10 plus aggregation-ranked front combinations crossed with legal back choices; eligibility determined only by exact pre-draw complete-ticket collision matrix. Model heuristic = 0.78*V3_front_score + 0.22*weighted_back_score + 0.025 if original V3 full ticket + 0.008 if back present in V3 final10; weighted_back_score=0.45*neutral+0.35*evidence+0.20*scarcity. Greedy diversity prevents identical fronts and backs across each game's 10 selections. Historical rarity does not imply higher actual draw probability.",
+  "sources": {
+    "DLT": {
+      "target_issue": "26110",
+      "cutoff_issue": "26109",
+      "historical_draws": 2927,
+      "model_artifact_id": 10805895322,
+      "model_sha256": "7b7bbb6835deae06fdd619377ad45b62e1e13f54f8d97629556b9801ef5b0d88"
+    },
+    "SSQ": {
+      "target_issue": "2026112",
+      "cutoff_issue": "2026111",
+      "historical_draws": 3508,
+      "model_artifact_id": 10901953495,
+      "model_sha256": "e4d5f4e207d9ca6ce8afd77609aebc80708635f1f44936a1fee037234f17f7a1"
+    }
+  },
+  "grade_rules": {
+    "DLT": {
+      "H13": "N52+N51+N50+N42",
+      "H45": "N41+N40+N32",
+      "L2": "H13=0,H45=2",
+      "L3": "H13=0,H45=3..4"
+    },
+    "SSQ": {
+      "H13": "N61+N60+N51",
+      "H45": "N50+N41+N40+N31",
+      "L4": "H13=0,H45=26..30",
+      "L5": "H13=0,H45=31..40"
+    }
+  },
+  "shortlists": {
+    "DLT": {
+      "L2": [
+        {
+          "front": [
+            2,
+            15,
+            22,
+            25,
+            26
+          ],
+          "back": [
+            1,
+            7
+          ],
+          "H13": 0,
+          "H45": 2,
+          "model_selection_score": 0.795031,
+          "from_original_v30_ticket": false
+        },
+        {
+          "front": [
+            10,
+            12,
+            15,
+            19,
+            29
+          ],
+          "back": [
+            1,
+            12
+          ],
+          "H13": 0,
+          "H45": 2,
+          "model_selection_score": 0.755486,
+          "from_original_v30_ticket": true
+        },
+        {
+          "front": [
+            3,
+            12,
+            14,
+            21,
+            33
+          ],
+          "back": [
+            2,
+            7
+          ],
+          "H13": 0,
+          "H45": 2,
+          "model_selection_score": 0.749912,
+          "from_original_v30_ticket": false
+        },
+        {
+          "front": [
+            3,
+            8,
+            20,
+            23,
+            31
+          ],
+          "back": [
+            1,
+            2
+          ],
+          "H13": 0,
+          "H45": 2,
+          "model_selection_score": 0.745163,
+          "from_original_v30_ticket": false
+        },
+        {
+          "front": [
+            4,
+            11,
+            19,
+            20,
+            31
+          ],
+          "back": [
+            2,
+            9
+          ],
+          "H13": 0,
+          "H45": 2,
+          "model_selection_score": 0.743382,
+          "from_original_v30_ticket": false
+        }
+      ],
+      "L3": [
+        {
+          "front": [
+            3,
+            10,
+            19,
+            25,
+            26
+          ],
+          "back": [
+            1,
+            9
+          ],
+          "H13": 0,
+          "H45": 3,
+          "model_selection_score": 0.733265,
+          "from_original_v30_ticket": false
+        },
+        {
+          "front": [
+            5,
+            10,
+            14,
+            21,
+            34
+          ],
+          "back": [
+            7,
+            9
+          ],
+          "H13": 0,
+          "H45": 3,
+          "model_selection_score": 0.721861,
+          "from_original_v30_ticket": false
+        },
+        {
+          "front": [
+            3,
+            12,
+            22,
+            25,
+            28
+          ],
+          "back": [
+            2,
+            12
+          ],
+          "H13": 0,
+          "H45": 4,
+          "model_selection_score": 0.706755,
+          "from_original_v30_ticket": false
+        },
+        {
+          "front": [
+            9,
+            12,
+            17,
+            26,
+            29
+          ],
+          "back": [
+            2,
+            6
+          ],
+          "H13": 0,
+          "H45": 3,
+          "model_selection_score": 0.696706,
+          "from_original_v30_ticket": false
+        },
+        {
+          "front": [
+            2,
+            12,
+            19,
+            26,
+            31
+          ],
+          "back": [
+            7,
+            12
+          ],
+          "H13": 0,
+          "H45": 4,
+          "model_selection_score": 0.688738,
+          "from_original_v30_ticket": false
+        }
+      ]
+    },
+    "SSQ": {
+      "L4": [
+        {
+          "front": [
+            2,
+            11,
+            17,
+            20,
+            24,
+            28
+          ],
+          "back": [
+            12
+          ],
+          "H13": 0,
+          "H45": 30,
+          "model_selection_score": 0.809971,
+          "from_original_v30_ticket": true
+        },
+        {
+          "front": [
+            1,
+            10,
+            18,
+            21,
+            23,
+            27
+          ],
+          "back": [
+            7
+          ],
+          "H13": 0,
+          "H45": 28,
+          "model_selection_score": 0.807383,
+          "from_original_v30_ticket": true
+        },
+        {
+          "front": [
+            4,
+            8,
+            17,
+            18,
+            27,
+            29
+          ],
+          "back": [
+            3
+          ],
+          "H13": 0,
+          "H45": 28,
+          "model_selection_score": 0.78625,
+          "from_original_v30_ticket": true
+        },
+        {
+          "front": [
+            1,
+            7,
+            19,
+            20,
+            24,
+            28
+          ],
+          "back": [
+            9
+          ],
+          "H13": 0,
+          "H45": 30,
+          "model_selection_score": 0.775814,
+          "from_original_v30_ticket": true
+        },
+        {
+          "front": [
+            6,
+            11,
+            13,
+            14,
+            24,
+            33
+          ],
+          "back": [
+            8
+          ],
+          "H13": 0,
+          "H45": 27,
+          "model_selection_score": 0.750478,
+          "from_original_v30_ticket": false
+        }
+      ],
+      "L5": [
+        {
+          "front": [
+            3,
+            11,
+            14,
+            18,
+            25,
+            28
+          ],
+          "back": [
+            15
+          ],
+          "H13": 0,
+          "H45": 31,
+          "model_selection_score": 0.750738,
+          "from_original_v30_ticket": false
+        },
+        {
+          "front": [
+            3,
+            6,
+            18,
+            23,
+            24,
+            25
+          ],
+          "back": [
+            1
+          ],
+          "H13": 0,
+          "H45": 38,
+          "model_selection_score": 0.730963,
+          "from_original_v30_ticket": true
+        },
+        {
+          "front": [
+            1,
+            4,
+            18,
+            25,
+            27,
+            28
+          ],
+          "back": [
+            5
+          ],
+          "H13": 0,
+          "H45": 31,
+          "model_selection_score": 0.695353,
+          "from_original_v30_ticket": false
+        },
+        {
+          "front": [
+            3,
+            11,
+            17,
+            18,
+            24,
+            27
+          ],
+          "back": [
+            11
+          ],
+          "H13": 0,
+          "H45": 33,
+          "model_selection_score": 0.693605,
+          "from_original_v30_ticket": false
+        },
+        {
+          "front": [
+            4,
+            11,
+            14,
+            17,
+            27,
+            28
+          ],
+          "back": [
+            4
+          ],
+          "H13": 0,
+          "H45": 33,
+          "model_selection_score": 0.682086,
+          "from_original_v30_ticket": false
+        }
+      ]
+    }
+  }
+}

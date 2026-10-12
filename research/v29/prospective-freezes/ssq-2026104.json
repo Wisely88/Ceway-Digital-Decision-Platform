@@ -1,0 +1,28 @@
+{
+  "schema_version": "ceway.v29.prospective-freeze-manifest.v1",
+  "game": "SSQ",
+  "target_issue": "2026104",
+  "history_cutoff_issue": "2026103",
+  "generator_version": "protected-core-incremental-fusion-v2.9",
+  "production_enabled": false,
+  "immutable_before_and_after_target_draw": true,
+  "track_counts": {"evidence": 3, "scarcity": 3, "neutral": 2, "fusion": 2},
+  "core_reference": {"origin_track": "scarcity", "front": [2,7,17,21,23,32], "back": [6], "rank_score": 0.8128},
+  "items": [
+    {"origin_track":"evidence","front":[4,9,18,22,24,25],"back":[4],"rank_score":0.7723,"front_track_rank":1},
+    {"origin_track":"scarcity","front":[2,7,17,21,23,32],"back":[6],"rank_score":0.8128,"front_track_rank":1},
+    {"origin_track":"evidence","front":[6,9,13,18,24,33],"back":[2],"rank_score":0.7466,"front_track_rank":4},
+    {"origin_track":"neutral","front":[3,10,11,12,26,31],"back":[11],"rank_score":0.8103,"front_track_rank":3},
+    {"origin_track":"evidence","front":[4,9,13,22,25,30],"back":[5],"rank_score":0.7512,"front_track_rank":2},
+    {"origin_track":"scarcity","front":[2,7,15,19,29,32],"back":[3],"rank_score":0.7887,"front_track_rank":3},
+    {"origin_track":"fusion","front":[7,10,16,18,25,31],"back":[7],"rank_score":0.7430,"front_track_rank":3,"replacement_gain":0.1264,"replaced_track":"evidence"},
+    {"origin_track":"scarcity","front":[1,2,14,21,29,33],"back":[5],"rank_score":0.7409,"front_track_rank":42},
+    {"origin_track":"fusion","front":[2,10,14,19,25,33],"back":[5],"rank_score":0.7584,"front_track_rank":1,"replacement_gain":0.1161,"replaced_track":"evidence"},
+    {"origin_track":"neutral","front":[3,5,12,26,27,28],"back":[7],"rank_score":0.8080,"front_track_rank":4}
+  ],
+  "fusion_replacement_decisions": [
+    {"fusion_front":[2,10,14,19,25,33],"candidate_remove_track":"evidence","candidate_remove_front":[4,6,13,22,24,33],"accepted":true,"added_unique_ratio":0.0,"lost_unique_ratio":0.0,"max_jaccard":0.333333,"replacement_gain":0.116086,"score_delta":0.032172},
+    {"fusion_front":[7,10,16,18,25,31],"candidate_remove_track":"evidence","candidate_remove_front":[6,9,16,18,25,30],"accepted":true,"added_unique_ratio":0.166667,"lost_unique_ratio":0.166667,"max_jaccard":0.2,"replacement_gain":0.126443,"score_delta":0.012885}
+  ],
+  "ci": {"run_id":34038894942,"artifact_id":9991047556,"artifact_sha256":"59e82d2949eefd26a5d2f385676cda3dabf652037a7bdffbc365f7123f2ebcc9"}
+}

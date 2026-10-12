@@ -1,0 +1,53 @@
+{
+  "schema_version": "ceway.v30.combined-prospective-freeze.v3",
+  "generator_version": "protected-core-aggregation-v3.0",
+  "production_enabled": false,
+  "immutable": true,
+  "artifact": {
+    "run_id": 35048960886,
+    "artifact_id": 10427832533,
+    "sha256": "f9da7a16f998967932b2c41a3d6dbc59ba134f83f4326d5119c84bab458cdb30"
+  },
+  "SSQ": {
+    "target_issue": "2026108",
+    "history_cutoff_issue": "2026107",
+    "track_counts": {"evidence":3,"scarcity":3,"neutral":2,"fusion":1,"aggregation":1},
+    "aggregation_pool": [31,16,2,18,1,4,7,23,20,8,9,22,27,12,33,13],
+    "aggregation_legal_combinations": 1843,
+    "core_reference": {"origin_track":"neutral","front":[1,2,12,20,31,33],"back":[7],"rank_score":0.8178},
+    "items": [
+      {"origin_track":"evidence","front":[4,9,14,16,25,31],"back":[4]},
+      {"origin_track":"scarcity","front":[7,8,18,21,26,29],"back":[6]},
+      {"origin_track":"evidence","front":[4,9,13,22,24,30],"back":[5]},
+      {"origin_track":"neutral","front":[1,2,12,20,31,33],"back":[7]},
+      {"origin_track":"fusion","front":[2,7,16,18,27,31],"back":[7]},
+      {"origin_track":"scarcity","front":[3,8,18,21,23,32],"back":[7]},
+      {"origin_track":"evidence","front":[6,9,13,16,30,31],"back":[2]},
+      {"origin_track":"scarcity","front":[7,8,16,19,23,26],"back":[5]},
+      {"origin_track":"aggregation","front":[2,9,16,20,27,31],"back":[3],"replacement_gain":0.240458},
+      {"origin_track":"neutral","front":[2,5,15,20,27,31],"back":[11]}
+    ],
+    "guard": {"front":[2,7,17,21,23,32],"back":[6],"cycle":"4/5","minimum_through_issue":"2026109"}
+  },
+  "DLT": {
+    "target_issue": "26106",
+    "history_cutoff_issue": "26105",
+    "track_counts": {"evidence":3,"scarcity":2,"fusion":2,"neutral":2,"aggregation":1},
+    "aggregation_pool": [33,12,5,11,16,22,25,4,9,19,2,28,29,6,20],
+    "aggregation_legal_combinations": 817,
+    "core_reference": {"origin_track":"neutral","front":[2,11,16,28,29],"back":[5,6],"rank_score":0.8019},
+    "items": [
+      {"origin_track":"evidence","front":[3,10,14,26,33],"back":[7,8]},
+      {"origin_track":"scarcity","front":[5,8,22,23,25],"back":[1,5]},
+      {"origin_track":"fusion","front":[4,5,18,20,33],"back":[5,8]},
+      {"origin_track":"neutral","front":[7,11,16,19,32],"back":[2,11]},
+      {"origin_track":"evidence","front":[6,9,15,26,33],"back":[11,12]},
+      {"origin_track":"aggregation","front":[2,12,16,19,29],"back":[1,10],"replacement_gain":0.223987},
+      {"origin_track":"fusion","front":[9,12,13,20,33],"back":[1,5]},
+      {"origin_track":"scarcity","front":[5,12,21,22,25],"back":[1,3]},
+      {"origin_track":"evidence","front":[6,12,14,27,33],"back":[1,12]},
+      {"origin_track":"neutral","front":[2,11,16,28,29],"back":[5,6]}
+    ],
+    "guard": {"front":[4,5,13,30,34],"back":[1,10],"cycle":"4/5","minimum_through_issue":"26107"}
+  }
+}

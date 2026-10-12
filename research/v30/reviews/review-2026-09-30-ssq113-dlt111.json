@@ -1,0 +1,457 @@
+{
+  "schema_version": "ceway.v30.retrospective.v1",
+  "review_date": "2026-09-30",
+  "production_enabled": false,
+  "source_freeze": "research/v30/prospective-freezes/tier-selection-2026-09-28-ssq113-dlt111.json",
+  "rule": "Use only history strictly before each target draw for scarcity grade/rank. Never regenerate the preregistered tickets after the draw.",
+  "DLT": {
+    "issue": "26111",
+    "draw": {
+      "front": [
+        10,
+        11,
+        17,
+        26,
+        29
+      ],
+      "back": [
+        1,
+        3
+      ]
+    },
+    "pre_draw_cutoff": "26110",
+    "scarcity": {
+      "level": "L0",
+      "H13": 0,
+      "H45": 0,
+      "global_rank_start": 2715117,
+      "global_rank_end": 2726440,
+      "level_rank_start": 2715117,
+      "level_rank_end": 2726440,
+      "class_size": 11324
+    },
+    "tier_results": {
+      "L2": [
+        {
+          "id": 1,
+          "front": [
+            1,
+            6,
+            22,
+            27,
+            28
+          ],
+          "back": [
+            1,
+            6
+          ],
+          "hit": "0+1"
+        },
+        {
+          "id": 2,
+          "front": [
+            4,
+            9,
+            18,
+            23,
+            29
+          ],
+          "back": [
+            1,
+            10
+          ],
+          "hit": "1+1"
+        },
+        {
+          "id": 3,
+          "front": [
+            9,
+            11,
+            13,
+            20,
+            32
+          ],
+          "back": [
+            1,
+            2
+          ],
+          "hit": "1+1"
+        },
+        {
+          "id": 4,
+          "front": [
+            4,
+            8,
+            13,
+            29,
+            31
+          ],
+          "back": [
+            2,
+            12
+          ],
+          "hit": "1+0"
+        },
+        {
+          "id": 5,
+          "front": [
+            3,
+            12,
+            21,
+            25,
+            26
+          ],
+          "back": [
+            1,
+            12
+          ],
+          "hit": "1+1"
+        }
+      ],
+      "L3": [
+        {
+          "id": 1,
+          "front": [
+            6,
+            12,
+            14,
+            21,
+            33
+          ],
+          "back": [
+            7,
+            8
+          ],
+          "hit": "0+0"
+        },
+        {
+          "id": 2,
+          "front": [
+            6,
+            12,
+            15,
+            28,
+            29
+          ],
+          "back": [
+            6,
+            12
+          ],
+          "hit": "1+0"
+        },
+        {
+          "id": 3,
+          "front": [
+            6,
+            9,
+            14,
+            28,
+            29
+          ],
+          "back": [
+            2,
+            10
+          ],
+          "hit": "1+0"
+        },
+        {
+          "id": 4,
+          "front": [
+            4,
+            6,
+            21,
+            28,
+            29
+          ],
+          "back": [
+            7,
+            12
+          ],
+          "hit": "1+0"
+        },
+        {
+          "id": 5,
+          "front": [
+            5,
+            10,
+            14,
+            21,
+            35
+          ],
+          "back": [
+            1,
+            7
+          ],
+          "hit": "1+1"
+        }
+      ]
+    },
+    "simulated_basic_stake_yuan": 20,
+    "simulated_prize_yuan": 0,
+    "original_core": {
+      "front": [
+        1,
+        6,
+        22,
+        27,
+        28
+      ],
+      "back": [
+        1,
+        10
+      ],
+      "hit": "0+1"
+    },
+    "guard_chat_fifth": {
+      "front": [
+        3,
+        9,
+        16,
+        18,
+        29
+      ],
+      "back": [
+        5,
+        8
+      ],
+      "hit": "1+0",
+      "cycle": "5/5"
+    },
+    "repo_guard_audit": {
+      "front": [
+        7,
+        11,
+        16,
+        19,
+        32
+      ],
+      "back": [
+        4,
+        11
+      ],
+      "hit": "1+0"
+    }
+  },
+  "SSQ": {
+    "issue": "2026113",
+    "draw": {
+      "front": [
+        3,
+        4,
+        20,
+        24,
+        29,
+        30
+      ],
+      "back": [
+        11
+      ]
+    },
+    "pre_draw_cutoff": "2026112",
+    "scarcity": {
+      "level": "L3",
+      "H13": 0,
+      "H45": 24,
+      "global_rank_start": 3721259,
+      "global_rank_end": 3721347,
+      "level_rank_start": 2717276,
+      "level_rank_end": 2717364,
+      "class_size": 89
+    },
+    "tier_results": {
+      "L4": [
+        {
+          "id": 1,
+          "front": [
+            2,
+            9,
+            17,
+            20,
+            28,
+            29
+          ],
+          "back": [
+            6
+          ],
+          "hit": "2+0"
+        },
+        {
+          "id": 2,
+          "front": [
+            2,
+            5,
+            12,
+            20,
+            31,
+            33
+          ],
+          "back": [
+            12
+          ],
+          "hit": "1+0"
+        },
+        {
+          "id": 3,
+          "front": [
+            8,
+            10,
+            18,
+            21,
+            23,
+            27
+          ],
+          "back": [
+            8
+          ],
+          "hit": "0+0"
+        },
+        {
+          "id": 4,
+          "front": [
+            3,
+            10,
+            18,
+            21,
+            25,
+            27
+          ],
+          "back": [
+            15
+          ],
+          "hit": "1+0"
+        },
+        {
+          "id": 5,
+          "front": [
+            1,
+            11,
+            13,
+            22,
+            24,
+            30
+          ],
+          "back": [
+            4
+          ],
+          "hit": "2+0"
+        }
+      ],
+      "L5": [
+        {
+          "id": 1,
+          "front": [
+            2,
+            11,
+            15,
+            18,
+            27,
+            30
+          ],
+          "back": [
+            1
+          ],
+          "hit": "1+0"
+        },
+        {
+          "id": 2,
+          "front": [
+            2,
+            3,
+            15,
+            18,
+            30,
+            33
+          ],
+          "back": [
+            2
+          ],
+          "hit": "2+0"
+        },
+        {
+          "id": 3,
+          "front": [
+            6,
+            11,
+            15,
+            16,
+            25,
+            30
+          ],
+          "back": [
+            7
+          ],
+          "hit": "1+0"
+        },
+        {
+          "id": 4,
+          "front": [
+            2,
+            9,
+            15,
+            18,
+            28,
+            30
+          ],
+          "back": [
+            3
+          ],
+          "hit": "1+0"
+        },
+        {
+          "id": 5,
+          "front": [
+            4,
+            11,
+            13,
+            14,
+            25,
+            30
+          ],
+          "back": [
+            11
+          ],
+          "hit": "2+1",
+          "prize": "六等奖",
+          "prize_yuan": 5
+        }
+      ]
+    },
+    "simulated_basic_stake_yuan": 20,
+    "simulated_prize_yuan": 5,
+    "original_core": {
+      "front": [
+        2,
+        9,
+        17,
+        20,
+        28,
+        29
+      ],
+      "back": [
+        6
+      ],
+      "hit": "2+0"
+    },
+    "guard_fifth": {
+      "front": [
+        5,
+        12,
+        16,
+        23,
+        29,
+        33
+      ],
+      "back": [
+        10
+      ],
+      "hit": "1+0",
+      "cycle": "5/5"
+    }
+  },
+  "combined_simulated": {
+    "stake_yuan": 40,
+    "prize_yuan": 5,
+    "net_yuan": -35
+  },
+  "interpretation": "This round does not support narrowing future tickets to the tested target tiers: the actual DLT draw fell in L0, while the actual SSQ draw fell in L3. This is descriptive evidence only; do not change long-run weights from one round."
+}

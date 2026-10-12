@@ -1,0 +1,14 @@
+{
+  "schema_version": "ceway.v30.request.v1",
+  "game": "DLT",
+  "target_issue": "26103",
+  "required_history_cutoff": "26102",
+  "budget": 20,
+  "model": "protected-core-aggregation-v3.0",
+  "purpose": "prospective_prediction_trigger_and_audit",
+  "rules": {
+    "do_not_modify_after_generation": true,
+    "do_not_regenerate_after_target_draw": true,
+    "production_enabled": false
+  }
+}

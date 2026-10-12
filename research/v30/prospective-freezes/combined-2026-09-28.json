@@ -1,0 +1,190 @@
+{
+  "schema_version": "ceway.v30.nextdraw_combined_scarcity_overlay.v1",
+  "created_utc": "2026-09-28",
+  "production_enabled": false,
+  "generation_status": "pre_draw_immutable",
+  "raw_model": {
+    "github_actions_run_id": 36362668376,
+    "artifact_id": 10946341812,
+    "archive_sha256": "049ed8ef5c2675bd55f5180cb6bc0759a181da2396c012b53ddb65b2bea4fc04"
+  },
+  "overlay": {
+    "formula": "0.60*V3_rank_score + 0.40*(1 - ((mean(tied_global_rank_interval)-1)/(full_legal_space-1)))",
+    "meaning": "historical-rarity research ranking, not draw probability",
+    "independent_collision_crosscheck": "PASSED all 23 tickets including active and audit guards",
+    "local_snapshot_sha256": "3ad77e0d4e9c715245ed88a7edce2a926aa5257f09e4ff6008dc7b2ff69a7356"
+  },
+  "SSQ": {
+    "target_issue": "2026113",
+    "history_cutoff": "2026112",
+    "raw_model_core_ticket_index": 4,
+    "overlay_core_ticket_index": 9,
+    "overlay_core": {
+      "front": [
+        2,
+        3,
+        15,
+        18,
+        30,
+        33
+      ],
+      "back": [
+        7
+      ],
+      "level": "L2",
+      "H13": 0,
+      "H45": 20,
+      "global_rank": [
+        904405,
+        904411
+      ]
+    },
+    "overlay_ticket_indices": [
+      9,
+      7,
+      6,
+      2,
+      4,
+      10,
+      1,
+      3,
+      8,
+      5
+    ],
+    "original_ticket_levels": [
+      "L4",
+      "L3",
+      "L4",
+      "L4",
+      "L5",
+      "L3",
+      "L2",
+      "L5",
+      "L2",
+      "L4"
+    ],
+    "original_ticket_h45": [
+      28,
+      25,
+      28,
+      26,
+      36,
+      23,
+      20,
+      31,
+      20,
+      28
+    ],
+    "active_guard": {
+      "front": [
+        5,
+        12,
+        16,
+        23,
+        29,
+        33
+      ],
+      "back": [
+        10
+      ],
+      "cycle": "2026109-2026113",
+      "position": "5/5",
+      "level_at_cutoff": "L0"
+    }
+  },
+  "DLT": {
+    "target_issue": "26111",
+    "history_cutoff": "26110",
+    "raw_model_core_ticket_index": 4,
+    "overlay_core_ticket_index": 4,
+    "overlay_core": {
+      "front": [
+        1,
+        6,
+        22,
+        27,
+        28
+      ],
+      "back": [
+        1,
+        10
+      ],
+      "level": "L1",
+      "H13": 0,
+      "H45": 1,
+      "global_rank": [
+        5132050,
+        5148416
+      ]
+    },
+    "overlay_ticket_indices": [
+      4,
+      8,
+      2,
+      3,
+      6,
+      5,
+      10,
+      7,
+      9,
+      1
+    ],
+    "original_ticket_levels": [
+      "L3",
+      "L1",
+      "L1",
+      "L1",
+      "L1",
+      "L1",
+      "L2",
+      "L1",
+      "L3",
+      "L2"
+    ],
+    "original_ticket_h45": [
+      3,
+      1,
+      1,
+      1,
+      1,
+      1,
+      2,
+      1,
+      3,
+      2
+    ],
+    "active_guard_chat_revision": {
+      "front": [
+        3,
+        9,
+        16,
+        18,
+        29
+      ],
+      "back": [
+        5,
+        8
+      ],
+      "cycle": "26107-26111",
+      "position": "5/5",
+      "level_at_cutoff": "L1"
+    },
+    "original_repository_guard_audit": {
+      "front": [
+        7,
+        11,
+        16,
+        19,
+        32
+      ],
+      "back": [
+        4,
+        11
+      ],
+      "cycle": "26107-26111",
+      "position": "5/5"
+    }
+  },
+  "google_drive_folder": "/Google Drive/CEWAY/前瞻预测/20260928",
+  "note": "Raw model artifact and exported Google Drive JSON carry complete ticket numbers, exact score, grade and tie rank. Do not rerun after target draw."
+}

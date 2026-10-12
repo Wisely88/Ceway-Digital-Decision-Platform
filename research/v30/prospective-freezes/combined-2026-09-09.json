@@ -1,0 +1,51 @@
+{
+  "schema_version": "ceway.v30.combined-prospective-freeze.v1",
+  "generator_version": "protected-core-aggregation-v3.0",
+  "production_enabled": false,
+  "immutable": true,
+  "artifact": {
+    "run_id": 34315923334,
+    "artifact_id": 10090070967,
+    "sha256": "a57fbff65f27b4115168fd0f318f2c5e4810cafaebfe5673e23cc23293f41b17"
+  },
+  "SSQ": {
+    "target_issue": "2026105",
+    "history_cutoff_issue": "2026104",
+    "track_counts": {"evidence":3,"scarcity":2,"neutral":2,"aggregation":1,"fusion":2},
+    "aggregation_pool": [14,18,9,3,33,16,25,2,32,27,1,4,7,15,17,10],
+    "aggregation_legal_combinations": 1719,
+    "core_reference": {"origin_track":"neutral","front":[3,10,14,18,27,33],"back":[7],"rank_score":0.81407},
+    "items": [
+      {"origin_track":"evidence","front":[4,9,14,16,25,31],"back":[4],"rank_score":0.762689,"front_track_rank":1},
+      {"origin_track":"scarcity","front":[2,7,17,21,23,32],"back":[6],"rank_score":0.810402,"front_track_rank":1},
+      {"origin_track":"evidence","front":[6,9,13,18,24,31],"back":[5],"rank_score":0.734126,"front_track_rank":10},
+      {"origin_track":"neutral","front":[3,10,14,18,27,33],"back":[7],"rank_score":0.81407,"front_track_rank":3},
+      {"origin_track":"evidence","front":[4,9,18,22,24,25],"back":[2],"rank_score":0.74373,"front_track_rank":3},
+      {"origin_track":"aggregation","front":[2,3,14,16,27,33],"back":[5],"rank_score":0.763978,"front_track_rank":1,"replaced_track":"scarcity","replaced_front":[1,2,15,23,29,32],"replacement_gain":0.243534},
+      {"origin_track":"fusion","front":[3,8,16,18,25,33],"back":[5],"rank_score":0.750292,"front_track_rank":7},
+      {"origin_track":"scarcity","front":[2,7,15,17,29,32],"back":[1],"rank_score":0.788947,"front_track_rank":2},
+      {"origin_track":"fusion","front":[1,9,14,16,30,33],"back":[7],"rank_score":0.78494,"front_track_rank":1},
+      {"origin_track":"neutral","front":[3,5,14,26,27,28],"back":[11],"rank_score":0.807202,"front_track_rank":4}
+    ]
+  },
+  "DLT": {
+    "target_issue": "26103",
+    "history_cutoff_issue": "26102",
+    "track_counts": {"evidence":3,"scarcity":3,"neutral":2,"aggregation":1,"fusion":1},
+    "aggregation_pool": [4,5,29,10,26,8,12,13,14,17,22,18,2,24,25],
+    "aggregation_legal_combinations": 675,
+    "core_reference": {"origin_track":"neutral","front":[2,8,24,25,29],"back":[4,12],"rank_score":0.820149},
+    "items": [
+      {"origin_track":"evidence","front":[9,12,14,26,33],"back":[1,5],"rank_score":0.752999,"front_track_rank":1},
+      {"origin_track":"scarcity","front":[4,5,13,30,34],"back":[1,10],"rank_score":0.799515,"front_track_rank":1},
+      {"origin_track":"evidence","front":[3,10,18,26,27],"back":[1,7],"rank_score":0.738127,"front_track_rank":7},
+      {"origin_track":"neutral","front":[2,8,24,25,29],"back":[4,12],"rank_score":0.820149,"front_track_rank":1},
+      {"origin_track":"aggregation","front":[4,10,17,25,29],"back":[1,12],"rank_score":0.730883,"front_track_rank":1,"replaced_track":"fusion","replaced_front":[5,10,17,22,26],"replacement_gain":0.272278},
+      {"origin_track":"scarcity","front":[4,5,14,23,32],"back":[1,5],"rank_score":0.758013,"front_track_rank":7},
+      {"origin_track":"evidence","front":[10,11,15,18,33],"back":[7,8],"rank_score":0.726539,"front_track_rank":21},
+      {"origin_track":"scarcity","front":[4,5,16,22,35],"back":[3,12],"rank_score":0.740439,"front_track_rank":13},
+      {"origin_track":"fusion","front":[4,12,13,20,29],"back":[1,5],"rank_score":0.748323,"front_track_rank":3},
+      {"origin_track":"neutral","front":[6,8,17,21,29],"back":[2,4],"rank_score":0.809415,"front_track_rank":3}
+    ]
+  }
+}
