@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 
@@ -20,6 +21,8 @@ from scripts.update_dlt_history import (
 from scripts.run_draw_update import (
     frontend_dependencies_are_stale,
     github_repo_slug,
+    push_with_proxy_fallback,
+    refresh_checkout,
     scheduled_game,
     write_run_status,
 )
@@ -140,6 +143,22 @@ class LocalAutomationScheduleTests(unittest.TestCase):
             expected,
         )
 
+    @patch("scripts.run_draw_update.run_with_retry", side_effect=RuntimeError("temporary ssl failure"))
+    def test_temporary_github_failure_does_not_block_data_collection(self, fetch):
+        with patch("scripts.run_draw_update.data_changed", return_value=False):
+            refresh_checkout()
+        fetch.assert_called_once()
+
+    @patch("scripts.run_draw_update.run_with_retry")
+    def test_git_push_retries_once_without_proxy(self, run_retry):
+        run_retry.side_effect = [RuntimeError("ssl failure"), object()]
+        push_with_proxy_fallback(["origin", "main"])
+        self.assertEqual(run_retry.call_count, 2)
+        self.assertEqual(
+            run_retry.call_args_list[1].args[0],
+            ["git", "-c", "http.proxy=", "-c", "https.proxy=", "push", "origin", "main"],
+        )
+
 
 class SsqSyncScheduleTests(unittest.TestCase):
     def test_parses_78500_year_archive_row(self):
@@ -227,6 +246,13 @@ class SsqSyncScheduleTests(unittest.TestCase):
         now = datetime(2026, 7, 18, 12, 0, tzinfo=SHANGHAI_TZ)
         rows = fill_latest_new_draw_date(incoming, current, now)
         self.assertEqual(rows[0]["date"], "2026-07-16")
+
+    def test_sunday_retry_does_not_relabel_a_missed_thursday_draw(self):
+        current = [{"issue": "2026089", "date": "2026-08-04", "front": [], "back": []}]
+        incoming = [{"issue": "2026090", "date": "", "front": [], "back": []}]
+        now = datetime(2026, 8, 9, 12, 0, tzinfo=SHANGHAI_TZ)
+        rows = fill_latest_new_draw_date(incoming, current, now)
+        self.assertEqual(rows[0]["date"], "2026-08-06")
 
     def test_rejects_duplicate_or_non_increasing_draw_dates(self):
         with tempfile.TemporaryDirectory() as temp_dir:

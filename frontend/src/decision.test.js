@@ -27,6 +27,13 @@ test("预算内且没有连续加码时给出低风险结论", () => {
   assert.equal(brief.principal_exposure, 2);
 });
 
+test("决策说明保留单式倍数并区分复式覆盖", () => {
+  const single = buildDecisionBrief({ plan: { mode: "single", cost: 8, tickets: 1, multiplier: 4 }, budget: 20, principal: 1000, periodCap: 200 });
+  const compound = buildDecisionBrief({ plan: { mode: "compound", cost: 12, tickets: 6 }, budget: 20, principal: 1000, periodCap: 200 });
+  assert.equal(single.multiplier, 4);
+  assert.equal(compound.coverage_label, "复式展开 6 注");
+});
+
 test("超预算或超过周期上限时建议暂停", () => {
   const brief = buildDecisionBrief({
     plan: { ...basePlan, cost: 60, tickets: 30 },
@@ -108,4 +115,28 @@ test("超过净投入周期上限只报警不阻断保存", () => {
   assert.equal(brief.risk_tone, "watch");
   assert.equal(brief.block_save, false);
   assert.match(brief.action, /继续生成和保存/);
+});
+
+test("关闭预算风险后保留费用统计但不报警或阻断", () => {
+  const brief = buildDecisionBrief({
+    plan: { ...basePlan, cost: 80 },
+    budget: 20,
+    principal: 100,
+    periodCap: 10,
+    budgetRiskEnabled: false,
+    records: [
+      { saved_at: "2026-07-01T00:00:00Z", plan: { cost: 10 } },
+      { saved_at: "2026-07-02T00:00:00Z", plan: { cost: 20 } },
+    ],
+    capital: { level_units: 4, round_profit: -10 },
+    now: new Date("2026-07-03T00:00:00Z"),
+  });
+
+  assert.equal(brief.risk_enabled, false);
+  assert.equal(brief.risk_level, "已关闭");
+  assert.equal(brief.risk_tone, "off");
+  assert.equal(brief.block_save, false);
+  assert.equal(brief.period_spent, 30);
+  assert.equal(brief.projected_period_net_spend, 110);
+  assert.deepEqual(brief.signals, ["预算风险提醒已关闭；本期支出上限仍用于控制生成费用"]);
 });

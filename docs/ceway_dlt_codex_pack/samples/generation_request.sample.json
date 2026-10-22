@@ -1,0 +1,11 @@
+{
+  "target_issue": "26090",
+  "history_cutoff_issue": "26089",
+  "history_window": {"mode": "all_history"},
+  "mode": "model",
+  "candidate_pool": {"front_size": 12, "back_size": 5},
+  "output_count": 10,
+  "addon": false,
+  "multiplier": 1,
+  "model_config_version": "ceway-dlt-collision-v1"
+}

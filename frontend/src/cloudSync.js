@@ -113,6 +113,14 @@ export async function signOutCloud() {
   if (error) throw error;
 }
 
+export async function updateCloudPassword(password) {
+  if (String(password).length < 6) throw new Error("同步密码至少需要 6 位");
+  const session = await getCloudSession();
+  if (!session?.user) throw new Error("请先连接云同步");
+  const { error } = await cloudClient.auth.updateUser({ password });
+  if (error) throw error;
+}
+
 export async function syncCloudState() {
   const session = await getCloudSession();
   if (!session?.user) throw new Error("请先输入同步密码");

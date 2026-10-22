@@ -65,6 +65,7 @@ export function buildDecisionBrief({
   budget,
   principal,
   periodCap,
+  budgetRiskEnabled = true,
   records = [],
   reviewItems = [],
   backtest,
@@ -74,6 +75,7 @@ export function buildDecisionBrief({
   if (!plan) return null;
 
   const cost = Math.max(0, finiteNumber(plan.cost));
+  const riskEnabled = budgetRiskEnabled !== false;
   const safeBudget = Math.max(0, finiteNumber(budget, plan?.budget_analysis?.budget || cost));
   const safePrincipal = Math.max(0, finiteNumber(principal));
   const safePeriodCap = Math.max(0, finiteNumber(periodCap, safePrincipal * 0.1));
@@ -86,25 +88,29 @@ export function buildDecisionBrief({
   const budgetUtilization = safeBudget ? round((cost / safeBudget) * 100, 1) : 0;
   const principalExposure = safePrincipal ? round((cost / safePrincipal) * 100, 2) : 0;
   const periodUtilization = safePeriodCap ? round((projectedPeriodNetSpend / safePeriodCap) * 100, 1) : 0;
-  const overBudget = safeBudget > 0 && cost > safeBudget;
-  const overPeriodCap = safePeriodCap > 0 && projectedPeriodNetSpend > safePeriodCap;
-  const escalating = hasEscalationPattern(records, cost);
+  const overBudget = riskEnabled && safeBudget > 0 && cost > safeBudget;
+  const overPeriodCap = riskEnabled && safePeriodCap > 0 && projectedPeriodNetSpend > safePeriodCap;
+  const escalating = riskEnabled && hasEscalationPattern(records, cost);
   const levelUnits = finiteNumber(capital?.level_units, 1);
-  const unprofitableStepUp = levelUnits > 1 && finiteNumber(capital?.round_profit) <= 0;
+  const unprofitableStepUp = riskEnabled && levelUnits > 1 && finiteNumber(capital?.round_profit) <= 0;
 
   const signals = [];
   if (overBudget) signals.push(`方案超出本期预算 ${round(cost - safeBudget)} 元`);
   if (overPeriodCap) signals.push(`计入本期后，近30日净投入将超过周期上限 ${round(projectedPeriodNetSpend - safePeriodCap)} 元`);
   if (escalating) signals.push("最近三次方案费用连续上升，存在追投倾向");
   if (unprofitableStepUp) signals.push("当前处于加注级别，但上一轮没有形成净盈利");
-  if (principalExposure > 5) signals.push(`单次投入占本金 ${principalExposure}%，暴露偏高`);
-  else if (principalExposure > 2) signals.push(`单次投入占本金 ${principalExposure}%，需要留意`);
+  if (riskEnabled && principalExposure > 5) signals.push(`单次投入占本金 ${principalExposure}%，暴露偏高`);
+  else if (riskEnabled && principalExposure > 2) signals.push(`单次投入占本金 ${principalExposure}%，需要留意`);
 
   let riskLevel = "低";
   let riskTone = "safe";
   let action = "可按当前预算执行，开奖后复盘，不因未中奖追加。";
   const blockSave = overBudget || unprofitableStepUp;
-  if (blockSave) {
+  if (!riskEnabled) {
+    riskLevel = "已关闭";
+    riskTone = "off";
+    action = "预算风险提醒已关闭，本次仅统计方案费用，不作风险判断。";
+  } else if (blockSave) {
     riskLevel = "高";
     riskTone = "stop";
     action = "建议暂停或缩减方案，先恢复到基础预算。";
@@ -127,7 +133,13 @@ export function buildDecisionBrief({
 
   const coverageLabel = plan.mode === "dantuo"
     ? `组合覆盖 ${finiteNumber(plan.tickets)} 注`
-    : `${finiteNumber(plan.tickets)} 注分散单式`;
+    : plan.mode === "batch"
+      ? `多玩法合计 ${finiteNumber(plan.tickets)} 注`
+      : plan.mode === "compound"
+        ? `复式展开 ${finiteNumber(plan.tickets)} 注`
+        : plan.mode === "package"
+          ? `套餐展开 ${finiteNumber(plan.tickets)} 注`
+          : `${finiteNumber(plan.tickets)} 注分散单式`;
 
   return {
     cost,
@@ -142,18 +154,23 @@ export function buildDecisionBrief({
     projected_period_net_spend: projectedPeriodNetSpend,
     period_utilization: periodUtilization,
     coverage_label: coverageLabel,
-    multiplier: 1,
+    multiplier: Math.max(1, finiteNumber(plan.multiplier, 1)),
+    risk_enabled: riskEnabled,
     risk_level: riskLevel,
     risk_tone: riskTone,
-    signals: signals.length ? signals : ["未发现超预算、连续加码或高资金暴露"],
+    signals: riskEnabled
+      ? (signals.length ? signals : ["未发现超预算、连续加码或高资金暴露"])
+      : ["预算风险提醒已关闭；本期支出上限仍用于控制生成费用"],
     escalation_detected: escalating,
     block_save: blockSave,
     history_message: historyMessage,
     action,
-    guardrails: [
-      `本期支出上限 ${safeBudget} 元`,
-      `近30日投入上限 ${safePeriodCap} 元`,
-      "未中奖不加码，只有本轮净盈利后才允许升级",
-    ],
+    guardrails: riskEnabled
+      ? [
+          `本期支出上限 ${safeBudget} 元`,
+          `近30日投入上限 ${safePeriodCap} 元`,
+          "未中奖不加码，只有本轮净盈利后才允许升级",
+        ]
+      : ["预算风险提醒已关闭"],
   };
 }

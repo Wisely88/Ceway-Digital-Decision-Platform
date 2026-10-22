@@ -1,0 +1,19 @@
+{
+  "game": "super_lotto_dlt",
+  "rule_version": "ceway-dlt-rules-2026-08",
+  "front": {"min": 1, "max": 35, "pick": 5},
+  "back": {"min": 1, "max": 12, "pick": 2},
+  "base_unit_yuan": 2,
+  "addon_unit_yuan": 1,
+  "multiplier_min": 1,
+  "multiplier_max": 99,
+  "max_ticket_base_yuan": 20000,
+  "max_ticket_with_addon_yuan": 30000,
+  "front_dan_max": 4,
+  "back_dan_max": 1,
+  "zones_front": [[1, 12], [13, 24], [25, 35]],
+  "notes": [
+    "Treat this file as configurable game validation, not model weights.",
+    "Re-verify official rules when rule_version changes."
+  ]
+}

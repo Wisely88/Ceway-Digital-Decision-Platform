@@ -1,4 +1,4 @@
-# 策维（Ceway）数字决策平台 v1.12.4
+# 策维（Ceway）数字决策平台 v1.12.5
 
 Digital Decision Platform  
 Powered by CBGO Framework
@@ -51,6 +51,8 @@ ceway/
 - [v1.12.2 完整历史与性能优化](docs/ceway_v1_12_2_history_performance.md)
 - [v1.12.3 方案永久归档与全量查询](docs/ceway_v1_12_3_record_archive.md)
 - [v1.12.4 后区与蓝球走势分析](docs/ceway_v1_12_4_back_trends.md)
+- [v1.12.5 预算闭环与交互优化](docs/ceway_v1_12_5_budget_ux.md)
+- [大乐透实验室](docs/ceway_dlt_laboratory.md)
 - [Backlog](docs/backlog.md)
 - [数据导入说明](docs/data_import.md)
 
@@ -99,8 +101,8 @@ backend/.venv/bin/python scripts/mobile_smoke.py
 
 当前数据快照：
 
-- 大乐透：2902 期，最新 `26084`（2026-07-27）。
-- 双色球：3482 期，最新 `2026085`（2026-07-26）。
+- 大乐透：2907 期，最新 `26089`（2026-08-08）。
+- 双色球：3487 期，最新 `2026090`（2026-08-06）。
 - 两份数据均通过当前期号范围连续性检查；双色球从首期开始没有空开奖日期。
 
 每期实际奖金快照：

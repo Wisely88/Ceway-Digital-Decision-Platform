@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Cloud, CloudOff, Download, LogOut, RefreshCw, ShieldCheck, Upload } from "lucide-react";
+import { Cloud, CloudOff, Download, KeyRound, LogOut, RefreshCw, ShieldCheck, Upload } from "lucide-react";
 import {
   cloudClient,
   collectLocalState,
@@ -10,6 +10,7 @@ import {
   signInCloud,
   signOutCloud,
   syncCloudState,
+  updateCloudPassword,
 } from "./cloudSync";
 
 function readableError(error) {
@@ -47,6 +48,8 @@ export default function CloudSyncPanel({ scene = "DLT", onApply }) {
   const fileInputRef = useRef(null);
   const [session, setSession] = useState(null);
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
   const [autoSync, setAutoSync] = useState(isAutoSyncEnabled());
   const [status, setStatus] = useState("正在检查云端状态...");
   const [busy, setBusy] = useState(false);
@@ -77,8 +80,8 @@ export default function CloudSyncPanel({ scene = "DLT", onApply }) {
   };
 
   const connect = async () => {
-    if (password.length < 8) {
-      setStatus("同步密码至少需要 8 位。");
+    if (password.length < 6) {
+      setStatus("同步密码至少需要 6 位。");
       return;
     }
     setBusy(true);
@@ -89,6 +92,24 @@ export default function CloudSyncPanel({ scene = "DLT", onApply }) {
       await syncNow();
     } catch (error) {
       setStatus(readableError(error));
+      setBusy(false);
+    }
+  };
+
+  const changePassword = async () => {
+    if (newPassword.length < 6) {
+      setStatus("新同步密码至少需要 6 位。");
+      return;
+    }
+    setBusy(true);
+    try {
+      await updateCloudPassword(newPassword);
+      setNewPassword("");
+      setChangingPassword(false);
+      setStatus("同步密码已更新，本设备仍保持连接。其他设备需要使用新密码重新连接。");
+    } catch (error) {
+      setStatus(readableError(error));
+    } finally {
       setBusy(false);
     }
   };
@@ -160,7 +181,7 @@ export default function CloudSyncPanel({ scene = "DLT", onApply }) {
             <h3>输入同步密码</h3>
             <p>所有自用设备输入同一个密码。系统不会显示邮箱、注册或用户管理。</p>
           </div>
-          <input autoComplete="current-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="至少 8 位同步密码" />
+          <input autoComplete="current-password" minLength={6} type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="6 位或以上同步密码" />
           <button className="primary-button" disabled={busy || !password} onClick={connect} type="button"><Cloud size={16} />开启云同步</button>
         </div>
       ) : (
@@ -169,8 +190,15 @@ export default function CloudSyncPanel({ scene = "DLT", onApply }) {
           <label className="cloud-toggle"><input checked={autoSync} type="checkbox" onChange={(event) => { setAutoSync(event.target.checked); setAutoSyncEnabled(event.target.checked); }} />方案变化后自动同步</label>
           <div className="cloud-actions">
             <button className="primary-button" disabled={busy} onClick={syncNow} type="button"><RefreshCw className={busy ? "spin" : ""} size={16} />立即同步</button>
+            <button className="ghost-button" disabled={busy} onClick={() => setChangingPassword((value) => !value)} type="button"><KeyRound size={16} />修改同步密码</button>
             <button className="ghost-button" disabled={busy} onClick={disconnect} type="button"><LogOut size={16} />断开本设备</button>
           </div>
+          {changingPassword && (
+            <div className="cloud-password-change">
+              <input autoComplete="new-password" minLength={6} type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="输入6位或以上新密码" />
+              <button className="primary-button" disabled={busy || !newPassword} onClick={changePassword} type="button">确认修改</button>
+            </div>
+          )}
         </div>
       )}
       <p className="cloud-message">{status}</p>

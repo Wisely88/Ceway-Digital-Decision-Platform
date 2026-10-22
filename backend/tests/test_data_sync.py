@@ -4,6 +4,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 
@@ -72,7 +73,7 @@ class CsvSqliteSyncTests(unittest.TestCase):
 
                 self.assertEqual(result["dlt"]["latest_issue"], "26001")
                 self.assertEqual(result["ssq"]["latest_issue"], "2026001")
-                with sqlite3.connect(db.DB_PATH) as connection:
+                with closing(sqlite3.connect(db.DB_PATH)) as connection:
                     self.assertEqual(connection.execute("select count(*) from dlt_draws").fetchone()[0], 1)
                     self.assertEqual(connection.execute("select count(*) from ssq_draws").fetchone()[0], 1)
                     self.assertEqual(connection.execute("select count(*) from dlt_recommendation_records").fetchone()[0], 1)

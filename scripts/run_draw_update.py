@@ -143,6 +143,18 @@ def run_with_retry(
     raise RuntimeError(f"命令连续失败 {attempts} 次：{' '.join(command)}")
 
 
+def push_with_proxy_fallback(arguments: list[str], *, cwd: Path = ROOT_DIR, timeout: int = 120) -> subprocess.CompletedProcess[str]:
+    try:
+        return run_with_retry(["git", "push", *arguments], cwd=cwd, timeout=timeout)
+    except RuntimeError:
+        log("Git 推送代理握手失败，仅本次绕开代理重试")
+        return run_with_retry(
+            ["git", "-c", "http.proxy=", "-c", "https.proxy=", "push", *arguments],
+            cwd=cwd,
+            timeout=timeout,
+        )
+
+
 def scheduled_game(now: datetime | None = None) -> str | None:
     local_now = now.astimezone(SHANGHAI_TZ) if now else datetime.now(SHANGHAI_TZ)
     draw_day = local_now.date()
@@ -174,11 +186,15 @@ def refresh_checkout() -> None:
     if data_changed():
         log("检测到上次未完成的数据更新，先继续本地恢复流程")
         return
-    run_with_retry(["git", "fetch", "origin", "main"], timeout=120)
+    try:
+        run_with_retry(["git", "fetch", "origin", "main"], timeout=120)
+    except RuntimeError as exc:
+        log(f"GitHub 暂时不可用，继续抓取并保留本地开奖数据：{exc}")
+        return
     run(["git", "merge", "--ff-only", "origin/main"])
     ahead = run(["git", "rev-list", "--count", "origin/main..HEAD"]).stdout.strip()
     if ahead and int(ahead) > 0:
-        run_with_retry(["git", "push", "origin", "main"], timeout=120)
+        push_with_proxy_fallback(["origin", "main"], timeout=120)
 
 
 def update_history(game: str) -> None:
@@ -208,7 +224,7 @@ def commit_data(game: str) -> None:
     run(["git", "add", *[str(path) for path in DATA_FILES]])
     today = datetime.now(SHANGHAI_TZ).date().isoformat()
     run(["git", "commit", "-m", f"Update {game} lottery history ({today})"])
-    run_with_retry(["git", "push", "origin", "main"], timeout=120)
+    push_with_proxy_fallback(["origin", "main"], timeout=120)
 
 
 def frontend_dependencies_are_stale(frontend_dir: Path = FRONTEND_DIR) -> bool:
@@ -287,7 +303,7 @@ def publish_pages() -> None:
         run(["git", "config", "user.name", "Ceway Data Updater"], cwd=pages_dir)
         run(["git", "config", "user.email", "ceway-updater@local.invalid"], cwd=pages_dir)
         run(["git", "commit", "-m", "Publish latest lottery history"], cwd=pages_dir)
-        run_with_retry(["git", "push", "origin", "HEAD:gh-pages"], cwd=pages_dir, timeout=120)
+        push_with_proxy_fallback(["origin", "HEAD:gh-pages"], cwd=pages_dir, timeout=120)
         trigger_pages_build(remote)
         log("GitHub Pages 已发布")
 

@@ -4,6 +4,7 @@ import { createRecordId } from "./recordIdentity.js";
 import dltPrizeUrl from "../../backend/data/dlt_prizes.json?url";
 import ssqPrizeUrl from "../../backend/data/ssq_prizes.json?url";
 import { buildBehaviorProfile } from "./behavior";
+import { paginateDraws } from "./drawPagination";
 import { archiveRecord, listArchivedRecords } from "./recordStore.js";
 
 const prizeCache = new Map();
@@ -578,7 +579,7 @@ export function getDemoDashboard({ budget = 20, lastPrize = 0, strategy = "balan
   });
   return Promise.resolve({
     scene: "DLT",
-    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.12.4 Stable" },
+    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.12.5 Stable" },
     disclaimer: "策维（Ceway）不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
     history_count: HISTORY.length,
     latest_issue: latest.issue,
@@ -641,7 +642,7 @@ export function getDemoSsqDashboard({ budget = 20, lastPrize = 0, strategy = "ba
   });
   return Promise.resolve({
     scene: "SSQ",
-    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.12.4 Stable" },
+    product: { name: "策维", english_name: "Ceway", subtitle: "Digital Decision Platform", framework: "Powered by CBGO Framework", version: "v1.12.5 Stable" },
     disclaimer: "策维不预测开奖结果，不承诺提高中奖概率，仅提供基于历史数据的分析、预算管理与决策辅助。",
     history_count: SSQ_HISTORY.length,
     latest_issue: latest.issue,
@@ -1087,21 +1088,6 @@ export function getDemoSsqBacktest({ budget = 20, strategy = "balanced", periods
 
 export function getDemoSsqDraws(limit = 10) {
   return Promise.resolve(SSQ_HISTORY.slice(-limit).reverse());
-}
-
-function paginateDraws(history, { limit = 12, offset = 0, issue = "" } = {}) {
-  const normalizedIssue = String(issue || "").trim();
-  const filtered = history
-    .slice()
-    .reverse()
-    .filter((row) => !normalizedIssue || row.issue.includes(normalizedIssue));
-  return {
-    items: filtered.slice(offset, offset + limit),
-    total: filtered.length,
-    limit,
-    offset,
-    issue: normalizedIssue,
-  };
 }
 
 export function searchDemoSsqDraws(params = {}) {

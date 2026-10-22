@@ -1,0 +1,20 @@
+{
+  "model_version": "ceway-dlt-collision-v1",
+  "history_window": {"mode": "all_history"},
+  "frequency_windows": {"short": 20, "mid": 60, "long": 120},
+  "trend_weights": {"short": 0.35, "mid": 0.25, "long": 0.20, "omission": 0.20},
+  "candidate_pool": {"front_size": 12, "back_size": 5},
+  "ranking": {
+    "primary": "collision_lexicographic_high_hits_first",
+    "scarcity_total_hit_order": [7,6,5,4,3,2,1],
+    "secondary_weights": {"number": 0.45, "structure": 0.45, "diversity": 0.10}
+  },
+  "structure": {
+    "laplace_lambda": 1.0,
+    "front_zones": [[1,12],[13,24],[25,35]],
+    "hard_filters": []
+  },
+  "diversity": {"front_weight": 0.75, "back_weight": 0.25, "max_exact_duplicates": 0},
+  "safety": {"require_history_cutoff": true, "disallow_future_draws": true},
+  "disclaimer": "Historical collision/omission/hot-cold statistics are experimental selection features, not evidence that future draw probability changes."
+}

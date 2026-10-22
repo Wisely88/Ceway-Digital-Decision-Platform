@@ -52,6 +52,14 @@ export function getScenes() {
   return request("/scenes");
 }
 
+export function getRuntimeRecommendation({ game, refresh = false, minCost = 18, maxCost = 24 }) {
+  if (STATIC_DEMO) {
+    return Promise.reject(new Error("今日正式推荐仅在 Mac 本地运行环境开放。"));
+  }
+  const params = toQueryString({ refresh, min_cost: minCost, max_cost: maxCost });
+  return request(`/runtime/${String(game).toLowerCase()}/recommendation?${params}`);
+}
+
 export function getDltDashboard({
   budget,
   lastPrize,
@@ -147,7 +155,7 @@ export function getDltDataStatus() {
 
 export function getDltDraws({ limit = 10 } = {}) {
   if (STATIC_DEMO) {
-    return loadDemo().then((module) => module.getDemoDraws(limit)).then((items) => ({ items, total: items.length, limit, offset: 0, issue: "" }));
+    return loadDemo().then((module) => module.searchDemoDltDraws({ limit, offset: 0, issue: "" }));
   }
   return request(`/data/dlt/draws?${toQueryString({ limit })}`);
 }
@@ -262,7 +270,7 @@ export function getSsqDataStatus() {
 }
 
 export function getSsqDraws({ limit = 10 } = {}) {
-  if (STATIC_DEMO) return loadDemo().then((module) => module.getDemoSsqDraws(limit)).then((items) => ({ items, total: items.length, limit, offset: 0, issue: "" }));
+  if (STATIC_DEMO) return loadDemo().then((module) => module.searchDemoSsqDraws({ limit, offset: 0, issue: "" }));
   return request(`/data/ssq/draws?${toQueryString({ limit })}`);
 }
 
@@ -320,4 +328,81 @@ export async function importDltHistory(file) {
   }
 
   return response.json();
+}
+
+function requireDltLabBackend() {
+  if (STATIC_DEMO) {
+    throw new Error("大乐透实验室需要连接本地策维后端；公开静态页面暂只展示已发布的基础工作台。");
+  }
+}
+
+export function getDltLabRules() {
+  requireDltLabBackend();
+  return request("/api/v1/lottery/dlt/rules");
+}
+
+export function generateDltLabModel(payload) {
+  requireDltLabBackend();
+  return request("/api/v1/lottery/dlt/generate/model", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function generateDltLabRandom(payload) {
+  requireDltLabBackend();
+  return request("/api/v1/lottery/dlt/generate/random", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function generateDltLabPackage(payload) {
+  requireDltLabBackend();
+  return request("/api/v1/lottery/dlt/generate/package", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function analyzeDltLabCollisions(payload) {
+  requireDltLabBackend();
+  return request("/api/v1/lottery/dlt/collisions/analyze", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function calculateDltLabBet(payload) {
+  requireDltLabBackend();
+  return request("/api/v1/lottery/dlt/bet/calculate", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function getDltLabRuns({ limit = 50, targetIssue = "" } = {}) {
+  requireDltLabBackend();
+  return request(`/api/v1/lottery/dlt/runs?${toQueryString({ limit, target_issue: targetIssue })}`);
+}
+
+export function freezeDltLabRun(id) {
+  requireDltLabBackend();
+  return request(`/api/v1/lottery/dlt/runs/${encodeURIComponent(id)}/freeze`, { method: "POST" });
+}
+
+export function cloneDltLabRun(id) {
+  requireDltLabBackend();
+  return request(`/api/v1/lottery/dlt/runs/${encodeURIComponent(id)}/clone`, { method: "POST" });
+}
+
+export function settleDltLabRun(id) {
+  requireDltLabBackend();
+  return request(`/api/v1/lottery/dlt/runs/${encodeURIComponent(id)}/settle`, { method: "POST" });
+}
+
+function requireSsqLabBackend() {
+  if (STATIC_DEMO) {
+    throw new Error("双色球实验室需要连接本地策维后端。");
+  }
+}
+
+export function generateSsqLabModel(payload) {
+  requireSsqLabBackend();
+  return request("/api/v1/lottery/ssq/generate/model", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function generateSsqLabRandom(payload) {
+  requireSsqLabBackend();
+  return request("/api/v1/lottery/ssq/generate/random", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function analyzeSsqLabCollisions(payload) {
+  requireSsqLabBackend();
+  return request("/api/v1/lottery/ssq/collisions/analyze", { method: "POST", body: JSON.stringify(payload) });
 }

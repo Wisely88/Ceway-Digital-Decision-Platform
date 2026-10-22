@@ -19,12 +19,16 @@ export const PACKAGE_SOURCES = {
     region: "部分地区有售，以当地终端为准",
     sourceUrl: "https://m.lottery.gov.cn/zx/zj/20260429/10053451.html",
     activity: "当前不计入额外赠票或已结束派奖权益。",
+    referenceDate: "2026-04-29",
+    status: "标准结构参考",
   },
   SSQ: {
     label: "江苏福彩双色球套餐赠票",
     region: "仅江苏省福彩销售网点",
     sourceUrl: "https://www.jslottery.com/articles/45623020-2cbc-46ef-89d4-77e77ca8f41e?locale=zh-CN",
     activity: "自第2026080期起，至500万元赠票资金用完为止。",
+    referenceDate: "2026-07-14",
+    status: "额度动态，以终端为准",
   },
 };
 
