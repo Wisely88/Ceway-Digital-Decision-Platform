@@ -1,0 +1,164 @@
+{
+  "schema_version": "ceway.research-evidence-ledger.v2.1",
+  "status": "ACTIVE_PROSPECTIVE_VALIDATION",
+  "production_enabled": false,
+  "policy": {
+    "frozen_objects_are_immutable": true,
+    "historical_blocks_are_single_use_for_promotion_evidence": true,
+    "prospective_reviews_must_replay_frozen_tickets_without_regeneration": true,
+    "one_future_draw_is_evidence_not_proof": true,
+    "next_untouched_historical_block_min_excluded_recent_points": 250
+  },
+  "prospective_tracks": {
+    "DLT": {
+      "track_role": "predictive_candidate_forward_shadow",
+      "candidate_version": "fixed-window-100-exposure-v2.4",
+      "target_issue": "26092",
+      "history_cutoff_issue": "26091",
+      "freeze_sha256": "fc040de750c72dbd9b4734915e6ba0445e29fb38956b300c2e25949e0e5daf23",
+      "frozen_registry": "research/forward/dlt/26092-v24.json",
+      "reviewer": "scripts/review_dlt_forward_shadow.py",
+      "review_workflow": ".github/workflows/v24-dlt-forward-review.yml",
+      "current_expected_status": "PENDING_UNTIL_TARGET_DRAW",
+      "claim_scope": "Candidate passed fresh historical gate and may be evaluated prospectively; no production or certainty claim."
+    },
+    "SSQ": {
+      "track_role": "coverage_only_forward_shadow",
+      "candidate_version": "feature-pruned-shrink-v2.3+score-exposure-balanced-v2.1",
+      "target_issue": "2026094",
+      "history_cutoff_issue": "2026093",
+      "freeze_sha256": "e1579a38d10c25278060ac5bcf2ef7a8e9b2441fd391b8a35e64ed2137ebc1c7",
+      "frozen_registry": "research/shadow/ssq/2026094-v23-coverage-shadow.json",
+      "matched_random_controls": "research/shadow/ssq/2026094-v23-matched-random-controls.json",
+      "reviewer": "scripts/review_v23_ssq_shadow.py",
+      "review_workflow": ".github/workflows/v23-ssq-shadow-review.yml",
+      "control_count": 3,
+      "predictive_ranking_claim": false,
+      "current_expected_status": "PENDING_UNTIL_TARGET_DRAW",
+      "claim_scope": "Coverage-engineering shadow only; compare against pre-registered structure-matched random controls."
+    }
+  },
+  "retrospective_stress_tracks": {
+    "V2.5_MULTI_REGIME": {
+      "candidate_version": "multi-regime-exposure-v2.5",
+      "decision": "HOLD_RETROSPECTIVE",
+      "workflow_run": 33286144639,
+      "artifact_id": 9724546932,
+      "artifact_zip_sha256": "276df0c1c40b223e8410071adb3504325f62eb25a2c3d0b83cb5977ba7779761",
+      "evidence_path": "research/v25/multiregime-retrospective-stress.json",
+      "settings": {
+        "periods": 60,
+        "excluded_recent": 200,
+        "baseline_seeds": 3,
+        "budget": 20
+      },
+      "parameters": {
+        "role_weights": {"evidence": 0.50, "scarcity": 0.30, "neutral": 0.20},
+        "evidence_weights": {"long_frequency": 0.25, "recency": 0.15, "momentum": 0.10, "stability": 0.10},
+        "scarcity_weights": {"rarity3": 0.30, "rarity7": 0.20, "rarity20": 0.15, "gap": 0.15, "divergence": 0.20},
+        "outcome_tuned": false
+      },
+      "DLT": {
+        "vs_random_best_hit": {"mean": 0.0722, "ci95": [-0.1111, 0.25]},
+        "vs_v24_best_hit": {"mean": 0.2167, "ci95": [-0.05, 0.4833]},
+        "vs_v9_best_hit": {"mean": 0.3667, "ci95": [0.15, 0.5667]},
+        "front_mean_jaccard": 0.0512,
+        "actual_front_mean_top_quartile_scarcity_hits_per_draw": 1.2
+      },
+      "SSQ": {
+        "vs_random_best_hit": {"mean": 0.1556, "ci95": [-0.0222, 0.3389]},
+        "vs_v24_best_hit": {"mean": 0.3167, "ci95": [0.0833, 0.55]},
+        "vs_v9_best_hit": {"mean": 0.2333, "ci95": [-0.0167, 0.4833]},
+        "front_mean_jaccard": 0.0646,
+        "actual_front_mean_top_quartile_scarcity_hits_per_draw": 1.2167
+      },
+      "claim_scope": "Retrospective stress only. Recent scarcity observations motivated the hypothesis and excluded_recent=200 overlaps already-consumed historical evidence; this track cannot authorize production or fresh promotion.",
+      "retuning_policy": "Do not adjust V2.5 weights from this outcome block."
+    }
+  },
+  "prospective_v26_tracks": {
+    "V2.6_DLT_26099": {
+      "track_role": "post-review_collision_aware_forward_shadow",
+      "candidate_version": "multi-regime-collision-v2.6",
+      "target_issue": "26099",
+      "history_cutoff_issue": "26098",
+      "frozen_at": "2026-08-31T11:18:00+08:00",
+      "frozen_registry": "research/v26/forward-dlt-26099.json",
+      "source_generator_commit": "e13480b7e97f771a47528a97af8624e84edda4ba",
+      "validation_workflow_run": 33354058817,
+      "current_expected_status": "FROZEN_PENDING_TARGET_DRAW",
+      "claim_scope": "Prospective research freeze only; evaluate the exact frozen tickets after 26099 without regeneration or retuning."
+    },
+    "V2.6_SSQ_2026101": {
+      "track_role": "post-review_collision_aware_forward_shadow",
+      "candidate_version": "multi-regime-collision-v2.6",
+      "target_issue": "2026101",
+      "history_cutoff_issue": "2026100",
+      "frozen_at": "2026-08-31T11:18:00+08:00",
+      "frozen_registry": "research/v26/forward-ssq-2026101.json",
+      "source_generator_commit": "e13480b7e97f771a47528a97af8624e84edda4ba",
+      "validation_workflow_run": 33354058817,
+      "current_expected_status": "FROZEN_PENDING_TARGET_DRAW",
+      "claim_scope": "Prospective research freeze only; evaluate the exact frozen tickets after 2026101 without regeneration or retuning."
+    }
+  },
+  "prospective_v27_tracks": {
+    "V2.7_DLT_26099": {
+      "track_role": "scarcity_combination_forward_shadow",
+      "candidate_version": "multi-regime-scarcity-combo-v2.7",
+      "target_issue": "26099",
+      "history_cutoff_issue": "26098",
+      "design_freeze": "research/v27/design-freeze.json",
+      "freeze_manifest": "research/v27/prospective-freeze-manifest-2026-08-31.json",
+      "full_ranking_artifact_id": 9744975041,
+      "full_ranking_artifact_sha256": "37c5a8a30d546b8177593a7ae5c6b77d5b27f918809e6ef9be5deaafc8c03697",
+      "freeze_file_sha256": "2c62b3db1e72c6c1bcb5798368b828a8ba1d6098c47e5f8f111973afa503ac32",
+      "scarcity_pool_size": 12,
+      "scarcity_full_combination_count": 185,
+      "reviewer": "scripts/review_v27_scarcity.py",
+      "validation_workflow_run": 33355447750,
+      "current_expected_status": "FROZEN_PENDING_TARGET_DRAW",
+      "claim_scope": "Prospective V2.7 scarcity-ranking research only. Replay the frozen full ranking after 26099; never regenerate it from the outcome."
+    },
+    "V2.7_SSQ_2026101": {
+      "track_role": "scarcity_combination_forward_shadow",
+      "candidate_version": "multi-regime-scarcity-combo-v2.7",
+      "target_issue": "2026101",
+      "history_cutoff_issue": "2026100",
+      "design_freeze": "research/v27/design-freeze.json",
+      "freeze_manifest": "research/v27/prospective-freeze-manifest-2026-08-31.json",
+      "full_ranking_artifact_id": 9744975041,
+      "full_ranking_artifact_sha256": "37c5a8a30d546b8177593a7ae5c6b77d5b27f918809e6ef9be5deaafc8c03697",
+      "freeze_file_sha256": "d3a36e7cc7e08e733d3b11b5f6def4122312a9746afeec9ad91c0c7dc26cbeda",
+      "scarcity_pool_size": 12,
+      "scarcity_full_combination_count": 359,
+      "reviewer": "scripts/review_v27_scarcity.py",
+      "validation_workflow_run": 33355447750,
+      "current_expected_status": "FROZEN_PENDING_TARGET_DRAW",
+      "claim_scope": "Prospective V2.7 scarcity-ranking research only. Replay the frozen full ranking after 2026101; never regenerate it from the outcome."
+    }
+  },
+  "consumed_historical_evidence": {
+    "recent_outcome_blocks": {
+      "minimum_consumed_recent_outcome_count": 200,
+      "reason": "development, V1 holdout, V2.1 holdout, V2.4 exclude-150 validation, feature-pruned exclude-200 validation, V2.5 retrospective stress, and V2.6/V2.7 architecture development have inspected recent outcomes."
+    },
+    "exclude_150_fresh_block": {
+      "consumed": true,
+      "DLT_outcomes": {"first_issue": "25042", "last_issue": "25091", "count": 50},
+      "SSQ_outcomes": {"first_issue": "2025045", "last_issue": "2025094", "count": 50},
+      "consumer": "fixed-window-100-exposure-v2.4"
+    },
+    "exclude_200_fresh_block": {
+      "consumed": true,
+      "DLT_outcomes": {"first_issue": "24144", "last_issue": "25041", "count": 50},
+      "SSQ_outcomes": {"first_issue": "2024146", "last_issue": "2025044", "count": 50},
+      "consumer": "feature-pruned-shrink-v2.3; later reused only for V2.5 retrospective stress, not promotion evidence"
+    }
+  },
+  "next_actions": {
+    "DLT": "Keep both V2.6 and V2.7 DLT 26099 freezes immutable. V2.7 review must include scarcity pool number ranks, full scarcity-combination rank analysis, and Top10/50/100/full ranking hit distribution.",
+    "SSQ": "Keep both V2.6 and V2.7 SSQ 2026101 freezes immutable. V2.7 review must include scarcity pool number ranks, full scarcity-combination rank analysis, and Top10/50/100/full ranking hit distribution.",
+    "historical_research": "Any new 50-outcome promotion holdout must be older than all consumed blocks and use at least excluded_recent_points=250 unless a stricter boundary is recorded first."
+  }
+}

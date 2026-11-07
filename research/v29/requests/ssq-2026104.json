@@ -1,0 +1,22 @@
+{
+  "schema_version": "ceway.v29.request.v1",
+  "game": "SSQ",
+  "target_issue": "2026104",
+  "required_history_cutoff": "2026103",
+  "budget": 20,
+  "model": "protected-core-incremental-fusion-v2.9",
+  "purpose": "prospective_prediction_trigger_and_audit",
+  "supplemental_history": [
+    {
+      "issue": "2026103",
+      "front": [4, 11, 20, 27, 28, 30],
+      "back": [15],
+      "verification_note": "User-supplied current draw history screenshot; independently cross-checked against current public draw-history pages before prospective generation."
+    }
+  ],
+  "rules": {
+    "do_not_modify_after_generation": true,
+    "do_not_regenerate_after_target_draw": true,
+    "production_enabled": false
+  }
+}

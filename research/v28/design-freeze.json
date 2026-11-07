@@ -1,0 +1,65 @@
+{
+  "schema_version": "ceway.v28.design-freeze.v1",
+  "version": "multi-regime-cross-fusion-v2.8",
+  "parent_version": "multi-regime-scarcity-combo-v2.7",
+  "production_enabled": false,
+  "change_reason": "Forward reviews showed repeated cases where correct numbers were distributed across Evidence, Scarcity and Neutral tracks but were not recombined into the same final ticket. V2.8 addresses that architecture gap without retuning legacy scorers from observed outcomes.",
+  "anti_overfit_guard": {
+    "legacy_v27_scoring_unchanged": true,
+    "legacy_member_weights": {
+      "evidence": 0.5,
+      "scarcity": 0.3,
+      "neutral": 0.2
+    },
+    "fusion_share": 0.2,
+    "outcome_tuned_v27": false,
+    "post_draw_ranking_regeneration_prohibited": true
+  },
+  "default_10_ticket_quota": {
+    "evidence": 4,
+    "scarcity": 2,
+    "neutral": 2,
+    "fusion": 2
+  },
+  "fusion_number_pool": {
+    "front_pool_size": {
+      "DLT": 14,
+      "SSQ": 14
+    },
+    "back_pool_size": {
+      "DLT": 10,
+      "SSQ": 12
+    },
+    "seed_quotas": {
+      "evidence": 4,
+      "scarcity": 3,
+      "neutral": 3
+    },
+    "fill_score": "0.50 * evidence_score + 0.30 * scarcity_score + 0.20 * neutral_score",
+    "ordering": "fusion_score desc -> support_count desc -> max component score desc -> number asc",
+    "manual_selection": false
+  },
+  "fusion_complete_combination": {
+    "member_quality": "0.70 * average fusion_score + 0.30 * minimum fusion_score",
+    "fusion_quality": "0.60 * member_quality + 0.25 * provenance_coverage + 0.15 * consensus_strength",
+    "rank_score": "0.55 * fusion_quality + 0.25 * collision_calibration + 0.20 * structure_quality",
+    "tie_breakers": [
+      "provenance_coverage desc",
+      "minimum fusion score desc",
+      "mean_abs_collision_z asc",
+      "numbers asc"
+    ],
+    "full_ranking_persisted": true
+  },
+  "review_metrics": [
+    "fusion pool winning-number coverage and original pool ranks",
+    "exact winning combination rank if candidate-eligible",
+    "best matching fusion combination and original rank",
+    "first rank reaching each hit count",
+    "Top10 Top50 Top100 full-ranking hit summaries",
+    "final ticket hits by Evidence Scarcity Neutral Fusion origin",
+    "per-track front-number union coverage",
+    "all-final-ticket front-number union coverage"
+  ],
+  "promotion_rule": "V2.8 remains research-only until multiple forward-frozen target draws have been reviewed. A single successful draw cannot trigger production promotion or retuning."
+}

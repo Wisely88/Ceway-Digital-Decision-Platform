@@ -1,0 +1,66 @@
+{
+  "schema_version": "ceway.v2.5.multiregime-retrospective-stress.1",
+  "generated_at": "2026-08-30T01:44:04.167903+00:00",
+  "candidate_version": "multi-regime-exposure-v2.5",
+  "workflow_run": 33286144639,
+  "artifact_id": 9724546932,
+  "artifact_zip_sha256": "276df0c1c40b223e8410071adb3504325f62eb25a2c3d0b83cb5977ba7779761",
+  "settings": {
+    "periods": 60,
+    "excluded_recent": 200,
+    "baseline_seeds": 3,
+    "budget": 20
+  },
+  "hypothesis_provenance": "Recent scarcity-pool misses motivated the independent Evidence/Scarcity/Neutral hypothesis. Therefore this report is retrospective stress evidence only and is not admissible production-promotion evidence.",
+  "parameters_frozen_before_run": {
+    "role_weights": {"evidence": 0.50, "scarcity": 0.30, "neutral": 0.20},
+    "evidence_weights": {"long_frequency": 0.25, "recency": 0.15, "momentum": 0.10, "stability": 0.10},
+    "scarcity_weights": {"rarity3": 0.30, "rarity7": 0.20, "rarity20": 0.15, "gap": 0.15, "divergence": 0.20},
+    "outcome_tuned": false
+  },
+  "rows": [
+    {
+      "game": "DLT",
+      "metrics": {
+        "v25_vs_random_best_hit": {"mean": 0.0722, "ci95_low": -0.1111, "ci95_high": 0.25},
+        "v25_vs_random_mean_ticket_hit": {"mean": 0.005, "ci95_low": -0.0578, "ci95_high": 0.0667},
+        "v25_vs_random_record_hit": {"mean": 0.0944, "ci95_low": -0.0444, "ci95_high": 0.2389},
+        "v25_vs_v24_best_hit": {"mean": 0.2167, "ci95_low": -0.05, "ci95_high": 0.4833},
+        "v25_vs_v9_best_hit": {"mean": 0.3667, "ci95_low": 0.15, "ci95_high": 0.5667},
+        "v25_mean_best_hit": 2.5667,
+        "v24_mean_best_hit": 2.35,
+        "v9_mean_best_hit": 2.2,
+        "random_mean_best_hit": 2.4944,
+        "v25_front_mean_jaccard": 0.0512,
+        "random_front_mean_jaccard": 0.0807,
+        "actual_front_mean_scarcity_percentile": 0.4657,
+        "actual_front_mean_evidence_percentile": 0.5269,
+        "actual_front_mean_top_quartile_scarcity_hits_per_draw": 1.2
+      },
+      "decision": "HOLD_RETROSPECTIVE"
+    },
+    {
+      "game": "SSQ",
+      "metrics": {
+        "v25_vs_random_best_hit": {"mean": 0.1556, "ci95_low": -0.0222, "ci95_high": 0.3389},
+        "v25_vs_random_mean_ticket_hit": {"mean": 0.005, "ci95_low": -0.0533, "ci95_high": 0.0622},
+        "v25_vs_random_record_hit": {"mean": 0.0889, "ci95_low": -0.0333, "ci95_high": 0.2167},
+        "v25_vs_v24_best_hit": {"mean": 0.3167, "ci95_low": 0.0833, "ci95_high": 0.55},
+        "v25_vs_v9_best_hit": {"mean": 0.2333, "ci95_low": -0.0167, "ci95_high": 0.4833},
+        "v25_mean_best_hit": 2.7667,
+        "v24_mean_best_hit": 2.45,
+        "v9_mean_best_hit": 2.5333,
+        "random_mean_best_hit": 2.6111,
+        "v25_front_mean_jaccard": 0.0646,
+        "random_front_mean_jaccard": 0.1009,
+        "actual_front_mean_scarcity_percentile": 0.4708,
+        "actual_front_mean_evidence_percentile": 0.5075,
+        "actual_front_mean_top_quartile_scarcity_hits_per_draw": 1.2167
+      },
+      "decision": "HOLD_RETROSPECTIVE"
+    }
+  ],
+  "overall_decision": "HOLD_RETROSPECTIVE",
+  "interpretation": "The multi-regime design materially reduces portfolio homogeneity and improves best-hit versus V9 in DLT and versus V2.4 in SSQ. However both games' V2.5-vs-structure-matched-random best-hit confidence intervals still cross zero, so no production promotion is authorized.",
+  "guardrail": "Keep V2.5 research-only. Do not retune weights from these outcomes. Any next admissible evidence must use the same frozen parameters prospectively or on a genuinely unconsumed block."
+}
