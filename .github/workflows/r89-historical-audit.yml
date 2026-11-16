@@ -1,0 +1,36 @@
+name: R8.9 historical audit
+on:
+  pull_request:
+    paths:
+      - 'engine/historical_high_zone_audit.py'
+      - 'tests/test_historical_high_zone_audit.py'
+      - 'backend/data/dlt_history.csv'
+      - '.github/workflows/r89-historical-audit.yml'
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Unit tests
+        run: python -m unittest discover -s tests -p 'test_historical_high_zone_audit.py' -v
+      - name: Historical fixture checks
+        run: |
+          python - <<'PY'
+          import csv
+          from engine.historical_high_zone_audit import audit
+          with open("backend/data/dlt_history.csv", encoding="utf-8-sig", newline="") as f:
+              rows = list(csv.DictReader(f))
+          early = audit(rows, 29, 35, 7001, 13153)
+          later = audit(rows, 29, 35, 14001, 20096)
+          muse = audit(rows, 25, 35, 7001, 13153)
+          assert (early["draws"], early["observed_total"], early["observed_at_least_three"]) == (1014,1392,119), early
+          assert (later["draws"], later["observed_total"]) == (1014,1022), later
+          assert muse["draws"] == 1014
+          print("EARLY",early)
+          print("LATER",later)
+          print("MUSE",muse)
+          PY
